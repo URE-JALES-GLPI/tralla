@@ -12,6 +12,11 @@ class PluginTrallaMachineModel extends CommonDBTM
 {
     public static string $rightname = 'plugin_tralla';
 
+    public static function getTable($classname = null)
+    {
+        return 'glpi_plugin_tralla_machine_models';
+    }
+
     public static function getTypeName($nb = 0)
     {
         return _n('Modelo de máquina', 'Modelos de máquina', $nb, 'tralla');

@@ -44,11 +44,11 @@ The product uses the GLPI/system stack; do not add a webfont dependency.
 | Board title | 18px | 700 | 1.3 | Board header |
 | Section title | 20px | 600 | 1.3 | Modal title |
 | List title | 14px | 600 | 20px | List header |
-| Card title | 14px | 500 | 20px | Card name |
+| Card title | 14px | 500 | 1.3 | Card name |
 | Body | 14px | 400 | 1.5 | Controls, inputs |
 | Body/sm | 12px | 400 | 1.5 | Card description, hints |
 | Caption | 11px | 500 | 1.4 | Badges, metadata |
-| Code | 10.5px | 600 | 1.4 | Card code, mono |
+| Code | 11px | 600 | 1.4 | Card code, mono |
 
 Font stack: `--tr-font` (`-apple-system`, `BlinkMacSystemFont`, `"Segoe UI"`, `Roboto`, `"Helvetica Neue"`, `Arial`, sans-serif`). Monospace: `"SFMono-Regular", Consolas, "Liberation Mono", monospace`.
 
@@ -96,10 +96,10 @@ Board geometry:
 - **Scroll**: `.tralla-cards` is the vertical scroll owner; list is a flex column, empty lists keep a compact 72px minimum, and the composer stays outside the scroll area.
 
 ### Card
-- **Structure**: code/top row, title, optional description, footer badges/avatar.
+- **Structure**: optional maintenance status label, inline code + title, optional footer badges/avatar. Description stays in the card detail, never in the board preview.
 - **Variants**: normal, maintenance status label, locked, dragging.
-- **States**: default, hover lift/wash, focus-visible, dragging 3deg/opacity, locked cursor.
-- **Spacing**: 8px 12px padding, 8px radius, 8px gap between cards.
+- **States**: default, hover shadow, focus-visible, dragging 3deg/opacity, locked cursor.
+- **Spacing**: 8px 10px padding, 8px radius, 8px gap between cards.
 - **Accessibility**: `article` with `role="button"`, `tabindex="0"`, Enter/Space opens; aria-label names the card.
 
 ### Inline card composer
@@ -111,9 +111,9 @@ Board geometry:
 - **Layout**: below the card scroll area, inside the list; stays visible while the list scrolls.
 
 ### Maintenance create modal
-- **Structure**: name combobox + source + machine rows + actions.
+- **Structure**: name combobox + machine rows + actions, with quantity left and model right.
 - **States**: default, validation error, busy, closed.
-- **Rules**: source is only shown here; machine model + integer quantity are required; no description/label/serial fields.
+- **Rules**: source is not shown in creation; machine model + integer quantity are required; no description/label/serial fields. The entity list opens only after a click or typing, never on modal focus.
 - **Accessibility**: dialog role, focus trap, Escape closes, errors announced by toast.
 
 ### Buttons

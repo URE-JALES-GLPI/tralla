@@ -614,7 +614,7 @@
                 + '<i class="ti ti-device-desktop" aria-hidden="true"></i><span>' + esc(machineBadgeText) + '</span></span>'
             : '';
 
-        var badges = '';
+        var badges = source;
         if (showProgress) {
             badges += progressMarkup(progress, Number(progress.total || machineCount), Number(progress.filled || 0));
         }
@@ -626,12 +626,8 @@
             + ' tabindex="0" role="button" aria-label="Abrir card ' + attr(card.name) + '">'
             + '<span class="tralla-card-edit" aria-hidden="true"><i class="ti ti-pencil"></i></span>'
             + label
-            + '<div class="tralla-card-top">'
-            + '<span class="tralla-card-code">' + esc(card.code || ('#' + cardId)) + '</span>'
-            + source
-            + '</div>'
-            + '<h4>' + esc(card.name) + '</h4>'
-            + (card.description ? '<p class="tralla-card-desc">' + esc(card.description) + '</p>' : '')
+            + '<h4 class="tralla-card-title"><span class="tralla-card-code">'
+            + esc(card.code || ('#' + cardId)) + '</span> ' + esc(card.name) + '</h4>'
             + ((badges || tech)
                 ? '<div class="tralla-card-footer">'
                     + '<div class="tralla-card-badges">' + badges + '</div>'
@@ -1399,7 +1395,7 @@
             input.setAttribute('aria-expanded', 'true');
         }
 
-        input.addEventListener('focus', openList);
+        input.addEventListener('click', openList);
         input.addEventListener('input', openList);
         input.addEventListener('keydown', function (event) {
             var options = Array.prototype.slice.call(list.querySelectorAll('[role="option"]'));
@@ -1491,11 +1487,11 @@
         row.className = 'tralla-create-machine';
         row.setAttribute('data-create-machine', '');
         row.innerHTML = '<div class="tralla-add-machine-grid tralla-create-machine-grid">'
-            + '<div class="tralla-field"><label>Modelo *</label><select data-create-model>'
-            + modelOptions('') + '</select></div>'
             + '<div class="tralla-field"><label>Quantidade *</label>'
             + '<input type="number" data-create-quantity min="1" max="' + quantityMax()
             + '" step="1" value="1" inputmode="numeric"></div>'
+            + '<div class="tralla-field"><label>Modelo *</label><select data-create-model>'
+            + modelOptions('') + '</select></div>'
             + '</div>'
             + '<div class="tralla-create-machine-summary" data-create-summary aria-live="polite" hidden></div>'
             + '<button type="button" class="tralla-icon-btn" data-remove-create-machine title="Remover modelo">'
@@ -1590,12 +1586,6 @@
             return;
         }
 
-        var sources = labels.source_choices || {};
-        var sourceOptions = Object.keys(sources).map(function (value) {
-            return '<option value="' + attr(value) + '"' + (value === 'manual' ? ' selected' : '') + '>'
-                + esc(sources[value]) + '</option>';
-        }).join('');
-
         var machinesSection = isMaintenance
             ? '<section class="tralla-detail-section">'
                 + '<h3><i class="ti ti-device-desktop"></i> Máquinas *</h3>'
@@ -1605,15 +1595,12 @@
                 + '</section>'
             : '';
 
-        var sourceField = '<div class="tralla-field"><label for="tralla-create-source">Origem</label>'
-            + '<select id="tralla-create-source" name="source">' + sourceOptions + '</select></div>';
-
         var entities = Array.isArray(state.entities) ? state.entities : [];
         var hasEntities = entities.length > 0;
         var nameField = '<div class="tralla-field tralla-combobox-field">'
             + '<label for="tralla-create-name">Nome do card *</label>'
             + '<div class="tralla-combobox">'
-            + '<input id="tralla-create-name" type="text" name="name" maxlength="255" required autofocus autocomplete="off"'
+            + '<input id="tralla-create-name" type="text" name="name" maxlength="255" required autocomplete="off"'
             + (hasEntities
                 ? ' role="combobox" aria-autocomplete="list" aria-expanded="false"'
                     + ' aria-controls="tralla-create-name-list" aria-haspopup="listbox"'
@@ -1631,7 +1618,6 @@
             + '</div>' + modalCloseButton() + '</div>'
             + '<div class="tralla-modal-body">'
             + nameField
-            + sourceField
             + machinesSection
             + '</div>'
             + '<div class="tralla-modal-actions">'
@@ -1651,7 +1637,6 @@
     async function submitCreateCard(form) {
         var inline = form.hasAttribute('data-inline-card-form');
         var nameEl = form.querySelector('[name="name"]');
-        var sourceEl = form.querySelector('[name="source"]');
         var name = nameEl ? nameEl.value.trim() : '';
 
         if (!name) {
@@ -1699,7 +1684,7 @@
                 boards_id: state.board.id,
                 list_id: Number(form.dataset.listId || 0),
                 name: name,
-                source: inline ? 'manual' : (sourceEl ? sourceEl.value : 'manual'),
+                source: 'manual',
                 machines: machines
             });
 
