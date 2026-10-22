@@ -345,10 +345,14 @@ class PluginTrallaCard extends CommonDBTM
                     throw new RuntimeException('Selecione um modelo de máquina válido.');
                 }
 
-                $quantity = array_key_exists('quantity', $machine) ? (int) $machine['quantity'] : 1;
-                if ($quantity < 1 || $quantity > self::MAX_MACHINE_QUANTITY) {
+                $quantity = filter_var(
+                    $machine['quantity'] ?? 1,
+                    FILTER_VALIDATE_INT,
+                    ['options' => ['min_range' => 1, 'max_range' => self::MAX_MACHINE_QUANTITY]]
+                );
+                if ($quantity === false) {
                     throw new RuntimeException(
-                        'Informe uma quantidade entre 1 e ' . self::MAX_MACHINE_QUANTITY . '.'
+                        'Informe uma quantidade inteira entre 1 e ' . self::MAX_MACHINE_QUANTITY . '.'
                     );
                 }
 
