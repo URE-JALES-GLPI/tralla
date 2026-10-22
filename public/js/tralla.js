@@ -9,6 +9,33 @@
     var root = document.getElementById('tralla-kanban');
     var boardModal = document.getElementById('tralla-board-create');
 
+    /**
+     * Closes a modal only when the pointer press starts on its backdrop.
+     * A text selection can start inside the dialog and end on the backdrop,
+     * which makes the resulting click target the backdrop; that must not close it.
+     * Every custom modal must bind this helper to its backdrop. showModal() already does.
+     */
+    function bindBackdropDismiss(backdrop, close) {
+        if (!backdrop) {
+            return;
+        }
+
+        var pressedOnBackdrop = false;
+
+        backdrop.addEventListener('pointerdown', function (event) {
+            pressedOnBackdrop = event.target === backdrop;
+        });
+
+        backdrop.addEventListener('click', function (event) {
+            var shouldClose = pressedOnBackdrop && event.target === backdrop;
+            pressedOnBackdrop = false;
+
+            if (shouldClose) {
+                close();
+            }
+        });
+    }
+
     function closeBoardModal() {
         if (!boardModal) {
             return;
@@ -32,6 +59,8 @@
     }
 
     if (boardModal) {
+        bindBackdropDismiss(boardModal, closeBoardModal);
+
         document.addEventListener('click', function (event) {
             if (event.target.closest('[data-tralla-modal="tralla-board-create"]')) {
                 event.preventDefault();
@@ -40,10 +69,6 @@
             }
             if (event.target.closest('[data-tralla-close="tralla-board-create"]')) {
                 event.preventDefault();
-                closeBoardModal();
-                return;
-            }
-            if (event.target === boardModal) {
                 closeBoardModal();
             }
         });
@@ -120,7 +145,7 @@
 
             var layer = document.createElement('div');
             layer.className = 'tralla-dialog-layer';
-            layer.innerHTML = '<div class="tralla-dialog-backdrop" data-dialog-cancel></div>'
+            layer.innerHTML = '<div class="tralla-dialog-backdrop" data-dialog-backdrop></div>'
                 + '<div class="tralla-modal tralla-dialog tralla-dialog-' + tone + '" role="alertdialog" aria-modal="true"'
                 + ' aria-labelledby="' + uid + '-title" aria-describedby="' + uid + '-message">'
                 + '<div class="tralla-dialog-head">'
@@ -172,6 +197,8 @@
             function cancel() {
                 finish(mode === 'prompt' ? null : false);
             }
+
+            bindBackdropDismiss(layer.querySelector('[data-dialog-backdrop]'), cancel);
 
             function submit() {
                 if (mode === 'prompt') {
@@ -326,6 +353,13 @@
         maintenance_approval: '#c377e0',
         maintenance_withdrawal: '#f2d600',
         maintenance_done: '#61bd4f'
+    };
+
+    var addCardBlockedCategories = {
+        maintenance_in_progress: true,
+        maintenance_approval: true,
+        maintenance_withdrawal: true,
+        maintenance_done: true
     };
 
     var statusClasses = {
@@ -555,8 +589,12 @@
         }
 
         var composerOpen = !isMaintenance && can.create && Number(inlineComposerListId) === listId;
+        var addCardBlocked = !!addCardBlockedCategories[list.category];
+        var addCardAttrs = addCardBlocked
+            ? ' disabled aria-disabled="true" title="Novos cards de manutenção são criados em Manutenção Pendente."'
+            : '';
         var addCard = can.create && !composerOpen
-            ? '<button type="button" class="tralla-add-card" data-add-card="' + listId + '">'
+            ? '<button type="button" class="tralla-add-card" data-add-card="' + listId + '"' + addCardAttrs + '>'
                 + '<i class="ti ti-plus"></i> Adicionar card</button>'
             : '';
         var composer = composerOpen ? renderInlineCardComposer(listId) : '';
@@ -685,6 +723,7 @@
             + '<div class="tralla-modal' + (wide ? ' is-wide' : '') + '" role="dialog" aria-modal="true">'
             + html
             + '</div></div>';
+        bindBackdropDismiss(modalRoot.querySelector('[data-tralla-modal-backdrop]'), closeModal);
         document.body.classList.add('tralla-modal-open');
 
         window.setTimeout(function () {
@@ -1586,6 +1625,10 @@
             return;
         }
 
+        if (addCardBlockedCategories[list.category]) {
+            return;
+        }
+
         var machinesSection = isMaintenance
             ? '<section class="tralla-detail-section">'
                 + '<h3><i class="ti ti-device-desktop"></i> Máquinas *</h3>'
@@ -1936,6 +1979,9 @@
         var addCard = event.target.closest('[data-add-card]');
         if (addCard) {
             event.preventDefault();
+            if (addCard.disabled) {
+                return;
+            }
             openCreateCard(Number(addCard.dataset.addCard));
             return;
         }
@@ -2095,11 +2141,6 @@
     });
 
     modalRoot.addEventListener('click', function (event) {
-        if (event.target.matches('[data-tralla-modal-backdrop]')) {
-            closeModal();
-            return;
-        }
-
         if (event.target.closest('[data-tralla-close]')) {
             closeModal();
             return;

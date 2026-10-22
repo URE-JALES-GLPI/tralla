@@ -91,7 +91,7 @@ Board geometry:
 ### List
 - **Structure**: `section.tralla-list` > header + `.tralla-cards` + composer/button.
 - **Variants**: normal, maintenance category (colored dot), drop target.
-- **States**: default, hover (actions reveal), focus-within (actions stay visible), drag-over wash, empty.
+- **States**: default, hover (actions reveal), focus-within (actions stay visible), drag-over wash, empty. The "Adicionar card" button is disabled in the in-progress, approval, withdrawal, and done maintenance lists because those cards are created only in the pending list.
 - **Motion**: box-shadow 140ms; no layout animation.
 - **Scroll**: `.tralla-cards` is the vertical scroll owner; list is a flex column, empty lists keep a compact 72px minimum, and the composer stays outside the scroll area.
 
@@ -115,6 +115,10 @@ Board geometry:
 - **States**: default, validation error, busy, closed.
 - **Rules**: source is not shown in creation; machine model + integer quantity are required; no description/label/serial fields. The entity list opens only after a click or typing, never on modal focus.
 - **Accessibility**: dialog role, focus trap, Escape closes, errors announced by toast.
+
+### Modal
+- **Dismissal**: clicking the backdrop closes the modal only when the pointer press starts on the backdrop. Dragging a text selection from inside the dialog to the backdrop must not close it.
+- **Implementation**: `showModal()` binds this rule automatically. Any custom modal must use the same `bindBackdropDismiss()` helper on its backdrop.
 
 ### Buttons
 - **Variants**: primary, ghost, danger, icon.

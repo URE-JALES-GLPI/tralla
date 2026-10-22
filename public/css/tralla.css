@@ -1026,6 +1026,17 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
     color: var(--tr-text);
 }
 
+.tralla-add-card:disabled {
+    color: var(--tr-muted);
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.tralla-add-card:disabled:hover {
+    background: transparent;
+    color: var(--tr-muted);
+}
+
 @keyframes tralla-composer-in {
     from {
         opacity: 0;
@@ -1171,6 +1182,13 @@ body[data-theme="dark"] .tralla-add-card:hover,
 .tralla-kanban-page[data-theme="dark"] .tralla-add-card:hover {
     background: rgba(255, 255, 255, 0.08);
     color: var(--tr-text);
+}
+
+html[data-theme="dark"] .tralla-add-card:disabled:hover,
+body[data-theme="dark"] .tralla-add-card:disabled:hover,
+.tralla-kanban-page[data-theme="dark"] .tralla-add-card:disabled:hover {
+    background: transparent;
+    color: var(--tr-muted);
 }
 
 /* -------------------------------------------------------------- modals */
