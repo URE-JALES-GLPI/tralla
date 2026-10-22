@@ -12,6 +12,8 @@ class PluginTrallaCard extends CommonDBTM
 {
     public static string $rightname = 'plugin_tralla';
 
+    public const MAX_MACHINE_QUANTITY = 999;
+
     public static function getTypeName($nb = 0)
     {
         return _n('Card', 'Cards', $nb, 'tralla');
@@ -110,6 +112,17 @@ class PluginTrallaCard extends CommonDBTM
             $machinesByCard[(int) $machine['plugin_tralla_cards_id']][] = $machine;
         }
 
+        $modelIds = [];
+        foreach ($machinesByCard as $cardMachines) {
+            foreach ($cardMachines as $machine) {
+                $modelId = (int) ($machine['plugin_tralla_machine_models_id'] ?? 0);
+                if ($modelId > 0) {
+                    $modelIds[$modelId] = $modelId;
+                }
+            }
+        }
+        $modelNames = PluginTrallaMachineModel::getModelNames(array_values($modelIds));
+
         $lists = [];
         foreach (PluginTrallaList::getListsForBoard($boards_id) as $list) {
             $lists[(int) $list['id']] = $list;
@@ -133,6 +146,7 @@ class PluginTrallaCard extends CommonDBTM
             $card['category'] = (string) ($list['category'] ?? '');
             $card['list_name'] = (string) ($list['name'] ?? '');
             $card['machine_count'] = count($machines) ?: (int) $card['machines_total'];
+            $card['machine_summary'] = PluginTrallaMachine::summarizeModels($machines, $modelNames);
             $card['progress'] = tralla_machines_progress($machines);
             $card['is_filled'] = tralla_all_machines_filled($machines);
             $card['permissions'] = self::permissionsFor($card, $boardType, $userId, $isAdmin);
@@ -315,15 +329,37 @@ class PluginTrallaCard extends CommonDBTM
                 throw new RuntimeException('O quadro não possui a lista "Manutenção Pendente".');
             }
 
-            $machines = $data['machines'] ?? [];
-            if (!is_array($machines) || $machines === []) {
+            $requestedMachines = $data['machines'] ?? [];
+            if (!is_array($requestedMachines) || $requestedMachines === []) {
                 throw new RuntimeException('Informe ao menos uma máquina.');
             }
 
-            foreach ($machines as $machine) {
+            $machines = [];
+            foreach ($requestedMachines as $machine) {
+                if (!is_array($machine)) {
+                    throw new RuntimeException('Máquina inválida.');
+                }
+
                 $modelId = (int) ($machine['model_id'] ?? 0);
                 if ($modelId <= 0 || !PluginTrallaMachineModel::canUseModel($modelId)) {
                     throw new RuntimeException('Selecione um modelo de máquina válido.');
+                }
+
+                $quantity = array_key_exists('quantity', $machine) ? (int) $machine['quantity'] : 1;
+                if ($quantity < 1 || $quantity > self::MAX_MACHINE_QUANTITY) {
+                    throw new RuntimeException(
+                        'Informe uma quantidade entre 1 e ' . self::MAX_MACHINE_QUANTITY . '.'
+                    );
+                }
+
+                $label = tralla_normalize_label($machine['label'] ?? '');
+                $serial = tralla_normalize_label($machine['serial'] ?? '');
+                for ($index = 0; $index < $quantity; $index++) {
+                    $machines[] = [
+                        'model_id' => $modelId,
+                        'label'    => $quantity === 1 ? $label : '',
+                        'serial'   => $quantity === 1 ? $serial : '',
+                    ];
                 }
             }
 

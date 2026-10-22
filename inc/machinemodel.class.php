@@ -83,4 +83,31 @@ class PluginTrallaMachineModel extends CommonDBTM
 
         return $models;
     }
+
+    /**
+     * Nomes de modelos por ID, incluindo arquivados (histórico de cards).
+     *
+     * @param array<int, int> $ids
+     * @return array<int, string>
+     */
+    public static function getModelNames(array $ids): array
+    {
+        global $DB;
+
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+        if ($ids === []) {
+            return [];
+        }
+
+        $names = [];
+        foreach ($DB->request([
+            'SELECT' => ['id', 'name'],
+            'FROM'   => 'glpi_plugin_tralla_machine_models',
+            'WHERE'  => ['id' => $ids],
+        ]) as $row) {
+            $names[(int) $row['id']] = (string) $row['name'];
+        }
+
+        return $names;
+    }
 }

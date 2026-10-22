@@ -57,6 +57,29 @@ class PluginTrallaMachine extends CommonDBTM
         return $machines;
     }
 
+    public static function summarizeModels(array $machines, array $modelNames = []): string
+    {
+        $counts = [];
+        foreach ($machines as $machine) {
+            $modelId = (int) ($machine['plugin_tralla_machine_models_id'] ?? 0);
+            $name = trim((string) ($modelNames[$modelId] ?? ($machine['model_name'] ?? '')));
+            if ($name === '') {
+                $name = 'Modelo não informado';
+            }
+            if (!isset($counts[$name])) {
+                $counts[$name] = 0;
+            }
+            $counts[$name]++;
+        }
+
+        $parts = [];
+        foreach ($counts as $name => $count) {
+            $parts[] = $count . 'x ' . $name;
+        }
+
+        return implode(' · ', $parts);
+    }
+
     public static function insertForCard(int $cards_id, array $data, float $rank = 0): int
     {
         global $DB;
