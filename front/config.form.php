@@ -166,7 +166,11 @@ Html::header('Configurações — [URE] Tralla', $_SERVER['PHP_SELF'], 'tools', 
                 <div class="tralla-input-group">
                     <input id="tralla-assignature-token" type="text" readonly value="<?= tralla_h($token) ?>">
                     <button type="submit" name="regenerate_token" value="1" class="tralla-btn tralla-btn-ghost"
-                            onclick="return confirm('Gerar um novo token? O valor antigo deixará de funcionar.');">
+                            data-tralla-confirm="Gerar um novo token? O valor antigo deixará de funcionar."
+                            data-tralla-confirm-title="Gerar novo token"
+                            data-tralla-confirm-label="Gerar token"
+                            data-tralla-confirm-icon="ti-refresh"
+                            data-tralla-confirm-tone="primary">
                         <i class="ti ti-refresh"></i> Gerar novo
                     </button>
                 </div>
