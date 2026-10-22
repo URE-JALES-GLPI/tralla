@@ -1,0 +1,24 @@
+# Dependências e artefatos locais
+node_modules/
+vendor/
+dist/
+build/
+*.log
+
+# Ambiente
+.env
+.env.*
+!.env.example
+*.local.php
+
+# Editores / sistema
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporários
+*.tmp
+*.bak
+*.swp
