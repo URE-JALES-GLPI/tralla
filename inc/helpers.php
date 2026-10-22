@@ -7,6 +7,8 @@ if (!defined('GLPI_ROOT')) {
     die("Sorry. You can't access this file directly");
 }
 
+require_once __DIR__ . '/domain.php';
+
 if (!function_exists('tralla_now')) {
     function tralla_now(): string
     {
