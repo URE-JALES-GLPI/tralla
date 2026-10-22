@@ -135,7 +135,11 @@ Html::header('Editar quadro — [URE] Tralla', $_SERVER['PHP_SELF'], 'tools', 'P
             <footer class="tralla-form-actions">
                 <?php if ($canDelete): ?>
                     <button type="submit" name="delete" value="1" class="tralla-btn tralla-btn-danger"
-                            onclick="return confirm('Excluir este quadro e todos os cards? Esta ação não pode ser desfeita.');">
+                            data-tralla-confirm="Excluir este quadro e todos os cards? Esta ação não pode ser desfeita."
+                            data-tralla-confirm-title="Excluir quadro"
+                            data-tralla-confirm-label="Excluir quadro"
+                            data-tralla-confirm-icon="ti-trash"
+                            data-tralla-confirm-tone="danger">
                         <i class="ti ti-trash"></i> Excluir quadro
                     </button>
                 <?php endif; ?>
