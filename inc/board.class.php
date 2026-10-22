@@ -1,0 +1,328 @@
+<?php
+if (!defined('GLPI_ROOT')) {
+    die("Sorry. You can't access this file directly");
+}
+
+require_once __DIR__ . '/helpers.php';
+
+/**
+ * Quadro do Tralla.
+ */
+class PluginTrallaBoard extends CommonDBTM
+{
+    public static string $rightname = 'plugin_tralla';
+
+    public static function getTypeName($nb = 0)
+    {
+        return _n('Quadro', 'Quadros', $nb, 'tralla');
+    }
+
+    public static function getMenuName()
+    {
+        return 'Quadros';
+    }
+
+    public static function getMenuContent()
+    {
+        $menu = parent::getMenuContent();
+        $menu['icon'] = 'ti ti-layout-kanban';
+        $menu['title'] = 'Quadros Tralla';
+        $menu['page'] = tralla_web_dir() . '/front/board.php';
+
+        return $menu;
+    }
+
+    public static function canView(): bool
+    {
+        return Session::haveRight(self::$rightname, READ);
+    }
+
+    public static function canCreate(): bool
+    {
+        return Session::haveRight(self::$rightname, CREATE);
+    }
+
+    public function canViewItem(): bool
+    {
+        return self::canViewBoard((int) $this->getID());
+    }
+
+    public function canCreateItem(): bool
+    {
+        return self::canCreate();
+    }
+
+    public function canUpdateItem(): bool
+    {
+        return Session::haveRight(self::$rightname, UPDATE) && self::canViewBoard((int) $this->getID());
+    }
+
+    public function canPurgeItem(): bool
+    {
+        return Session::haveRight(self::$rightname, PURGE);
+    }
+
+    public static function getTypeChoices(): array
+    {
+        return [
+            'normal'      => 'Normal (listas e cards livres)',
+            'maintenance' => 'Manutenção (fluxo controlado)',
+        ];
+    }
+
+    public static function getDefaultLists(string $type): array
+    {
+        if ($type === 'maintenance') {
+            return [
+                ['name' => 'Manutenção Pendente', 'category' => 'maintenance_pending', 'color' => tralla_category_color('maintenance_pending')],
+                ['name' => 'Manutenção Em Andamento', 'category' => 'maintenance_in_progress', 'color' => tralla_category_color('maintenance_in_progress')],
+                ['name' => 'Manutenção Aprovação', 'category' => 'maintenance_approval', 'color' => tralla_category_color('maintenance_approval')],
+                ['name' => 'Manutenção Retirada', 'category' => 'maintenance_withdrawal', 'color' => tralla_category_color('maintenance_withdrawal')],
+                ['name' => 'Manutenção Concluído', 'category' => 'maintenance_done', 'color' => tralla_category_color('maintenance_done')],
+            ];
+        }
+
+        return [
+            ['name' => 'A Fazer', 'category' => '', 'color' => '#97a0af'],
+            ['name' => 'Em Progresso', 'category' => '', 'color' => '#0079bf'],
+            ['name' => 'Concluído', 'category' => '', 'color' => '#61bd4f'],
+        ];
+    }
+
+    public function prepareInputForAdd($input)
+    {
+        $input['name'] = tralla_normalize_label($input['name'] ?? '');
+        if ($input['name'] === '') {
+            Session::addMessageAfterRedirect('Informe o nome do quadro.', false, ERROR);
+            return false;
+        }
+
+        $type = (string) ($input['type'] ?? 'normal');
+        $input['type'] = array_key_exists($type, self::getTypeChoices()) ? $type : 'normal';
+        $input['color'] = tralla_valid_color((string) ($input['color'] ?? '#0079bf'));
+        $input['background'] = tralla_valid_background((string) ($input['background'] ?? 'ocean'));
+        $input['comment'] = trim(strip_tags((string) ($input['comment'] ?? '')));
+        $input['is_archived'] = !empty($input['is_archived']) ? 1 : 0;
+        $input['is_recursive'] = !empty($input['is_recursive']) ? 1 : 0;
+        $input['users_id'] = (int) Session::getLoginUserID();
+
+        $entitiesId = (int) ($input['entities_id'] ?? ($_SESSION['glpiactive_entity'] ?? 0));
+        if (!Session::haveAccessToEntity($entitiesId, (bool) $input['is_recursive'])) {
+            $entitiesId = (int) ($_SESSION['glpiactive_entity'] ?? 0);
+        }
+        $input['entities_id'] = $entitiesId;
+
+        $input['date_creation'] = tralla_now();
+        $input['date_mod'] = $input['date_creation'];
+
+        return $input;
+    }
+
+    public function prepareInputForUpdate($input)
+    {
+        if (array_key_exists('name', $input)) {
+            $input['name'] = tralla_normalize_label($input['name']);
+            if ($input['name'] === '') {
+                unset($input['name']);
+            }
+        }
+
+        if (array_key_exists('color', $input)) {
+            $input['color'] = tralla_valid_color((string) $input['color']);
+        }
+        if (array_key_exists('background', $input)) {
+            $input['background'] = tralla_valid_background((string) $input['background']);
+        }
+        if (array_key_exists('comment', $input)) {
+            $input['comment'] = trim(strip_tags((string) $input['comment']));
+        }
+        if (array_key_exists('is_archived', $input)) {
+            $input['is_archived'] = !empty($input['is_archived']) ? 1 : 0;
+        }
+
+        // Tipo e entidade definem o schema de listas e a visibilidade: não mudam.
+        unset($input['type'], $input['entities_id'], $input['users_id']);
+
+        $input['date_mod'] = tralla_now();
+
+        return $input;
+    }
+
+    public function post_addItem()
+    {
+        $boardId = (int) $this->getID();
+        $type = (string) ($this->fields['type'] ?? 'normal');
+        $rank = 1000.0;
+
+        foreach (self::getDefaultLists($type) as $list) {
+            $item = new PluginTrallaList();
+            $item->add([
+                'plugin_tralla_boards_id' => $boardId,
+                'name'                    => $list['name'],
+                'category'                => $list['category'],
+                'color'                   => $list['color'],
+                'rank'                    => $rank,
+                'users_id'                => (int) Session::getLoginUserID(),
+                'date_creation'           => tralla_now(),
+                'date_mod'                => tralla_now(),
+            ]);
+            $rank += 1000.0;
+        }
+    }
+
+    public function cleanDBonPurge()
+    {
+        global $DB;
+
+        $boardId = (int) $this->getID();
+        if ($boardId <= 0) {
+            return;
+        }
+
+        $cardIds = [];
+        foreach ($DB->request([
+            'SELECT' => ['id'],
+            'FROM'   => 'glpi_plugin_tralla_cards',
+            'WHERE'  => ['plugin_tralla_boards_id' => $boardId],
+        ]) as $row) {
+            $cardIds[] = (int) $row['id'];
+        }
+
+        if ($cardIds !== []) {
+            $DB->delete('glpi_plugin_tralla_machines', ['plugin_tralla_cards_id' => $cardIds]);
+            $DB->delete('glpi_plugin_tralla_history', ['plugin_tralla_cards_id' => $cardIds]);
+            $DB->delete('glpi_plugin_tralla_notifications', ['plugin_tralla_cards_id' => $cardIds]);
+            $DB->delete('glpi_plugin_tralla_cards', ['id' => $cardIds]);
+        }
+
+        $DB->delete('glpi_plugin_tralla_lists', ['plugin_tralla_boards_id' => $boardId]);
+    }
+
+    public static function isMaintenance(int $boards_id): bool
+    {
+        $board = new self();
+        if (!$board->getFromDB($boards_id)) {
+            return false;
+        }
+
+        return ($board->fields['type'] ?? '') === 'maintenance';
+    }
+
+    public static function canViewBoard(int $boards_id): bool
+    {
+        if (!self::canView() || $boards_id <= 0) {
+            return false;
+        }
+
+        $board = new self();
+        if (!$board->getFromDB($boards_id)) {
+            return false;
+        }
+
+        return Session::haveAccessToEntity(
+            (int) $board->fields['entities_id'],
+            (bool) $board->fields['is_recursive']
+        );
+    }
+
+    /**
+     * Quadros visíveis para a sessão, ordenados por modificação.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function getVisibleBoards(bool $includeArchived = false): array
+    {
+        global $DB;
+
+        $where = [];
+        if (!$includeArchived) {
+            $where['is_archived'] = 0;
+        }
+
+        $boards = [];
+        foreach ($DB->request([
+            'FROM'  => 'glpi_plugin_tralla_boards',
+            'WHERE' => $where,
+            'ORDER' => 'date_mod DESC, name ASC',
+        ]) as $row) {
+            if (Session::haveAccessToEntity((int) $row['entities_id'], (bool) $row['is_recursive'])) {
+                $boards[] = $row;
+            }
+        }
+
+        return $boards;
+    }
+
+    public static function findListByCategory(int $boards_id, string $category): ?array
+    {
+        global $DB;
+
+        $row = $DB->request([
+            'FROM'  => 'glpi_plugin_tralla_lists',
+            'WHERE' => [
+                'plugin_tralla_boards_id' => $boards_id,
+                'category'                => $category,
+                'is_archived'             => 0,
+            ],
+            'ORDER' => 'rank ASC, id ASC',
+            'LIMIT' => 1,
+        ])->current();
+
+        return is_array($row) ? $row : null;
+    }
+
+    public static function getStats(int $boards_id): array
+    {
+        global $DB;
+
+        $stats = [
+            'cards'       => 0,
+            'pending'     => 0,
+            'in_progress' => 0,
+            'approval'    => 0,
+            'withdrawal'  => 0,
+            'done'        => 0,
+            'lists'       => countElementsInTable('glpi_plugin_tralla_lists', [
+                'plugin_tralla_boards_id' => $boards_id,
+                'is_archived'             => 0,
+            ]),
+        ];
+
+        foreach ($DB->request([
+            'SELECT' => ['status', 'COUNT' => 'id AS total'],
+            'FROM'   => 'glpi_plugin_tralla_cards',
+            'WHERE'  => [
+                'plugin_tralla_boards_id' => $boards_id,
+                'is_archived'             => 0,
+            ],
+            'GROUPBY' => ['status'],
+        ]) as $row) {
+            $status = (string) $row['status'];
+            $total = (int) $row['total'];
+            $stats['cards'] += $total;
+            if (array_key_exists($status, $stats)) {
+                $stats[$status] += $total;
+            }
+        }
+
+        return $stats;
+    }
+
+    public static function countCards(int $boards_id): int
+    {
+        return countElementsInTable('glpi_plugin_tralla_cards', [
+            'plugin_tralla_boards_id' => $boards_id,
+            'is_archived'             => 0,
+        ]);
+    }
+
+    public static function countMaintenanceByStatus(int $boards_id, string $status): int
+    {
+        return countElementsInTable('glpi_plugin_tralla_cards', [
+            'plugin_tralla_boards_id' => $boards_id,
+            'stage'                   => 1,
+            'status'                  => $status,
+            'is_archived'             => 0,
+        ]);
+    }
+}
