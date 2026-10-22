@@ -339,6 +339,41 @@ if (!function_exists('tralla_normalize_label')) {
     }
 }
 
+if (!function_exists('tralla_all_entity_options')) {
+    /**
+     * Entidades disponíveis para o combobox de nome do card.
+     *
+     * A lista é intencionalmente global (sem filtro de acesso) para que o
+     * operador possa nomear cards com qualquer entidade do GLPI. Entidades
+     * removidas não permanecem na tabela, portanto não há flag de exclusão.
+     *
+     * @return array<int, array{id:int,name:string,completename:string}>
+     */
+    function tralla_all_entity_options(): array
+    {
+        global $DB;
+
+        $entities = [];
+        foreach ($DB->request([
+            'FROM'  => 'glpi_entities',
+            'ORDER' => 'completename ASC, name ASC',
+        ]) as $row) {
+            $name = trim((string) ($row['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            $complete = trim((string) ($row['completename'] ?? ''));
+            $entities[] = [
+                'id'           => (int) ($row['id'] ?? 0),
+                'name'         => $name,
+                'completename' => $complete !== '' ? $complete : $name,
+            ];
+        }
+
+        return $entities;
+    }
+}
+
 if (!function_exists('tralla_post_string')) {
     function tralla_post_string(string $key, string $default = ''): string
     {

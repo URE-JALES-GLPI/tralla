@@ -911,6 +911,21 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
     font-size: 13px;
 }
 
+.tralla-card-machines {
+    max-width: 210px;
+    min-width: 0;
+}
+
+.tralla-card-machines span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tralla-card-machines .ti {
+    flex: 0 0 auto;
+}
+
 .tralla-card-progress {
     gap: 5px;
 }
@@ -2383,6 +2398,98 @@ body.tralla-modal-open {
     margin-top: 0;
 }
 
+.tralla-create-machine-grid {
+    grid-template-columns: minmax(0, 1fr) 112px;
+}
+
+.tralla-create-machine .tralla-create-machine-grid .tralla-field:first-child {
+    grid-column: auto;
+}
+
+.tralla-create-machine-summary {
+    color: var(--tr-muted);
+    font-size: 11px;
+    font-weight: 700;
+    margin-top: 6px;
+    min-height: 14px;
+}
+
+.tralla-create-machine-summary[hidden] {
+    display: none;
+}
+
+.tralla-combobox {
+    position: relative;
+}
+
+.tralla-combobox > input {
+    width: 100%;
+}
+
+.tralla-combobox-list {
+    background: var(--tr-surface);
+    border: 1px solid var(--tr-border);
+    border-radius: var(--tr-radius-sm);
+    box-shadow: var(--tr-shadow);
+    left: 0;
+    max-height: 240px;
+    overflow-y: auto;
+    padding: 4px;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    z-index: 40;
+}
+
+.tralla-combobox-list[hidden] {
+    display: none;
+}
+
+.tralla-combobox-option {
+    background: transparent;
+    border: 0;
+    border-radius: 4px;
+    color: var(--tr-text);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    font: inherit;
+    gap: 2px;
+    line-height: 1.3;
+    padding: 7px 9px;
+    text-align: left;
+    width: 100%;
+}
+
+.tralla-combobox-option:hover,
+.tralla-combobox-option.is-active {
+    background: var(--tr-primary-soft);
+    color: var(--tr-primary-strong);
+}
+
+.tralla-combobox-option span {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.tralla-combobox-option small {
+    color: var(--tr-muted);
+    font-size: 11px;
+    font-weight: 400;
+}
+
+.tralla-combobox-option:hover small,
+.tralla-combobox-option.is-active small {
+    color: inherit;
+    opacity: 0.8;
+}
+
+.tralla-combobox-empty {
+    color: var(--tr-muted);
+    font-size: 12px;
+    padding: 8px 9px;
+}
+
 /* ------------------------------------------------------------ responsive */
 
 @media (max-width: 900px) {
@@ -2510,12 +2617,18 @@ body.tralla-modal-open {
 
     .tralla-form-row,
     .tralla-machine-grid,
-    .tralla-add-machine-grid {
+    .tralla-add-machine-grid,
+    .tralla-create-machine-grid {
         grid-template-columns: 1fr;
     }
 
-    .tralla-add-machine-grid .tralla-field:first-child {
+    .tralla-add-machine-grid .tralla-field:first-child,
+    .tralla-create-machine .tralla-create-machine-grid .tralla-field:first-child {
         grid-column: 1;
+    }
+
+    .tralla-combobox-list {
+        max-height: 200px;
     }
 
     .tralla-modal-backdrop {

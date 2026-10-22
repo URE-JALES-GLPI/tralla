@@ -45,12 +45,14 @@ $bootstrap = [
         ];
     }, $lists),
     'cards' => $cards,
+    'entities' => tralla_all_entity_options(),
     'models' => array_map(static function (array $model): array {
         return [
             'id'   => (int) $model['id'],
             'name' => (string) $model['name'],
         ];
     }, $models),
+    'machine_quantity_max' => PluginTrallaCard::MAX_MACHINE_QUANTITY,
     'labels' => [
         'categories'       => tralla_category_labels(),
         'statuses'         => tralla_status_labels(),

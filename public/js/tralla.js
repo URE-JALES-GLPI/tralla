@@ -603,9 +603,11 @@
             ? '<span class="tralla-card-badge tralla-card-lock" title="Card bloqueado"><i class="ti ti-lock" aria-hidden="true"></i></span>'
             : '';
 
+        var machineSummaryText = String(card.machine_summary || '').trim();
+        var machineBadgeText = machineSummaryText || (machineCount ? machineCount + ' máquina(s)' : '');
         var machineBadge = machineCount
-            ? '<span class="tralla-card-badge" title="' + machineCount + ' máquina(s)">'
-                + '<i class="ti ti-device-desktop" aria-hidden="true"></i><span>' + machineCount + '</span></span>'
+            ? '<span class="tralla-card-badge tralla-card-machines" title="' + attr(machineBadgeText) + '">'
+                + '<i class="ti ti-device-desktop" aria-hidden="true"></i><span>' + esc(machineBadgeText) + '</span></span>'
             : '';
 
         var badges = '';
@@ -856,9 +858,11 @@
         };
     }
 
-    function renderMachine(machine, canEdit, permissions) {
+    function renderMachine(machine, canEdit, permissions, sequence) {
         var id = Number(machine.id);
-        var title = machine.label || machine.model_name || ('Máquina #' + id);
+        var modelName = String(machine.model_name || '');
+        var title = machine.label
+            || (modelName ? modelName + (sequence ? ' · unidade ' + sequence : '') : ('Máquina #' + id));
         var disabled = canEdit ? '' : ' disabled';
         var deleteButton = (canEdit && permissions.delete_machine)
             ? '<button type="button" class="tralla-icon-btn" data-delete-machine="' + id + '" title="Remover máquina">'
@@ -927,8 +931,8 @@
             + '<span data-progress-label>' + progress.filled + '/' + progress.total + '</span>'
             + '</div>'
             + (machines.length
-                ? machines.map(function (machine) {
-                    return renderMachine(machine, canEdit, permissions);
+                ? machines.map(function (machine, index) {
+                    return renderMachine(machine, canEdit, permissions, index + 1);
                 }).join('')
                 : '<p class="tralla-empty-mini">Nenhuma máquina cadastrada.</p>')
             + addMachine
@@ -1308,6 +1312,172 @@
         return data.model;
     }
 
+    function normalizeSearchText(value) {
+        return String(value === null || value === undefined ? '' : value)
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .trim();
+    }
+
+    function entityMatches(entity, query) {
+        var terms = normalizeSearchText(query).split(/\s+/).filter(function (term) {
+            return term !== '';
+        });
+        if (!terms.length) {
+            return true;
+        }
+        var haystack = normalizeSearchText((entity.name || '') + ' ' + (entity.completename || ''));
+        return terms.every(function (term) {
+            return haystack.indexOf(term) !== -1;
+        });
+    }
+
+    function renderEntityOptions(query) {
+        var list = document.getElementById('tralla-create-name-list');
+        if (!list) {
+            return;
+        }
+        var entities = Array.isArray(state.entities) ? state.entities : [];
+        var matches = entities.filter(function (entity) {
+            return entityMatches(entity, query);
+        }).slice(0, 60);
+
+        if (!matches.length) {
+            list.innerHTML = '<div class="tralla-combobox-empty">Nenhuma entidade encontrada.</div>';
+            list.hidden = false;
+            return;
+        }
+
+        list.innerHTML = matches.map(function (entity, index) {
+            var name = String(entity.name || '');
+            var complete = String(entity.completename || '');
+            var path = complete !== '' && complete !== name
+                ? '<small>' + esc(complete) + '</small>'
+                : '';
+            return '<button type="button" class="tralla-combobox-option" role="option"'
+                + ' id="tralla-create-entity-' + index + '" aria-selected="false"'
+                + ' data-entity-name="' + attr(name) + '">'
+                + '<span>' + esc(name) + '</span>' + path + '</button>';
+        }).join('');
+        list.hidden = false;
+    }
+
+    function closeEntityOptions() {
+        var input = document.getElementById('tralla-create-name');
+        var list = document.getElementById('tralla-create-name-list');
+        if (list) {
+            list.hidden = true;
+        }
+        if (input) {
+            input.setAttribute('aria-expanded', 'false');
+            input.removeAttribute('aria-activedescendant');
+        }
+    }
+
+    function selectEntityOption(input, option) {
+        if (!input || !option) {
+            return;
+        }
+        input.value = option.dataset.entityName || '';
+        closeEntityOptions();
+    }
+
+    function setupEntityCombobox() {
+        var input = document.getElementById('tralla-create-name');
+        var list = document.getElementById('tralla-create-name-list');
+        if (!input || !list) {
+            return;
+        }
+
+        function openList() {
+            renderEntityOptions(input.value);
+            input.setAttribute('aria-expanded', 'true');
+        }
+
+        input.addEventListener('focus', openList);
+        input.addEventListener('input', openList);
+        input.addEventListener('keydown', function (event) {
+            var options = Array.prototype.slice.call(list.querySelectorAll('[role="option"]'));
+            var active = list.querySelector('[role="option"].is-active');
+            var index = options.indexOf(active);
+
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                if (list.hidden) {
+                    openList();
+                    return;
+                }
+                if (!options.length) {
+                    return;
+                }
+                event.preventDefault();
+                if (event.key === 'ArrowDown') {
+                    index = index < 0 ? 0 : (index + 1) % options.length;
+                } else {
+                    index = index <= 0 ? options.length - 1 : index - 1;
+                }
+                options.forEach(function (option) {
+                    option.classList.remove('is-active');
+                    option.setAttribute('aria-selected', 'false');
+                });
+                options[index].classList.add('is-active');
+                options[index].setAttribute('aria-selected', 'true');
+                input.setAttribute('aria-activedescendant', options[index].id);
+                return;
+            }
+
+            if (event.key === 'Enter' && !list.hidden && active) {
+                event.preventDefault();
+                selectEntityOption(input, active);
+                return;
+            }
+
+            if (event.key === 'Escape' && !list.hidden) {
+                event.preventDefault();
+                event.stopPropagation();
+                closeEntityOptions();
+            }
+        });
+        input.addEventListener('blur', function () {
+            window.setTimeout(closeEntityOptions, 120);
+        });
+        list.addEventListener('mousedown', function (event) {
+            event.preventDefault();
+        });
+        list.addEventListener('click', function (event) {
+            var option = event.target.closest('[role="option"]');
+            if (option) {
+                event.preventDefault();
+                selectEntityOption(input, option);
+            }
+        });
+    }
+
+    function quantityMax() {
+        return Math.max(1, Number(state.machine_quantity_max || 999));
+    }
+
+    function updateCreateMachineSummary(row) {
+        var model = row.querySelector('[data-create-model]');
+        var quantity = row.querySelector('[data-create-quantity]');
+        var summary = row.querySelector('[data-create-summary]');
+        if (!model || !quantity || !summary) {
+            return;
+        }
+        var option = model.options[model.selectedIndex];
+        var modelName = option && option.value && option.value !== '__new'
+            ? option.textContent.trim()
+            : '';
+        var count = Number(quantity.value || 0);
+        if (modelName && count > 0) {
+            summary.textContent = count + 'x ' + modelName;
+            summary.hidden = false;
+        } else {
+            summary.textContent = '';
+            summary.hidden = true;
+        }
+    }
+
     function addCreateMachineRow() {
         var container = document.getElementById('tralla-create-machines');
         if (!container) {
@@ -1316,17 +1486,18 @@
         var row = document.createElement('div');
         row.className = 'tralla-create-machine';
         row.setAttribute('data-create-machine', '');
-        row.innerHTML = '<div class="tralla-add-machine-grid">'
+        row.innerHTML = '<div class="tralla-add-machine-grid tralla-create-machine-grid">'
             + '<div class="tralla-field"><label>Modelo *</label><select data-create-model>'
             + modelOptions('') + '</select></div>'
-            + '<div class="tralla-field"><label>Etiqueta / patrimônio</label>'
-            + '<input type="text" data-create-label maxlength="255"></div>'
-            + '<div class="tralla-field"><label>Número de série</label>'
-            + '<input type="text" data-create-serial maxlength="255"></div>'
+            + '<div class="tralla-field"><label>Quantidade *</label>'
+            + '<input type="number" data-create-quantity min="1" max="' + quantityMax()
+            + '" step="1" value="1" inputmode="numeric"></div>'
             + '</div>'
-            + '<button type="button" class="tralla-icon-btn" data-remove-create-machine title="Remover máquina">'
+            + '<div class="tralla-create-machine-summary" data-create-summary aria-live="polite" hidden></div>'
+            + '<button type="button" class="tralla-icon-btn" data-remove-create-machine title="Remover modelo">'
             + '<i class="ti ti-x"></i></button>';
         container.appendChild(row);
+        updateCreateMachineSummary(row);
     }
 
     /* ------------------------------------------------------- create card */
@@ -1350,9 +1521,25 @@
                 + '<h3><i class="ti ti-device-desktop"></i> Máquinas *</h3>'
                 + '<div id="tralla-create-machines"></div>'
                 + '<button type="button" class="tralla-add-card" data-add-create-machine style="margin:0;padding-left:0">'
-                + '<i class="ti ti-plus"></i> Adicionar outra máquina</button>'
+                + '<i class="ti ti-plus"></i> Adicionar outro modelo</button>'
                 + '</section>'
             : '';
+
+        var entities = Array.isArray(state.entities) ? state.entities : [];
+        var hasEntities = entities.length > 0;
+        var nameField = '<div class="tralla-field tralla-combobox-field">'
+            + '<label for="tralla-create-name">Nome do card *</label>'
+            + '<div class="tralla-combobox">'
+            + '<input id="tralla-create-name" type="text" name="name" maxlength="255" required autofocus autocomplete="off"'
+            + (hasEntities
+                ? ' role="combobox" aria-autocomplete="list" aria-expanded="false"'
+                    + ' aria-controls="tralla-create-name-list" aria-haspopup="listbox"'
+                : '')
+            + '>'
+            + (hasEntities
+                ? '<div id="tralla-create-name-list" class="tralla-combobox-list" role="listbox" hidden></div>'
+                : '')
+            + '</div></div>';
 
         showModal('<form id="tralla-create-card-form" class="tralla-form" data-list-id="' + Number(listId) + '" novalidate>'
             + '<div class="tralla-modal-head"><div>'
@@ -1360,10 +1547,7 @@
             + '<p>' + esc(list.name) + ' · ' + (isMaintenance ? 'Fluxo de manutenção' : 'Quadro normal') + '</p>'
             + '</div>' + modalCloseButton() + '</div>'
             + '<div class="tralla-modal-body">'
-            + '<div class="tralla-field"><label for="tralla-create-name">Nome do card *</label>'
-            + '<input id="tralla-create-name" type="text" name="name" maxlength="255" required autofocus></div>'
-            + '<div class="tralla-field"><label for="tralla-create-description">Descrição</label>'
-            + '<textarea id="tralla-create-description" name="description" rows="3" maxlength="2000"></textarea></div>'
+            + nameField
             + '<div class="tralla-field"><label for="tralla-create-source">Origem</label>'
             + '<select id="tralla-create-source" name="source">' + sourceOptions + '</select></div>'
             + machinesSection
@@ -1377,11 +1561,13 @@
         if (isMaintenance) {
             addCreateMachineRow();
         }
+        if (hasEntities) {
+            setupEntityCombobox();
+        }
     }
 
     async function submitCreateCard(form) {
         var nameEl = form.querySelector('[name="name"]');
-        var descriptionEl = form.querySelector('[name="description"]');
         var sourceEl = form.querySelector('[name="source"]');
         var name = nameEl ? nameEl.value.trim() : '';
 
@@ -1391,19 +1577,28 @@
         }
 
         var machines = [];
+        var invalidQuantity = false;
         Array.prototype.forEach.call(form.querySelectorAll('[data-create-machine]'), function (row) {
             var model = row.querySelector('[data-create-model]');
-            var label = row.querySelector('[data-create-label]');
-            var serial = row.querySelector('[data-create-serial]');
+            var quantityEl = row.querySelector('[data-create-quantity]');
             var modelId = model ? Number(model.value) : 0;
             if (modelId > 0) {
+                var quantity = quantityEl ? Number(quantityEl.value) : 1;
+                if (!Number.isInteger(quantity) || quantity < 1 || quantity > quantityMax()) {
+                    invalidQuantity = true;
+                    return;
+                }
                 machines.push({
                     model_id: modelId,
-                    label: label ? label.value : '',
-                    serial: serial ? serial.value : ''
+                    quantity: quantity
                 });
             }
         });
+
+        if (invalidQuantity) {
+            toast('Informe uma quantidade entre 1 e ' + quantityMax() + '.', 'error');
+            return;
+        }
 
         if (isMaintenance && !machines.length) {
             toast('Adicione ao menos uma máquina com modelo selecionado.', 'error');
@@ -1418,7 +1613,6 @@
                 boards_id: state.board.id,
                 list_id: Number(form.dataset.listId || 0),
                 name: name,
-                description: descriptionEl ? descriptionEl.value : '',
                 source: sourceEl ? sourceEl.value : 'manual',
                 machines: machines
             });
@@ -1846,6 +2040,11 @@
     });
 
     modalRoot.addEventListener('input', function (event) {
+        var createRow = event.target.closest('[data-create-machine]');
+        if (createRow) {
+            updateCreateMachineSummary(createRow);
+        }
+
         var field = event.target.closest('[data-machine-field]');
         if (!field) {
             return;
@@ -1861,6 +2060,11 @@
     });
 
     modalRoot.addEventListener('change', async function (event) {
+        var createRow = event.target.closest('[data-create-machine]');
+        if (createRow) {
+            updateCreateMachineSummary(createRow);
+        }
+
         var field = event.target.closest('[data-machine-field]');
         if (field) {
             var name = field.dataset.machineField;
@@ -1898,9 +2102,15 @@
                     select.appendChild(option);
                 });
                 modelSelect.value = String(model.id);
+                if (createRow) {
+                    updateCreateMachineSummary(createRow);
+                }
             } catch (error) {
                 toast(error.message, 'error');
                 modelSelect.value = '';
+                if (createRow) {
+                    updateCreateMachineSummary(createRow);
+                }
             }
         }
     });

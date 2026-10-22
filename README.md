@@ -55,7 +55,7 @@ Modelos arquivados continuam visíveis em cards e relatórios antigos, mas não 
    - Manutenção Aprovação
    - Manutenção Retirada
    - Manutenção Concluído
-3. Crie um card informando uma ou mais máquinas (modelo + etiqueta/série).
+3. Crie um card informando o nome, o modelo e a quantidade de máquinas. Etiqueta, número de série e relatório podem ser preenchidos depois, no detalhe do card.
 4. O fluxo é controlado pelo servidor; arrastar cards de manutenção não altera o status.
 
 ### 4. Fluxo de manutenção
