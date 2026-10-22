@@ -37,6 +37,23 @@ function plugin_tralla_install(): bool
         ") or die($DB->error());
     }
 
+    if (!$DB->tableExists('glpi_plugin_tralla_boards_users')) {
+        $DB->doQuery("
+            CREATE TABLE `glpi_plugin_tralla_boards_users` (
+                `id`                      INT {$sign} NOT NULL AUTO_INCREMENT,
+                `plugin_tralla_boards_id` INT {$sign} NOT NULL DEFAULT '0',
+                `users_id`                INT {$sign} NOT NULL DEFAULT '0',
+                `role`                    VARCHAR(20)  NOT NULL DEFAULT '',
+                `date_creation`           DATETIME     DEFAULT NULL,
+                `date_mod`                DATETIME     DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `uniq_board_user` (`plugin_tralla_boards_id`, `users_id`),
+                KEY `users_id` (`users_id`),
+                KEY `role` (`role`)
+            ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}
+        ") or die($DB->error());
+    }
+
     if (!$DB->tableExists('glpi_plugin_tralla_lists')) {
         $DB->doQuery("
             CREATE TABLE `glpi_plugin_tralla_lists` (
@@ -58,7 +75,8 @@ function plugin_tralla_install(): bool
         ") or die($DB->error());
     }
 
-    if (!$DB->tableExists('glpi_plugin_tralla_cards')) {
+    $cards_table_existed = $DB->tableExists('glpi_plugin_tralla_cards');
+    if (!$cards_table_existed) {
         $DB->doQuery("
             CREATE TABLE `glpi_plugin_tralla_cards` (
                 `id`                      INT {$sign} NOT NULL AUTO_INCREMENT,
@@ -72,7 +90,7 @@ function plugin_tralla_install(): bool
                 `stage`                   TINYINT(1)   NOT NULL DEFAULT '1' COMMENT '1=manutenção, 2=aprovação',
                 `parent_cards_id`         INT {$sign} NOT NULL DEFAULT '0' COMMENT 'card /1 de origem quando stage=2',
                 `approval_cards_id`       INT {$sign} NOT NULL DEFAULT '0' COMMENT 'card /2 gerado pelo /1',
-                `status`                  VARCHAR(30)  NOT NULL DEFAULT '' COMMENT 'normal,pending,in_progress,waiting_approval,withdrawal,done,approved,rejected',
+                `status`                  VARCHAR(30)  NOT NULL DEFAULT '' COMMENT 'normal,pending,in_progress,waiting_approval,withdrawal,done,approved,rejected,deletion_pending,deleted',
                 `is_locked`               TINYINT(1)   NOT NULL DEFAULT '0',
                 `is_archived`             TINYINT(1)   NOT NULL DEFAULT '0',
                 `source`                  VARCHAR(30)  NOT NULL DEFAULT '' COMMENT 'notebook_desktop|tablet_mobile|manual',
@@ -86,6 +104,16 @@ function plugin_tralla_install(): bool
                 `assignature_sent`        TINYINT(1)   NOT NULL DEFAULT '0',
                 `rejection_reason`        TEXT         DEFAULT NULL,
                 `users_id_approver`       INT {$sign} NOT NULL DEFAULT '0',
+                `is_deleted`              TINYINT(1)   NOT NULL DEFAULT 0,
+                `approval_kind`           VARCHAR(20)  NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|deletion',
+                `deletion_reason`         TEXT         DEFAULT NULL,
+                `deletion_requested_at`   DATETIME     DEFAULT NULL,
+                `deletion_requested_by`   INT {$sign} NOT NULL DEFAULT 0,
+                `deletion_decided_at`     DATETIME     DEFAULT NULL,
+                `deletion_decided_by`     INT {$sign} NOT NULL DEFAULT 0,
+                `deletion_previous_lists_id` INT {$sign} NOT NULL DEFAULT 0,
+                `deletion_previous_status`   VARCHAR(30)  NOT NULL DEFAULT '',
+                `deletion_previous_is_locked` TINYINT(1)  NOT NULL DEFAULT 0,
                 `date_creation`           DATETIME     DEFAULT NULL,
                 `date_mod`                DATETIME     DEFAULT NULL,
                 PRIMARY KEY (`id`),
@@ -96,6 +124,54 @@ function plugin_tralla_install(): bool
                 KEY `status` (`status`),
                 KEY `rank` (`rank`)
             ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}
+        ") or die($DB->error());
+    }
+
+    // Colunas de exclusão em tabelas de cards já existentes.
+    $cards_columns = [
+        'is_deleted'                  => 'TINYINT(1)   NOT NULL DEFAULT 0',
+        'approval_kind'               => "VARCHAR(20)  NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|deletion'",
+        'deletion_reason'             => 'TEXT         DEFAULT NULL',
+        'deletion_requested_at'       => 'DATETIME     DEFAULT NULL',
+        'deletion_requested_by'       => "INT {$sign} NOT NULL DEFAULT 0",
+        'deletion_decided_at'         => 'DATETIME     DEFAULT NULL',
+        'deletion_decided_by'         => "INT {$sign} NOT NULL DEFAULT 0",
+        'deletion_previous_lists_id'  => "INT {$sign} NOT NULL DEFAULT 0",
+        'deletion_previous_status'    => "VARCHAR(30)  NOT NULL DEFAULT ''",
+        'deletion_previous_is_locked' => 'TINYINT(1)   NOT NULL DEFAULT 0',
+    ];
+    $added_is_deleted = false;
+    $added_approval_kind = false;
+    foreach ($cards_columns as $field => $definition) {
+        if (!$DB->fieldExists('glpi_plugin_tralla_cards', $field)) {
+            $DB->doQuery("ALTER TABLE `glpi_plugin_tralla_cards` ADD COLUMN `{$field}` {$definition}") or die($DB->error());
+            if ($field === 'is_deleted') {
+                $added_is_deleted = true;
+            } elseif ($field === 'approval_kind') {
+                $added_approval_kind = true;
+            }
+        }
+    }
+    // Backfill somente quando a coluna acabou de ser criada: nunca reseta
+    // dados em atualizações posteriores.
+    if ($added_is_deleted) {
+        $DB->update(
+            'glpi_plugin_tralla_cards',
+            ['is_deleted' => 0],
+            ['id' => ['>', 0]]
+        );
+    }
+    if ($added_approval_kind) {
+        $DB->update(
+            'glpi_plugin_tralla_cards',
+            ['approval_kind' => 'maintenance'],
+            ['id' => ['>', 0]]
+        );
+    }
+    if ($cards_table_existed) {
+        $DB->doQuery("
+            ALTER TABLE `glpi_plugin_tralla_cards`
+            MODIFY `status` VARCHAR(30) NOT NULL DEFAULT '' COMMENT 'normal,pending,in_progress,waiting_approval,withdrawal,done,approved,rejected,deletion_pending,deleted'
         ") or die($DB->error());
     }
 
@@ -192,6 +268,27 @@ function plugin_tralla_install(): bool
         ") or die($DB->error());
     }
 
+    // Garante que o criador de cada quadro existente seja SuperAdmin.
+    require_once __DIR__ . '/inc/boarduser.class.php';
+    foreach ($DB->request([
+        'SELECT' => ['id', 'users_id'],
+        'FROM'   => 'glpi_plugin_tralla_boards',
+        'WHERE'  => ['users_id' => ['>', 0]],
+    ]) as $board) {
+        $membership = $DB->request([
+            'SELECT' => ['id'],
+            'FROM'   => 'glpi_plugin_tralla_boards_users',
+            'WHERE'  => [
+                'plugin_tralla_boards_id' => (int) $board['id'],
+                'users_id'                => (int) $board['users_id'],
+            ],
+            'LIMIT'  => 1,
+        ])->current();
+        if (!is_array($membership)) {
+            PluginTrallaBoardUser::addCreator((int) $board['id'], (int) $board['users_id']);
+        }
+    }
+
     // Configurações padrão — nunca sobrescreve ajuste do administrador.
     $now = $_SESSION['glpi_currenttime'] ?? date('Y-m-d H:i:s');
     $defaults = [
@@ -269,6 +366,7 @@ function plugin_tralla_uninstall(): bool
         'glpi_plugin_tralla_machines',
         'glpi_plugin_tralla_machine_models',
         'glpi_plugin_tralla_cards',
+        'glpi_plugin_tralla_boards_users',
         'glpi_plugin_tralla_lists',
         'glpi_plugin_tralla_boards',
         'glpi_plugin_tralla_configs',
