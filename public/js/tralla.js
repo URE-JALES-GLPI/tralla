@@ -317,6 +317,7 @@
     var lastFocused = null;
     var shouldRefreshBoard = false;
     var saveTimers = {};
+    var inlineComposerListId = null;
 
     var palette = {
         '': '#97a0af',
@@ -553,10 +554,12 @@
                 + '<i class="ti ti-trash"></i></button>';
         }
 
-        var addCard = can.create
+        var composerOpen = !isMaintenance && can.create && Number(inlineComposerListId) === listId;
+        var addCard = can.create && !composerOpen
             ? '<button type="button" class="tralla-add-card" data-add-card="' + listId + '">'
                 + '<i class="ti ti-plus"></i> Adicionar card</button>'
             : '';
+        var composer = composerOpen ? renderInlineCardComposer(listId) : '';
 
         var categoryDot = list.category
             ? '<span class="tralla-list-dot" style="--tr-list-color:' + attr(color) + '" aria-hidden="true"></span>'
@@ -571,6 +574,7 @@
             + '<div class="tralla-cards" data-list-id="' + listId + '">'
             + listCards.map(renderCard).join('')
             + '</div>'
+            + composer
             + addCard
             + '</section>';
     }
@@ -1502,11 +1506,87 @@
 
     /* ------------------------------------------------------- create card */
 
+    function inlineComposerInput(form) {
+        return form ? form.querySelector('textarea[name="name"]') : null;
+    }
+
+    function resizeInlineComposer(input) {
+        if (!input) {
+            return;
+        }
+        input.style.height = 'auto';
+        input.style.height = Math.max(56, Math.min(160, input.scrollHeight)) + 'px';
+    }
+
+    function syncInlineComposerSubmit(form) {
+        if (!form) {
+            return;
+        }
+        var input = inlineComposerInput(form);
+        var submit = form.querySelector('button[type="submit"]');
+        if (input && submit) {
+            submit.disabled = !input.value.trim();
+        }
+    }
+
+    function focusInlineComposer() {
+        var form = document.querySelector('[data-inline-card-form]');
+        if (!form) {
+            return;
+        }
+        var input = inlineComposerInput(form);
+        if (!input) {
+            return;
+        }
+        input.focus();
+        resizeInlineComposer(input);
+        input.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+
+    function openInlineCardComposer(listId) {
+        if (isMaintenance || !can.create) {
+            return;
+        }
+        inlineComposerListId = Number(listId);
+        renderBoard();
+        focusInlineComposer();
+    }
+
+    function closeInlineCardComposer() {
+        var listId = inlineComposerListId;
+        inlineComposerListId = null;
+        renderBoard();
+        if (listId) {
+            var button = document.querySelector('[data-add-card="' + listId + '"]');
+            if (button) {
+                button.focus();
+            }
+        }
+    }
+
+    function renderInlineCardComposer(listId) {
+        var inputId = 'tralla-inline-card-' + listId;
+        return '<form class="tralla-inline-card-form" data-inline-card-form data-list-id="' + listId + '" novalidate>'
+            + '<label class="tralla-visually-hidden" for="' + inputId + '">Título do card</label>'
+            + '<textarea id="' + inputId + '" name="name" rows="1" maxlength="255"'
+            + ' placeholder="Insira um título ou cole um link" autocomplete="off"></textarea>'
+            + '<div class="tralla-inline-card-actions">'
+            + '<button type="submit" class="tralla-btn tralla-btn-primary" disabled>Adicionar card</button>'
+            + '<button type="button" class="tralla-icon-btn tralla-inline-card-cancel" data-inline-card-cancel'
+            + ' aria-label="Cancelar" title="Cancelar"><i class="ti ti-x" aria-hidden="true"></i></button>'
+            + '</div></form>';
+    }
+
     function openCreateCard(listId) {
         var list = state.lists.find(function (item) {
             return Number(item.id) === Number(listId);
         });
         if (!list) {
+            return;
+        }
+
+        if (!isMaintenance) {
+            openInlineCardComposer(listId);
             return;
         }
 
@@ -1524,6 +1604,9 @@
                 + '<i class="ti ti-plus"></i> Adicionar outro modelo</button>'
                 + '</section>'
             : '';
+
+        var sourceField = '<div class="tralla-field"><label for="tralla-create-source">Origem</label>'
+            + '<select id="tralla-create-source" name="source">' + sourceOptions + '</select></div>';
 
         var entities = Array.isArray(state.entities) ? state.entities : [];
         var hasEntities = entities.length > 0;
@@ -1548,8 +1631,7 @@
             + '</div>' + modalCloseButton() + '</div>'
             + '<div class="tralla-modal-body">'
             + nameField
-            + '<div class="tralla-field"><label for="tralla-create-source">Origem</label>'
-            + '<select id="tralla-create-source" name="source">' + sourceOptions + '</select></div>'
+            + sourceField
             + machinesSection
             + '</div>'
             + '<div class="tralla-modal-actions">'
@@ -1567,12 +1649,16 @@
     }
 
     async function submitCreateCard(form) {
+        var inline = form.hasAttribute('data-inline-card-form');
         var nameEl = form.querySelector('[name="name"]');
         var sourceEl = form.querySelector('[name="source"]');
         var name = nameEl ? nameEl.value.trim() : '';
 
         if (!name) {
             toast('Informe o nome do card.', 'error');
+            if (nameEl) {
+                nameEl.focus();
+            }
             return;
         }
 
@@ -1600,7 +1686,7 @@
             return;
         }
 
-        if (isMaintenance && !machines.length) {
+        if (!inline && isMaintenance && !machines.length) {
             toast('Adicione ao menos uma máquina com modelo selecionado.', 'error');
             return;
         }
@@ -1613,9 +1699,18 @@
                 boards_id: state.board.id,
                 list_id: Number(form.dataset.listId || 0),
                 name: name,
-                source: sourceEl ? sourceEl.value : 'manual',
+                source: inline ? 'manual' : (sourceEl ? sourceEl.value : 'manual'),
                 machines: machines
             });
+
+            if (inline) {
+                inlineComposerListId = Number(form.dataset.listId || 0);
+                applyState(data);
+                toast('Card criado.', 'success');
+                focusInlineComposer();
+                return;
+            }
+
             closeModal();
             applyState(data);
             toast('Card criado.', 'success');
@@ -1623,6 +1718,9 @@
         } catch (error) {
             toast(error.message, 'error');
             setBusy(submit, false);
+            if (inline) {
+                focusInlineComposer();
+            }
         }
     }
 
@@ -1857,6 +1955,13 @@
             return;
         }
 
+        var cancelInline = event.target.closest('[data-inline-card-cancel]');
+        if (cancelInline) {
+            event.preventDefault();
+            closeInlineCardComposer();
+            return;
+        }
+
         var editList = event.target.closest('[data-edit-list]');
         if (editList) {
             event.preventDefault();
@@ -1890,6 +1995,46 @@
         if (cardElement) {
             event.preventDefault();
             openCard(Number(cardElement.dataset.cardId));
+        }
+    });
+
+    listsEl.addEventListener('submit', function (event) {
+        var form = event.target.closest('[data-inline-card-form]');
+        if (!form) {
+            return;
+        }
+        event.preventDefault();
+        submitCreateCard(form);
+    });
+
+    listsEl.addEventListener('input', function (event) {
+        var input = event.target.closest('[data-inline-card-form] textarea[name="name"]');
+        if (!input) {
+            return;
+        }
+        syncInlineComposerSubmit(input.closest('[data-inline-card-form]'));
+        resizeInlineComposer(input);
+    });
+
+    listsEl.addEventListener('keydown', function (event) {
+        var form = event.target.closest('[data-inline-card-form]');
+        if (!form) {
+            return;
+        }
+
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            closeInlineCardComposer();
+            return;
+        }
+
+        if (event.key === 'Enter' && !event.shiftKey) {
+            var input = inlineComposerInput(form);
+            if (!input || !input.value.trim()) {
+                return;
+            }
+            event.preventDefault();
+            form.requestSubmit();
         }
     });
 
