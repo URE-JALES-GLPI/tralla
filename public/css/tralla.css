@@ -1,0 +1,1699 @@
+/**
+ * [URE] Tralla — design system
+ * Inspirado no Kanpro, com tokens próprios e prefixo tr-.
+ */
+
+.tralla-page,
+.tralla-modal,
+.tralla-toast {
+    --tr-bg: #f4f5f7;
+    --tr-surface: #ffffff;
+    --tr-surface-2: #f1f2f4;
+    --tr-surface-3: #e9ebef;
+    --tr-text: #172b4d;
+    --tr-text-soft: #344563;
+    --tr-muted: #6b778c;
+    --tr-border: #dfe1e6;
+    --tr-border-strong: #c1c7d0;
+    --tr-primary: #0079bf;
+    --tr-primary-strong: #026aa7;
+    --tr-primary-soft: #e4f0f6;
+    --tr-success: #2e7d32;
+    --tr-success-soft: #e6f4ea;
+    --tr-warning: #b26a00;
+    --tr-warning-soft: #fff4e5;
+    --tr-danger: #c62828;
+    --tr-danger-soft: #fdecea;
+    --tr-purple: #7b1fa2;
+    --tr-purple-soft: #f3e5f5;
+    --tr-yellow: #f2d600;
+    --tr-radius-sm: 6px;
+    --tr-radius: 10px;
+    --tr-radius-lg: 16px;
+    --tr-shadow-sm: 0 1px 2px rgba(9, 30, 66, 0.12);
+    --tr-shadow: 0 8px 24px rgba(9, 30, 66, 0.12);
+    --tr-shadow-lg: 0 24px 64px rgba(9, 30, 66, 0.24);
+    --tr-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+html[data-theme="dark"] .tralla-page,
+html[data-theme="dark"] .tralla-modal,
+html[data-theme="dark"] .tralla-toast,
+body[data-theme="dark"] .tralla-page,
+body[data-theme="dark"] .tralla-modal,
+body[data-theme="dark"] .tralla-toast,
+.tralla-page[data-theme="dark"] {
+    --tr-bg: #101418;
+    --tr-surface: #1b2129;
+    --tr-surface-2: #232b35;
+    --tr-surface-3: #2d3742;
+    --tr-text: #e8edf3;
+    --tr-text-soft: #c6d0da;
+    --tr-muted: #93a1b0;
+    --tr-border: #34404c;
+    --tr-border-strong: #465463;
+    --tr-primary: #4aa3df;
+    --tr-primary-strong: #6bb8ea;
+    --tr-primary-soft: #173247;
+    --tr-success: #81c995;
+    --tr-success-soft: #1b3324;
+    --tr-warning: #f6c26b;
+    --tr-warning-soft: #3a2c18;
+    --tr-danger: #f28b82;
+    --tr-danger-soft: #3b2020;
+    --tr-purple: #d7aefb;
+    --tr-purple-soft: #33243d;
+    --tr-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --tr-shadow: 0 12px 32px rgba(0, 0, 0, 0.38);
+    --tr-shadow-lg: 0 28px 72px rgba(0, 0, 0, 0.55);
+}
+
+/* ---------------------------------------------------------------- base */
+
+.tralla-page {
+    color: var(--tr-text);
+    font-family: var(--tr-font);
+    font-size: 14px;
+    line-height: 1.5;
+    padding: 24px;
+    max-width: 1680px;
+    margin: 0 auto;
+}
+
+.tralla-page *,
+.tralla-modal *,
+.tralla-toast * {
+    box-sizing: border-box;
+}
+
+.tralla-page h1,
+.tralla-page h2,
+.tralla-page h3,
+.tralla-page h4,
+.tralla-modal h1,
+.tralla-modal h2,
+.tralla-modal h3,
+.tralla-modal h4 {
+    color: var(--tr-text);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0;
+}
+
+.tralla-page p,
+.tralla-modal p {
+    margin: 0;
+}
+
+.tralla-page a {
+    color: var(--tr-primary);
+    text-decoration: none;
+}
+
+.tralla-muted {
+    color: var(--tr-muted);
+    font-weight: 400;
+}
+
+.tralla-page-head {
+    align-items: flex-start;
+    display: flex;
+    gap: 24px;
+    justify-content: space-between;
+    margin-bottom: 24px;
+}
+
+.tralla-page-head h1 {
+    align-items: center;
+    display: flex;
+    font-size: 26px;
+    gap: 10px;
+    line-height: 1.2;
+}
+
+.tralla-page-head h1 .ti {
+    color: var(--tr-primary);
+}
+
+.tralla-page-head p {
+    color: var(--tr-muted);
+    margin-top: 6px;
+}
+
+.tralla-head-actions {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+/* --------------------------------------------------------------- buttons */
+
+.tralla-btn {
+    align-items: center;
+    background: var(--tr-surface);
+    border: 1px solid var(--tr-border);
+    border-radius: var(--tr-radius-sm);
+    color: var(--tr-text);
+    cursor: pointer;
+    display: inline-flex;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    gap: 7px;
+    justify-content: center;
+    line-height: 1.2;
+    min-height: 36px;
+    padding: 8px 14px;
+    text-decoration: none;
+    transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+    white-space: nowrap;
+}
+
+.tralla-btn:hover {
+    background: var(--tr-surface-2);
+    border-color: var(--tr-border-strong);
+    color: var(--tr-text);
+    text-decoration: none;
+}
+
+.tralla-btn:active {
+    transform: translateY(1px);
+}
+
+.tralla-btn:focus-visible,
+.tralla-icon-btn:focus-visible,
+.tralla-card:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--tr-primary) 35%, transparent);
+    outline-offset: 2px;
+}
+
+.tralla-btn-primary {
+    background: var(--tr-primary);
+    border-color: var(--tr-primary);
+    color: #fff;
+}
+
+.tralla-btn-primary:hover {
+    background: var(--tr-primary-strong);
+    border-color: var(--tr-primary-strong);
+    color: #fff;
+}
+
+.tralla-btn-ghost {
+    background: transparent;
+}
+
+.tralla-btn-danger {
+    background: transparent;
+    border-color: color-mix(in srgb, var(--tr-danger) 55%, var(--tr-border));
+    color: var(--tr-danger);
+}
+
+.tralla-btn-danger:hover {
+    background: var(--tr-danger-soft);
+    border-color: var(--tr-danger);
+    color: var(--tr-danger);
+}
+
+.tralla-btn[disabled],
+.tralla-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+    transform: none;
+}
+
+.tralla-icon-btn {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: var(--tr-radius-sm);
+    color: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    height: 34px;
+    justify-content: center;
+    padding: 0;
+    transition: background 120ms ease;
+    width: 34px;
+}
+
+.tralla-icon-btn:hover {
+    background: rgba(9, 30, 66, 0.08);
+}
+
+.tralla-icon-btn .ti {
+    font-size: 19px;
+}
+
+/* --------------------------------------------------------------- empty */
+
+.tralla-empty {
+    align-items: center;
+    background: var(--tr-surface);
+    border: 1px dashed var(--tr-border-strong);
+    border-radius: var(--tr-radius-lg);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    justify-content: center;
+    min-height: 280px;
+    padding: 40px 24px;
+    text-align: center;
+}
+
+.tralla-empty > .ti {
+    color: var(--tr-muted);
+    font-size: 48px;
+    margin-bottom: 8px;
+}
+
+.tralla-empty h2 {
+    font-size: 20px;
+}
+
+.tralla-empty p {
+    color: var(--tr-muted);
+    max-width: 480px;
+}
+
+.tralla-empty .tralla-btn {
+    margin-top: 12px;
+}
+
+/* ---------------------------------------------------------- board grid */
+
+.tralla-board-grid {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: repeat(auto-fill, minmax(285px, 1fr));
+}
+
+.tralla-board-tile {
+    background: linear-gradient(135deg, #0b4f6c 0%, #0079bf 55%, #00a8cc 100%);
+    border-radius: var(--tr-radius-lg);
+    box-shadow: var(--tr-shadow-sm);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    min-height: 190px;
+    overflow: hidden;
+    padding: 18px;
+    position: relative;
+    transition: box-shadow 160ms ease, transform 160ms ease;
+}
+
+.tralla-board-tile::after {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 55%);
+    content: "";
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+}
+
+.tralla-board-tile:hover {
+    box-shadow: var(--tr-shadow);
+    color: #fff;
+    transform: translateY(-3px);
+}
+
+.tralla-board-tile h2 {
+    color: #fff;
+    font-size: 19px;
+    margin: 14px 0 4px;
+    overflow-wrap: anywhere;
+    position: relative;
+    z-index: 1;
+}
+
+.tralla-board-tile .tralla-board-comment {
+    color: rgba(255, 255, 255, 0.82);
+    display: -webkit-box;
+    font-size: 13px;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    position: relative;
+    z-index: 1;
+}
+
+.tralla-board-tile footer {
+    align-items: center;
+    color: rgba(255, 255, 255, 0.75);
+    display: flex;
+    font-size: 12px;
+    gap: 12px;
+    justify-content: space-between;
+    margin-top: auto;
+    padding-top: 18px;
+    position: relative;
+    z-index: 1;
+}
+
+.tralla-board-type {
+    align-items: center;
+    align-self: flex-start;
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 999px;
+    color: #fff;
+    display: inline-flex;
+    font-size: 11px;
+    font-weight: 700;
+    gap: 5px;
+    letter-spacing: 0.04em;
+    padding: 4px 9px;
+    position: relative;
+    text-transform: uppercase;
+    z-index: 1;
+}
+
+.tralla-board-type.is-maintenance {
+    background: rgba(255, 193, 7, 0.2);
+    border-color: rgba(255, 224, 130, 0.5);
+}
+
+.tralla-board-metrics {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    font-size: 12px;
+    margin-top: 12px;
+    position: relative;
+    z-index: 1;
+}
+
+.tralla-board-metrics > span {
+    align-items: center;
+    display: inline-flex;
+    gap: 4px;
+}
+
+.tralla-pill {
+    background: var(--tr-surface-2);
+    border-radius: 999px;
+    color: var(--tr-text-soft);
+    display: inline-flex;
+    font-size: 11px;
+    font-weight: 600;
+    gap: 4px;
+    line-height: 1;
+    padding: 5px 8px;
+    white-space: nowrap;
+}
+
+.tralla-pill.pending {
+    background: var(--tr-warning-soft);
+    color: var(--tr-warning);
+}
+
+.tralla-pill.progress {
+    background: var(--tr-primary-soft);
+    color: var(--tr-primary);
+}
+
+.tralla-pill.approval {
+    background: var(--tr-purple-soft);
+    color: var(--tr-purple);
+}
+
+.tralla-pill.withdrawal {
+    background: #fff8d6;
+    color: #8a6d00;
+}
+
+html[data-theme="dark"] .tralla-pill.withdrawal,
+body[data-theme="dark"] .tralla-pill.withdrawal {
+    background: #3a3317;
+    color: #f2d600;
+}
+
+.tralla-pill.done {
+    background: var(--tr-success-soft);
+    color: var(--tr-success);
+}
+
+.tralla-pill.danger {
+    background: var(--tr-danger-soft);
+    color: var(--tr-danger);
+}
+
+/* ------------------------------------------------------------- kanban */
+
+.tralla-kanban-page {
+    background: linear-gradient(135deg, #0b4f6c 0%, #0079bf 52%, #00a8cc 100%);
+    border-radius: 0;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    margin: -24px;
+    max-width: none;
+    min-height: calc(100vh - 52px);
+    padding: 0;
+}
+
+.tralla-kanban-page.tr-bg-aurora {
+    background: linear-gradient(135deg, #172554 0%, #4338ca 48%, #db2777 100%);
+}
+
+.tralla-kanban-page.tr-bg-sunset {
+    background: linear-gradient(135deg, #7c2d12 0%, #ea580c 52%, #f59e0b 100%);
+}
+
+.tralla-kanban-page.tr-bg-forest {
+    background: linear-gradient(135deg, #052e16 0%, #15803d 52%, #84cc16 100%);
+}
+
+.tralla-kanban-page.tr-bg-graphite {
+    background: linear-gradient(135deg, #111827 0%, #374151 52%, #6b7280 100%);
+}
+
+.tralla-kanban-page.tr-bg-candy {
+    background: linear-gradient(135deg, #831843 0%, #db2777 52%, #f9a8d4 100%);
+}
+
+.tralla-kanban-head {
+    align-items: flex-start;
+    display: flex;
+    gap: 20px;
+    justify-content: space-between;
+    padding: 20px 24px 14px;
+}
+
+.tralla-kanban-title {
+    align-items: flex-start;
+    display: flex;
+    gap: 10px;
+    min-width: 0;
+}
+
+.tralla-kanban-title .tralla-icon-btn {
+    color: rgba(255, 255, 255, 0.9);
+    flex: 0 0 auto;
+    margin-top: 2px;
+}
+
+.tralla-kanban-title .tralla-icon-btn:hover {
+    background: rgba(0, 0, 0, 0.18);
+}
+
+.tralla-kanban-title h1 {
+    color: #fff;
+    font-size: 24px;
+    line-height: 1.25;
+    margin: 5px 0 0;
+    overflow-wrap: anywhere;
+}
+
+.tralla-kanban-title p {
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 13px;
+    margin-top: 3px;
+    max-width: 720px;
+}
+
+.tralla-kanban-head .tralla-btn {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.24);
+    color: #fff;
+}
+
+.tralla-kanban-head .tralla-btn:hover {
+    background: rgba(255, 255, 255, 0.24);
+    color: #fff;
+}
+
+.tralla-board-scroll {
+    align-items: flex-start;
+    display: flex;
+    flex: 1;
+    gap: 14px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 8px 24px 24px;
+    scrollbar-color: rgba(255, 255, 255, 0.4) transparent;
+}
+
+.tralla-list {
+    background: rgba(255, 255, 255, 0.94);
+    border-radius: var(--tr-radius);
+    box-shadow: var(--tr-shadow-sm);
+    color: var(--tr-text);
+    display: flex;
+    flex: 0 0 300px;
+    flex-direction: column;
+    max-height: calc(100vh - 170px);
+    min-height: 120px;
+    overflow: hidden;
+    transition: box-shadow 140ms ease;
+    width: 300px;
+}
+
+.tralla-list.is-drop-target {
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9), var(--tr-shadow);
+}
+
+.tralla-list-head {
+    align-items: flex-start;
+    border-top: 3px solid var(--tr-list-color, var(--tr-primary));
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+    padding: 11px 12px 8px;
+}
+
+.tralla-list-head h3 {
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.tralla-list-head .tralla-list-count {
+    background: var(--tr-surface-2);
+    border-radius: 999px;
+    color: var(--tr-muted);
+    display: inline-block;
+    font-size: 11px;
+    margin-left: 6px;
+    padding: 1px 7px;
+    vertical-align: 1px;
+}
+
+.tralla-list-head-actions {
+    display: flex;
+    gap: 1px;
+}
+
+.tralla-list-head .tralla-icon-btn {
+    color: var(--tr-muted);
+    height: 26px;
+    width: 26px;
+}
+
+.tralla-list-head .tralla-icon-btn .ti {
+    font-size: 15px;
+}
+
+.tralla-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 12px;
+    overflow-y: auto;
+    padding: 2px 8px 8px;
+}
+
+.tralla-cards.is-drag-over {
+    background: var(--tr-primary-soft);
+    border-radius: var(--tr-radius-sm);
+}
+
+.tralla-card {
+    background: var(--tr-surface);
+    border: 1px solid var(--tr-border);
+    border-radius: var(--tr-radius-sm);
+    box-shadow: var(--tr-shadow-sm);
+    cursor: pointer;
+    padding: 10px 10px 9px;
+    position: relative;
+    transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+
+.tralla-card:hover {
+    border-color: var(--tr-border-strong);
+    box-shadow: 0 3px 10px rgba(9, 30, 66, 0.16);
+}
+
+.tralla-card.is-dragging {
+    opacity: 0.5;
+    transform: rotate(1.5deg);
+}
+
+.tralla-card.is-locked {
+    cursor: default;
+}
+
+.tralla-card-top {
+    align-items: center;
+    display: flex;
+    gap: 6px;
+    justify-content: space-between;
+    margin-bottom: 5px;
+}
+
+.tralla-card-code {
+    color: var(--tr-muted);
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.tralla-card-source {
+    color: var(--tr-muted);
+    font-size: 10px;
+    text-transform: uppercase;
+}
+
+.tralla-card h4 {
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.tralla-card-desc {
+    color: var(--tr-muted);
+    display: -webkit-box;
+    font-size: 12px;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    margin-top: 4px;
+    overflow: hidden;
+}
+
+.tralla-card-meta {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.tralla-card-progress {
+    align-items: center;
+    display: flex;
+    flex: 1 1 100%;
+    gap: 6px;
+}
+
+.tralla-progress {
+    background: var(--tr-surface-3);
+    border-radius: 999px;
+    flex: 1;
+    height: 5px;
+    overflow: hidden;
+}
+
+.tralla-progress > span {
+    background: var(--tr-primary);
+    border-radius: inherit;
+    display: block;
+    height: 100%;
+    transition: width 220ms ease;
+}
+
+.tralla-progress.is-complete > span {
+    background: var(--tr-success);
+}
+
+.tralla-card-progress small {
+    color: var(--tr-muted);
+    font-size: 10px;
+    white-space: nowrap;
+}
+
+.tralla-avatar {
+    align-items: center;
+    background: var(--tr-primary);
+    border-radius: 50%;
+    color: #fff;
+    display: inline-flex;
+    flex: 0 0 auto;
+    font-size: 10px;
+    font-weight: 700;
+    height: 22px;
+    justify-content: center;
+    text-transform: uppercase;
+    width: 22px;
+}
+
+.tralla-card-footer {
+    align-items: center;
+    color: var(--tr-muted);
+    display: flex;
+    font-size: 11px;
+    gap: 6px;
+    justify-content: space-between;
+    margin-top: 7px;
+}
+
+.tralla-card-lock {
+    color: var(--tr-muted);
+    font-size: 11px;
+}
+
+.tralla-add-card,
+.tralla-add-list {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: var(--tr-radius-sm);
+    color: var(--tr-muted);
+    cursor: pointer;
+    display: flex;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    gap: 5px;
+    margin: 0 8px 8px;
+    padding: 7px 8px;
+    text-align: left;
+    transition: background 120ms ease, color 120ms ease;
+}
+
+.tralla-add-card:hover,
+.tralla-add-list:hover {
+    background: var(--tr-surface-2);
+    color: var(--tr-text);
+}
+
+.tralla-list-composer {
+    background: rgba(255, 255, 255, 0.96);
+    border-radius: var(--tr-radius);
+    box-shadow: var(--tr-shadow-sm);
+    flex: 0 0 300px;
+    padding: 10px;
+    width: 300px;
+}
+
+.tralla-list-composer input,
+.tralla-list-composer select {
+    margin-bottom: 7px;
+    width: 100%;
+}
+
+.tralla-list-composer-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.tralla-composer {
+    background: var(--tr-surface);
+    border-radius: var(--tr-radius-sm);
+    box-shadow: var(--tr-shadow);
+    margin: 0 0 2px;
+    padding: 8px;
+}
+
+.tralla-composer textarea {
+    min-height: 64px;
+    resize: vertical;
+    width: 100%;
+}
+
+.tralla-composer-actions {
+    align-items: center;
+    display: flex;
+    gap: 6px;
+    margin-top: 7px;
+}
+
+/* -------------------------------------------------------------- modals */
+
+.tralla-modal-backdrop {
+    align-items: center;
+    backdrop-filter: blur(4px);
+    background: rgba(9, 30, 66, 0.55);
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    padding: 24px;
+    position: fixed;
+    z-index: 1080;
+}
+
+.tralla-modal-backdrop[hidden] {
+    display: none;
+}
+
+.tralla-modal {
+    background: var(--tr-surface);
+    border-radius: var(--tr-radius-lg);
+    box-shadow: var(--tr-shadow-lg);
+    color: var(--tr-text);
+    display: flex;
+    flex-direction: column;
+    max-height: min(92vh, 900px);
+    max-width: 760px;
+    overflow: hidden;
+    width: 100%;
+}
+
+.tralla-modal.is-wide {
+    max-width: 1040px;
+}
+
+.tralla-modal-head {
+    align-items: flex-start;
+    border-bottom: 1px solid var(--tr-border);
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    padding: 18px 20px 14px;
+}
+
+.tralla-modal-head h2 {
+    align-items: center;
+    display: flex;
+    font-size: 19px;
+    gap: 7px;
+    line-height: 1.3;
+}
+
+.tralla-modal-head p {
+    color: var(--tr-muted);
+    font-size: 12px;
+    margin-top: 3px;
+}
+
+.tralla-modal-body {
+    overflow-y: auto;
+    padding: 18px 20px;
+}
+
+.tralla-modal-actions {
+    align-items: center;
+    background: var(--tr-surface-2);
+    border-top: 1px solid var(--tr-border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+    padding: 12px 20px;
+}
+
+.tralla-modal-actions .tralla-spacer {
+    margin-right: auto;
+}
+
+/* --------------------------------------------------------------- forms */
+
+.tralla-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.tralla-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.tralla-field > label {
+    color: var(--tr-text-soft);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.tralla-field small {
+    color: var(--tr-muted);
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+.tralla-form-row {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: 1fr 1fr;
+}
+
+.tralla-page input[type="text"],
+.tralla-page input[type="url"],
+.tralla-page input[type="number"],
+.tralla-page input[type="color"],
+.tralla-page input[type="password"],
+.tralla-page select,
+.tralla-page textarea,
+.tralla-modal input[type="text"],
+.tralla-modal input[type="url"],
+.tralla-modal input[type="number"],
+.tralla-modal input[type="color"],
+.tralla-modal input[type="password"],
+.tralla-modal select,
+.tralla-modal textarea {
+    background: var(--tr-surface);
+    border: 1px solid var(--tr-border-strong);
+    border-radius: var(--tr-radius-sm);
+    color: var(--tr-text);
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.35;
+    min-height: 36px;
+    padding: 7px 10px;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+    width: 100%;
+}
+
+.tralla-page input:focus,
+.tralla-page select:focus,
+.tralla-page textarea:focus,
+.tralla-modal input:focus,
+.tralla-modal select:focus,
+.tralla-modal textarea:focus {
+    border-color: var(--tr-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--tr-primary) 18%, transparent);
+    outline: 0;
+}
+
+.tralla-page textarea,
+.tralla-modal textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+.tralla-page input[type="color"],
+.tralla-modal input[type="color"] {
+    cursor: pointer;
+    padding: 3px;
+}
+
+.tralla-page input[disabled],
+.tralla-page select[disabled],
+.tralla-page textarea[disabled],
+.tralla-modal input[disabled],
+.tralla-modal select[disabled],
+.tralla-modal textarea[disabled] {
+    background: var(--tr-surface-2);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.tralla-check {
+    align-items: center;
+    color: var(--tr-text-soft);
+    cursor: pointer;
+    display: flex;
+    font-size: 13px;
+    gap: 8px;
+}
+
+.tralla-check input[type="checkbox"] {
+    accent-color: var(--tr-primary);
+    height: 16px;
+    margin: 0;
+    width: 16px;
+}
+
+.tralla-input-group {
+    display: flex;
+    gap: 8px;
+}
+
+.tralla-input-group input {
+    flex: 1;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    font-size: 12px;
+}
+
+.tralla-form-actions {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 4px;
+}
+
+.tralla-form-page .tralla-card {
+    cursor: default;
+    max-width: 720px;
+    padding: 20px;
+}
+
+.tralla-card {
+    background: var(--tr-surface);
+    border: 1px solid var(--tr-border);
+    border-radius: var(--tr-radius);
+    box-shadow: var(--tr-shadow-sm);
+}
+
+/* ------------------------------------------------------------- detail */
+
+.tralla-detail-head {
+    align-items: flex-start;
+    display: flex;
+    gap: 14px;
+    justify-content: space-between;
+}
+
+.tralla-detail-code {
+    color: var(--tr-muted);
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.tralla-detail-title {
+    font-size: 20px !important;
+    line-height: 1.3;
+    margin-top: 2px !important;
+    overflow-wrap: anywhere;
+}
+
+.tralla-detail-sub {
+    align-items: center;
+    color: var(--tr-muted);
+    display: flex;
+    flex-wrap: wrap;
+    font-size: 12px;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.tralla-detail-sub .tralla-avatar {
+    height: 20px;
+    width: 20px;
+}
+
+.tralla-detail-grid {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: minmax(0, 1fr) 290px;
+    margin-top: 18px;
+}
+
+.tralla-detail-main,
+.tralla-detail-side {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+}
+
+.tralla-detail-section {
+    border-top: 1px solid var(--tr-border);
+    padding-top: 14px;
+}
+
+.tralla-detail-section:first-child {
+    border-top: 0;
+    padding-top: 0;
+}
+
+.tralla-detail-section > h3 {
+    align-items: center;
+    display: flex;
+    font-size: 13px;
+    gap: 6px;
+    margin-bottom: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--tr-muted);
+}
+
+.tralla-detail-section > h3 .ti {
+    font-size: 16px;
+}
+
+.tralla-detail-description {
+    color: var(--tr-text-soft);
+    font-size: 13px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.tralla-detail-edit-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+    margin-top: 7px;
+}
+
+.tralla-detail-side .tralla-card {
+    padding: 13px;
+}
+
+.tralla-detail-side h3 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--tr-muted);
+    margin-bottom: 9px;
+}
+
+.tralla-meta-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.tralla-meta-row {
+    display: flex;
+    font-size: 12px;
+    gap: 10px;
+    justify-content: space-between;
+}
+
+.tralla-meta-row > span:first-child {
+    color: var(--tr-muted);
+}
+
+.tralla-meta-row > span:last-child {
+    font-weight: 600;
+    text-align: right;
+    overflow-wrap: anywhere;
+}
+
+.tralla-machine {
+    background: var(--tr-surface-2);
+    border: 1px solid var(--tr-border);
+    border-radius: var(--tr-radius-sm);
+    margin-bottom: 10px;
+    padding: 12px;
+}
+
+.tralla-machine-head {
+    align-items: flex-start;
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+    margin-bottom: 9px;
+}
+
+.tralla-machine-title {
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.tralla-machine-title small {
+    color: var(--tr-muted);
+    display: block;
+    font-size: 11px;
+    font-weight: 400;
+    margin-top: 1px;
+}
+
+.tralla-machine-grid {
+    display: grid;
+    gap: 9px;
+    grid-template-columns: 160px 1fr;
+}
+
+.tralla-machine-grid .tralla-field > label {
+    font-size: 11px;
+}
+
+.tralla-machine-flags {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 8px 0;
+}
+
+.tralla-machine-report {
+    min-height: 90px !important;
+}
+
+.tralla-save-state {
+    color: var(--tr-muted);
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.tralla-save-state.is-saving {
+    color: var(--tr-warning);
+}
+
+.tralla-save-state.is-saved {
+    color: var(--tr-success);
+}
+
+.tralla-save-state.is-error {
+    color: var(--tr-danger);
+}
+
+.tralla-add-machine {
+    background: var(--tr-surface);
+    border: 1px dashed var(--tr-border-strong);
+    border-radius: var(--tr-radius-sm);
+    padding: 10px;
+}
+
+.tralla-add-machine summary {
+    color: var(--tr-primary);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    list-style: none;
+}
+
+.tralla-add-machine summary::-webkit-details-marker {
+    display: none;
+}
+
+.tralla-add-machine-grid {
+    display: grid;
+    gap: 7px;
+    grid-template-columns: 1fr 1fr;
+    margin-top: 9px;
+}
+
+.tralla-add-machine-grid .tralla-field:first-child {
+    grid-column: 1 / -1;
+}
+
+.tralla-progress-summary {
+    align-items: center;
+    display: flex;
+    gap: 10px;
+    margin: 4px 0 12px;
+}
+
+.tralla-progress-summary .tralla-progress {
+    height: 7px;
+}
+
+.tralla-progress-summary span {
+    color: var(--tr-muted);
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.tralla-approval-banner {
+    align-items: center;
+    background: var(--tr-purple-soft);
+    border: 1px solid color-mix(in srgb, var(--tr-purple) 25%, transparent);
+    border-radius: var(--tr-radius-sm);
+    color: var(--tr-purple);
+    display: flex;
+    gap: 10px;
+    padding: 12px;
+}
+
+.tralla-approval-banner .ti {
+    font-size: 22px;
+}
+
+.tralla-approval-banner strong {
+    display: block;
+    font-size: 13px;
+}
+
+.tralla-approval-banner small {
+    display: block;
+    font-size: 11px;
+    margin-top: 2px;
+    opacity: 0.85;
+}
+
+.tralla-assignature-link {
+    align-items: center;
+    background: var(--tr-primary-soft);
+    border-radius: var(--tr-radius-sm);
+    color: var(--tr-primary);
+    display: flex;
+    font-size: 12px;
+    font-weight: 600;
+    gap: 7px;
+    margin-top: 10px;
+    padding: 10px;
+    overflow-wrap: anywhere;
+}
+
+.tralla-history {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.tralla-history-item {
+    display: flex;
+    gap: 10px;
+    padding: 7px 0;
+    position: relative;
+}
+
+.tralla-history-item:not(:last-child)::before {
+    background: var(--tr-border);
+    content: "";
+    left: 10px;
+    position: absolute;
+    top: 30px;
+    bottom: -2px;
+    width: 1px;
+}
+
+.tralla-history-dot {
+    align-items: center;
+    background: var(--tr-surface-2);
+    border: 1px solid var(--tr-border);
+    border-radius: 50%;
+    color: var(--tr-muted);
+    display: flex;
+    flex: 0 0 21px;
+    font-size: 10px;
+    height: 21px;
+    justify-content: center;
+    margin-top: 1px;
+    position: relative;
+    width: 21px;
+    z-index: 1;
+}
+
+.tralla-history-body {
+    font-size: 12px;
+    min-width: 0;
+    padding-bottom: 3px;
+}
+
+.tralla-history-body strong {
+    font-weight: 600;
+}
+
+.tralla-history-body small {
+    color: var(--tr-muted);
+    display: block;
+    font-size: 10px;
+    margin-top: 1px;
+}
+
+.tralla-history-body p {
+    color: var(--tr-text-soft);
+    margin-top: 3px;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.tralla-empty-mini {
+    color: var(--tr-muted);
+    font-size: 12px;
+    font-style: italic;
+}
+
+/* ------------------------------------------------------------- config */
+
+.tralla-config-grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: 1120px;
+}
+
+.tralla-config-card {
+    display: flex;
+    flex-direction: column;
+    gap: 13px;
+    padding: 18px;
+}
+
+.tralla-config-card header p {
+    color: var(--tr-muted);
+    font-size: 12px;
+    margin-top: 3px;
+}
+
+.tralla-config-card header h2 {
+    align-items: center;
+    display: flex;
+    font-size: 15px;
+    gap: 6px;
+}
+
+.tralla-config-actions {
+    display: flex;
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+}
+
+.tralla-config-card code {
+    background: var(--tr-surface-2);
+    border-radius: 3px;
+    font-size: 11px;
+    padding: 1px 4px;
+}
+
+.tralla-models-card {
+    margin-top: 16px;
+    max-width: 1120px;
+}
+
+.tralla-model-add-form {
+    background: var(--tr-surface-2);
+    border: 1px solid var(--tr-border);
+    border-radius: var(--tr-radius-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+}
+
+.tralla-model-add-form .tralla-form-row {
+    margin: 0;
+}
+
+.tralla-model-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.tralla-model-row {
+    align-items: center;
+    border-bottom: 1px solid var(--tr-border);
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    padding: 8px 0;
+}
+
+.tralla-model-row:last-child {
+    border-bottom: 0;
+}
+
+.tralla-model-row.is-archived {
+    opacity: 0.65;
+}
+
+.tralla-model-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.tralla-model-info small {
+    color: var(--tr-muted);
+    font-size: 11px;
+    overflow-wrap: anywhere;
+}
+
+/* --------------------------------------------------------------- toast */
+
+#tralla-toast-root {
+    bottom: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+    position: fixed;
+    right: 22px;
+    z-index: 1200;
+}
+
+.tralla-toast {
+    align-items: flex-start;
+    animation: tralla-toast-in 180ms ease-out;
+    background: var(--tr-text);
+    border-radius: var(--tr-radius-sm);
+    box-shadow: var(--tr-shadow);
+    color: var(--tr-surface);
+    display: flex;
+    font-family: var(--tr-font);
+    font-size: 13px;
+    gap: 8px;
+    max-width: 360px;
+    padding: 10px 13px;
+    pointer-events: auto;
+}
+
+.tralla-toast.is-error {
+    background: var(--tr-danger);
+    color: #fff;
+}
+
+.tralla-toast.is-success {
+    background: var(--tr-success);
+    color: #fff;
+}
+
+.tralla-toast .ti {
+    font-size: 17px;
+    margin-top: 1px;
+}
+
+@keyframes tralla-toast-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.tralla-spinner {
+    animation: tralla-spin 700ms linear infinite;
+    border: 2px solid currentColor;
+    border-radius: 50%;
+    border-right-color: transparent;
+    display: inline-block;
+    height: 14px;
+    width: 14px;
+}
+
+@keyframes tralla-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.tralla-loading {
+    align-items: center;
+    color: rgba(255, 255, 255, 0.85);
+    display: flex;
+    font-size: 13px;
+    gap: 8px;
+    padding: 20px;
+}
+
+body.tralla-modal-open {
+    overflow: hidden;
+}
+
+.tralla-card-tech {
+    align-items: center;
+    display: inline-flex;
+    gap: 4px;
+    min-width: 0;
+}
+
+.tralla-btn.is-busy {
+    cursor: progress;
+    opacity: 0.7;
+}
+
+.tralla-create-machine {
+    background: var(--tr-surface-2);
+    border: 1px solid var(--tr-border);
+    border-radius: var(--tr-radius-sm);
+    margin-bottom: 8px;
+    padding: 10px 38px 10px 10px;
+    position: relative;
+}
+
+.tralla-create-machine > .tralla-icon-btn {
+    color: var(--tr-muted);
+    position: absolute;
+    right: 4px;
+    top: 4px;
+}
+
+.tralla-create-machine .tralla-add-machine-grid {
+    margin-top: 0;
+}
+
+/* ------------------------------------------------------------ responsive */
+
+@media (max-width: 900px) {
+    .tralla-detail-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .tralla-config-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .tralla-config-actions {
+        grid-column: 1;
+    }
+}
+
+@media (max-width: 680px) {
+    .tralla-page {
+        padding: 14px;
+    }
+
+    .tralla-page-head,
+    .tralla-kanban-head {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .tralla-head-actions {
+        justify-content: flex-start;
+    }
+
+    .tralla-kanban-page {
+        margin: -14px;
+        min-height: calc(100vh - 40px);
+    }
+
+    .tralla-kanban-head {
+        padding: 14px 14px 8px;
+    }
+
+    .tralla-board-scroll {
+        padding: 6px 14px 18px;
+        scroll-snap-type: x proximity;
+    }
+
+    .tralla-list {
+        flex-basis: 86vw;
+        max-height: none;
+        min-height: 60vh;
+        scroll-snap-align: start;
+        width: 86vw;
+    }
+
+    .tralla-board-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .tralla-form-row,
+    .tralla-machine-grid,
+    .tralla-add-machine-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .tralla-add-machine-grid .tralla-field:first-child {
+        grid-column: 1;
+    }
+
+    .tralla-modal-backdrop {
+        align-items: flex-end;
+        padding: 0;
+    }
+
+    .tralla-modal {
+        border-radius: var(--tr-radius-lg) var(--tr-radius-lg) 0 0;
+        max-height: 94vh;
+    }
+
+    .tralla-modal-head,
+    .tralla-modal-body {
+        padding-left: 15px;
+        padding-right: 15px;
+    }
+
+    .tralla-modal-actions {
+        padding-left: 15px;
+        padding-right: 15px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tralla-page *,
+    .tralla-modal *,
+    .tralla-toast {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
