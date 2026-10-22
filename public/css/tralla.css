@@ -33,6 +33,13 @@
     --tr-shadow-sm: 0 1px 2px rgba(9, 30, 66, 0.12);
     --tr-shadow: 0 8px 24px rgba(9, 30, 66, 0.12);
     --tr-shadow-lg: 0 24px 64px rgba(9, 30, 66, 0.24);
+    --tr-list-bg: #f1f2f4;
+    --tr-card-bg: #ffffff;
+    --tr-card-hover: #f7f8f9;
+    --tr-card-shadow: 0 1px 1px rgba(9, 30, 66, 0.25), 0 0 1px rgba(9, 30, 66, 0.3);
+    --tr-card-shadow-hover: 0 2px 6px rgba(9, 30, 66, 0.22), 0 0 1px rgba(9, 30, 66, 0.32);
+    --tr-toast-bg: #172b4d;
+    --tr-toast-text: #ffffff;
     --tr-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
@@ -66,6 +73,13 @@ body[data-theme="dark"] .tralla-toast,
     --tr-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
     --tr-shadow: 0 12px 32px rgba(0, 0, 0, 0.38);
     --tr-shadow-lg: 0 28px 72px rgba(0, 0, 0, 0.55);
+    --tr-list-bg: #22272b;
+    --tr-card-bg: #282e33;
+    --tr-card-hover: #2c333a;
+    --tr-card-shadow: 0 1px 1px rgba(0, 0, 0, 0.5), 0 0 1px rgba(0, 0, 0, 0.6);
+    --tr-card-shadow-hover: 0 2px 8px rgba(0, 0, 0, 0.55);
+    --tr-toast-bg: #282e33;
+    --tr-toast-text: #e8edf3;
 }
 
 /* ---------------------------------------------------------------- base */
@@ -443,7 +457,7 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 /* ------------------------------------------------------------- kanban */
 
 .tralla-kanban-page {
-    background: linear-gradient(135deg, #0b4f6c 0%, #0079bf 52%, #00a8cc 100%);
+    background: linear-gradient(135deg, #0b4f6c 0%, #0079bf 46%, #00a8cc 100%);
     border-radius: 0;
     color: #fff;
     display: flex;
@@ -452,10 +466,25 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
     max-width: none;
     min-height: calc(100vh - 52px);
     padding: 0;
+    position: relative;
+}
+
+.tralla-kanban-page::before {
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0) 42%);
+    content: "";
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+    z-index: 0;
+}
+
+.tralla-kanban-page > * {
+    position: relative;
+    z-index: 1;
 }
 
 .tralla-kanban-page.tr-bg-aurora {
-    background: linear-gradient(135deg, #172554 0%, #4338ca 48%, #db2777 100%);
+    background: linear-gradient(135deg, #172554 0%, #4338ca 52%, #a855f7 100%);
 }
 
 .tralla-kanban-page.tr-bg-sunset {
@@ -463,11 +492,11 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 }
 
 .tralla-kanban-page.tr-bg-forest {
-    background: linear-gradient(135deg, #052e16 0%, #15803d 52%, #84cc16 100%);
+    background: linear-gradient(135deg, #052e16 0%, #15803d 52%, #65a30d 100%);
 }
 
 .tralla-kanban-page.tr-bg-graphite {
-    background: linear-gradient(135deg, #111827 0%, #374151 52%, #6b7280 100%);
+    background: linear-gradient(135deg, #0f172a 0%, #374151 52%, #6b7280 100%);
 }
 
 .tralla-kanban-page.tr-bg-candy {
@@ -476,121 +505,214 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 
 .tralla-kanban-head {
     align-items: flex-start;
+    backdrop-filter: blur(8px);
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.12));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     display: flex;
-    gap: 20px;
+    gap: 16px;
     justify-content: space-between;
-    padding: 20px 24px 14px;
+    padding: 12px 16px 10px;
+    position: sticky;
+    top: 0;
+    z-index: 20;
 }
 
 .tralla-kanban-title {
-    align-items: flex-start;
+    align-items: center;
     display: flex;
-    gap: 10px;
+    flex: 1 1 auto;
+    gap: 8px;
     min-width: 0;
 }
 
-.tralla-kanban-title .tralla-icon-btn {
-    color: rgba(255, 255, 255, 0.9);
+.tralla-back-btn {
+    background: rgba(255, 255, 255, 0.16);
+    border-radius: 8px;
+    color: #fff;
     flex: 0 0 auto;
-    margin-top: 2px;
+    height: 32px;
+    margin-top: 0;
+    width: 32px;
 }
 
-.tralla-kanban-title .tralla-icon-btn:hover {
-    background: rgba(0, 0, 0, 0.18);
+.tralla-back-btn:hover {
+    background: rgba(255, 255, 255, 0.28);
+    color: #fff;
+}
+
+.tralla-board-heading {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.tralla-board-title-row {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
 .tralla-kanban-title h1 {
     color: #fff;
-    font-size: 24px;
+    font-size: 20px;
+    font-weight: 700;
     line-height: 1.25;
-    margin: 5px 0 0;
+    margin: 0;
+    min-width: 0;
     overflow-wrap: anywhere;
 }
 
 .tralla-kanban-title p {
-    color: rgba(255, 255, 255, 0.78);
-    font-size: 13px;
-    margin-top: 3px;
+    color: rgba(255, 255, 255, 0.76);
+    font-size: 12.5px;
+    margin-top: 2px;
     max-width: 720px;
 }
 
-.tralla-kanban-head .tralla-btn {
-    background: rgba(255, 255, 255, 0.14);
-    border-color: rgba(255, 255, 255, 0.24);
+.tralla-kanban-head .tralla-board-type {
+    background: rgba(0, 0, 0, 0.2);
+    border-color: rgba(255, 255, 255, 0.2);
+    font-size: 10px;
+    padding: 3px 8px;
+}
+
+.tralla-kanban-head .tralla-board-type.is-maintenance {
+    background: rgba(255, 193, 7, 0.22);
+    border-color: rgba(255, 224, 130, 0.42);
+}
+
+.tralla-kanban-head .tralla-btn,
+.tralla-kanban-action {
+    background: rgba(255, 255, 255, 0.16);
+    border: 0;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 500;
+    min-height: 32px;
+    padding: 6px 12px;
+}
+
+.tralla-kanban-head .tralla-btn:hover,
+.tralla-kanban-action:hover {
+    background: rgba(255, 255, 255, 0.28);
+    border: 0;
     color: #fff;
 }
 
-.tralla-kanban-head .tralla-btn:hover {
-    background: rgba(255, 255, 255, 0.24);
-    color: #fff;
+.tralla-kanban-action-icon {
+    padding: 6px;
+    width: 32px;
 }
 
 .tralla-board-scroll {
     align-items: flex-start;
     display: flex;
     flex: 1;
-    gap: 14px;
+    gap: 12px;
     overflow-x: auto;
     overflow-y: hidden;
-    padding: 8px 24px 24px;
-    scrollbar-color: rgba(255, 255, 255, 0.4) transparent;
+    padding: 10px 16px 20px;
+    scrollbar-color: rgba(255, 255, 255, 0.45) transparent;
+    scrollbar-width: thin;
+}
+
+.tralla-board-scroll::-webkit-scrollbar {
+    height: 10px;
+}
+
+.tralla-board-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.tralla-board-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.42);
+    background-clip: content-box;
+    border: 2px solid transparent;
+    border-radius: 999px;
 }
 
 .tralla-list {
-    background: rgba(255, 255, 255, 0.94);
-    border-radius: var(--tr-radius);
-    box-shadow: var(--tr-shadow-sm);
+    background: var(--tr-list-bg);
+    border-radius: 12px;
+    box-shadow: 0 1px 1px rgba(9, 30, 66, 0.18);
     color: var(--tr-text);
     display: flex;
-    flex: 0 0 300px;
+    flex: 0 0 272px;
     flex-direction: column;
-    max-height: calc(100vh - 170px);
-    min-height: 120px;
+    max-height: calc(100vh - 128px);
+    min-height: 72px;
     overflow: hidden;
     transition: box-shadow 140ms ease;
-    width: 300px;
+    width: 272px;
 }
 
 .tralla-list.is-drop-target {
-    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9), var(--tr-shadow);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.95), 0 8px 20px rgba(0, 0, 0, 0.24);
 }
 
 .tralla-list-head {
-    align-items: flex-start;
-    border-top: 3px solid var(--tr-list-color, var(--tr-primary));
+    align-items: center;
     display: flex;
     gap: 8px;
     justify-content: space-between;
-    padding: 11px 12px 8px;
+    padding: 8px 8px 6px 12px;
+}
+
+.tralla-list-title {
+    align-items: center;
+    display: flex;
+    gap: 6px;
+    min-width: 0;
+}
+
+.tralla-list-dot {
+    background: var(--tr-list-color, var(--tr-primary));
+    border-radius: 50%;
+    flex: 0 0 auto;
+    height: 8px;
+    width: 8px;
 }
 
 .tralla-list-head h3 {
     font-size: 14px;
-    font-weight: 700;
-    line-height: 1.3;
+    font-weight: 600;
+    line-height: 20px;
     overflow-wrap: anywhere;
 }
 
 .tralla-list-head .tralla-list-count {
-    background: var(--tr-surface-2);
-    border-radius: 999px;
+    background: transparent;
+    border-radius: 0;
     color: var(--tr-muted);
     display: inline-block;
-    font-size: 11px;
-    margin-left: 6px;
-    padding: 1px 7px;
-    vertical-align: 1px;
+    font-size: 12px;
+    font-weight: 400;
+    margin-left: 2px;
+    padding: 0;
+    vertical-align: 0;
 }
 
 .tralla-list-head-actions {
     display: flex;
-    gap: 1px;
+    gap: 0;
+    opacity: 0;
+    transition: opacity 120ms ease;
+}
+
+.tralla-list:hover .tralla-list-head-actions,
+.tralla-list:focus-within .tralla-list-head-actions {
+    opacity: 1;
 }
 
 .tralla-list-head .tralla-icon-btn {
     color: var(--tr-muted);
     height: 26px;
     width: 26px;
+}
+
+.tralla-list-head .tralla-icon-btn:hover {
+    background: rgba(9, 30, 66, 0.08);
 }
 
 .tralla-list-head .tralla-icon-btn .ti {
@@ -601,39 +723,117 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    min-height: 12px;
+    min-height: 4px;
     overflow-y: auto;
-    padding: 2px 8px 8px;
+    padding: 0 8px 4px;
+    scrollbar-color: rgba(9, 30, 66, 0.28) transparent;
+    scrollbar-width: thin;
+}
+
+.tralla-cards::-webkit-scrollbar {
+    width: 8px;
+}
+
+.tralla-cards::-webkit-scrollbar-thumb {
+    background: rgba(9, 30, 66, 0.24);
+    background-clip: content-box;
+    border: 2px solid transparent;
+    border-radius: 999px;
 }
 
 .tralla-cards.is-drag-over {
-    background: var(--tr-primary-soft);
-    border-radius: var(--tr-radius-sm);
+    background: rgba(9, 30, 66, 0.06);
+    border-radius: 8px;
 }
 
-.tralla-card {
-    background: var(--tr-surface);
-    border: 1px solid var(--tr-border);
-    border-radius: var(--tr-radius-sm);
-    box-shadow: var(--tr-shadow-sm);
+.tralla-board-scroll .tralla-card {
+    background: var(--tr-card-bg);
+    border: 0;
+    border-radius: 8px;
+    box-shadow: var(--tr-card-shadow);
     cursor: pointer;
-    padding: 10px 10px 9px;
+    padding: 8px 10px 6px;
     position: relative;
-    transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+    transition: background 120ms ease, box-shadow 120ms ease, transform 120ms ease;
 }
 
-.tralla-card:hover {
-    border-color: var(--tr-border-strong);
-    box-shadow: 0 3px 10px rgba(9, 30, 66, 0.16);
+.tralla-board-scroll .tralla-card:hover {
+    background: var(--tr-card-hover);
+    border: 0;
+    box-shadow: var(--tr-card-shadow-hover);
 }
 
-.tralla-card.is-dragging {
-    opacity: 0.5;
-    transform: rotate(1.5deg);
+.tralla-board-scroll .tralla-card.is-dragging {
+    box-shadow: 0 12px 28px rgba(9, 30, 66, 0.35);
+    opacity: 0.9;
+    transform: rotate(3deg);
 }
 
-.tralla-card.is-locked {
+.tralla-board-scroll .tralla-card.is-locked {
     cursor: default;
+}
+
+.tralla-card-edit {
+    color: var(--tr-muted);
+    opacity: 0;
+    pointer-events: none;
+    position: absolute;
+    right: 8px;
+    top: 8px;
+    transition: opacity 120ms ease;
+}
+
+.tralla-card-edit .ti {
+    font-size: 14px;
+}
+
+.tralla-board-scroll .tralla-card:hover .tralla-card-edit {
+    opacity: 1;
+}
+
+.tralla-card-label {
+    align-self: flex-start;
+    background: #97a0af;
+    border-radius: 4px;
+    color: #fff;
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    margin-bottom: 6px;
+    max-width: 100%;
+    overflow: hidden;
+    padding: 4px 6px;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.tralla-card-label-pending {
+    background: #ff9f1a;
+    color: #172b4d;
+}
+
+.tralla-card-label-progress {
+    background: #0079bf;
+}
+
+.tralla-card-label-approval {
+    background: #c377e0;
+}
+
+.tralla-card-label-withdrawal {
+    background: #f2d600;
+    color: #172b4d;
+}
+
+.tralla-card-label-done {
+    background: #61bd4f;
+}
+
+.tralla-card-label-danger {
+    background: #eb5a46;
 }
 
 .tralla-card-top {
@@ -641,26 +841,29 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
     display: flex;
     gap: 6px;
     justify-content: space-between;
-    margin-bottom: 5px;
+    margin-bottom: 2px;
+    padding-right: 16px;
 }
 
 .tralla-card-code {
     color: var(--tr-muted);
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-    font-size: 11px;
-    font-weight: 700;
+    font-size: 10.5px;
+    font-weight: 600;
 }
 
 .tralla-card-source {
     color: var(--tr-muted);
     font-size: 10px;
+    font-weight: 600;
     text-transform: uppercase;
 }
 
-.tralla-card h4 {
-    font-size: 13.5px;
-    font-weight: 600;
-    line-height: 1.35;
+.tralla-board-scroll .tralla-card h4 {
+    color: var(--tr-text);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 20px;
     overflow-wrap: anywhere;
 }
 
@@ -674,31 +877,81 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
     overflow: hidden;
 }
 
-.tralla-card-meta {
+.tralla-card-footer {
+    align-items: center;
+    color: var(--tr-muted);
+    display: flex;
+    font-size: 12px;
+    gap: 6px;
+    justify-content: space-between;
+    margin-top: 8px;
+    min-height: 20px;
+}
+
+.tralla-card-badges {
     align-items: center;
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 8px;
+    gap: 10px;
+    min-width: 0;
+}
+
+.tralla-card-badge {
+    align-items: center;
+    color: var(--tr-muted);
+    display: inline-flex;
+    font-size: 11px;
+    font-weight: 500;
+    gap: 3px;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.tralla-card-badge .ti {
+    font-size: 13px;
 }
 
 .tralla-card-progress {
+    gap: 5px;
+}
+
+.tralla-card-progress .tralla-progress {
+    flex: 0 0 52px;
+    height: 4px;
+}
+
+.tralla-card-avatar {
     align-items: center;
-    display: flex;
-    flex: 1 1 100%;
-    gap: 6px;
+    display: inline-flex;
+    flex: 0 0 auto;
+    margin-left: auto;
+}
+
+.tralla-avatar {
+    align-items: center;
+    background: #0079bf;
+    border-radius: 50%;
+    color: #fff;
+    display: inline-flex;
+    flex: 0 0 auto;
+    font-size: 10px;
+    font-weight: 700;
+    height: 24px;
+    justify-content: center;
+    text-transform: uppercase;
+    width: 24px;
 }
 
 .tralla-progress {
-    background: var(--tr-surface-3);
+    background: #dfe1e6;
     border-radius: 999px;
     flex: 1;
-    height: 5px;
+    height: 4px;
     overflow: hidden;
 }
 
 .tralla-progress > span {
-    background: var(--tr-primary);
+    background: #0079bf;
     border-radius: inherit;
     display: block;
     height: 100%;
@@ -706,117 +959,116 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 }
 
 .tralla-progress.is-complete > span {
-    background: var(--tr-success);
+    background: #61bd4f;
 }
 
-.tralla-card-progress small {
-    color: var(--tr-muted);
-    font-size: 10px;
-    white-space: nowrap;
-}
-
-.tralla-avatar {
+.tralla-card-meta {
     align-items: center;
-    background: var(--tr-primary);
-    border-radius: 50%;
-    color: #fff;
-    display: inline-flex;
-    flex: 0 0 auto;
-    font-size: 10px;
-    font-weight: 700;
-    height: 22px;
-    justify-content: center;
-    text-transform: uppercase;
-    width: 22px;
-}
-
-.tralla-card-footer {
-    align-items: center;
-    color: var(--tr-muted);
     display: flex;
-    font-size: 11px;
+    flex-wrap: wrap;
     gap: 6px;
-    justify-content: space-between;
-    margin-top: 7px;
+    margin-top: 6px;
 }
 
 .tralla-card-lock {
     color: var(--tr-muted);
-    font-size: 11px;
 }
 
-.tralla-add-card,
-.tralla-add-list {
+.tralla-add-card {
     align-items: center;
     background: transparent;
     border: 0;
-    border-radius: var(--tr-radius-sm);
-    color: var(--tr-muted);
+    border-radius: 8px;
+    color: #44546f;
     cursor: pointer;
     display: flex;
     font-family: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    gap: 5px;
+    font-size: 14px;
+    font-weight: 500;
+    gap: 6px;
     margin: 0 8px 8px;
-    padding: 7px 8px;
+    padding: 6px 8px;
     text-align: left;
     transition: background 120ms ease, color 120ms ease;
+    width: calc(100% - 16px);
 }
 
-.tralla-add-card:hover,
-.tralla-add-list:hover {
-    background: var(--tr-surface-2);
+.tralla-add-card:hover {
+    background: rgba(9, 30, 66, 0.08);
     color: var(--tr-text);
 }
 
-.tralla-list-composer {
-    background: rgba(255, 255, 255, 0.96);
-    border-radius: var(--tr-radius);
-    box-shadow: var(--tr-shadow-sm);
-    flex: 0 0 300px;
-    padding: 10px;
-    width: 300px;
-}
-
-.tralla-list-composer input,
-.tralla-list-composer select {
-    margin-bottom: 7px;
-    width: 100%;
-}
-
-.tralla-list-composer-actions {
-    display: flex;
-    gap: 6px;
-}
-
-.tralla-composer {
-    background: var(--tr-surface);
-    border-radius: var(--tr-radius-sm);
-    box-shadow: var(--tr-shadow);
-    margin: 0 0 2px;
-    padding: 8px;
-}
-
-.tralla-composer textarea {
-    min-height: 64px;
-    resize: vertical;
-    width: 100%;
-}
-
-.tralla-composer-actions {
+.tralla-add-list-column {
     align-items: center;
+    background: rgba(255, 255, 255, 0.24);
+    border: 0;
+    border-radius: 12px;
+    color: #fff;
+    cursor: pointer;
     display: flex;
+    flex: 0 0 272px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
     gap: 6px;
-    margin-top: 7px;
+    min-height: 44px;
+    padding: 10px 12px;
+    text-align: left;
+    transition: background 120ms ease;
+    width: 272px;
+}
+
+.tralla-add-list-column:hover {
+    background: rgba(255, 255, 255, 0.32);
+}
+
+.tralla-add-list-column .ti {
+    font-size: 16px;
+}
+
+.tralla-board-scroll > .tralla-empty {
+    align-self: center;
+    background: rgba(0, 0, 0, 0.18);
+    border: 1px dashed rgba(255, 255, 255, 0.35);
+    color: #fff;
+    flex: 1 1 100%;
+    margin: 12px 0;
+    max-width: 520px;
+}
+
+.tralla-board-scroll > .tralla-empty h2,
+.tralla-board-scroll > .tralla-empty > .ti {
+    color: #fff;
+}
+
+.tralla-board-scroll > .tralla-empty p {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+html[data-theme="dark"] .tralla-list,
+body[data-theme="dark"] .tralla-list,
+.tralla-kanban-page[data-theme="dark"] .tralla-list {
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.4);
+}
+
+html[data-theme="dark"] .tralla-add-card,
+body[data-theme="dark"] .tralla-add-card,
+.tralla-kanban-page[data-theme="dark"] .tralla-add-card {
+    color: var(--tr-muted);
+}
+
+html[data-theme="dark"] .tralla-add-card:hover,
+body[data-theme="dark"] .tralla-add-card:hover,
+.tralla-kanban-page[data-theme="dark"] .tralla-add-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--tr-text);
 }
 
 /* -------------------------------------------------------------- modals */
 
 .tralla-modal-backdrop {
     align-items: center;
-    backdrop-filter: blur(4px);
-    background: rgba(9, 30, 66, 0.55);
+    background: rgba(0, 0, 0, 0.64);
     display: flex;
     inset: 0;
     justify-content: center;
@@ -831,12 +1083,13 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 
 .tralla-modal {
     background: var(--tr-surface);
-    border-radius: var(--tr-radius-lg);
-    box-shadow: var(--tr-shadow-lg);
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
     color: var(--tr-text);
     display: flex;
     flex-direction: column;
-    max-height: min(92vh, 900px);
+    font-family: var(--tr-font);
+    max-height: min(90vh, 900px);
     max-width: 760px;
     overflow: hidden;
     width: 100%;
@@ -848,17 +1101,17 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 
 .tralla-modal-head {
     align-items: flex-start;
-    border-bottom: 1px solid var(--tr-border);
     display: flex;
     gap: 12px;
     justify-content: space-between;
-    padding: 18px 20px 14px;
+    padding: 20px 24px 10px;
 }
 
 .tralla-modal-head h2 {
     align-items: center;
     display: flex;
-    font-size: 19px;
+    font-size: 20px;
+    font-weight: 600;
     gap: 7px;
     line-height: 1.3;
 }
@@ -871,18 +1124,17 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 
 .tralla-modal-body {
     overflow-y: auto;
-    padding: 18px 20px;
+    padding: 10px 24px 24px;
 }
 
 .tralla-modal-actions {
     align-items: center;
-    background: var(--tr-surface-2);
-    border-top: 1px solid var(--tr-border);
+    background: transparent;
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
     justify-content: flex-end;
-    padding: 12px 20px;
+    padding: 0 24px 20px;
 }
 
 .tralla-modal-actions .tralla-spacer {
@@ -1404,10 +1656,14 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 }
 
 .tralla-detail-code {
+    background: var(--tr-surface-2);
+    border-radius: 4px;
     color: var(--tr-muted);
+    display: inline-block;
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-    font-size: 12px;
+    font-size: 11.5px;
     font-weight: 700;
+    padding: 2px 6px;
 }
 
 .tralla-detail-title {
@@ -1443,29 +1699,26 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 .tralla-detail-side {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
     min-width: 0;
 }
 
 .tralla-detail-section {
-    border-top: 1px solid var(--tr-border);
-    padding-top: 14px;
-}
-
-.tralla-detail-section:first-child {
-    border-top: 0;
-    padding-top: 0;
+    background: var(--tr-surface-2);
+    border-radius: 10px;
+    padding: 12px 14px;
 }
 
 .tralla-detail-section > h3 {
     align-items: center;
-    display: flex;
-    font-size: 13px;
-    gap: 6px;
-    margin-bottom: 9px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
     color: var(--tr-muted);
+    display: flex;
+    font-size: 12px;
+    font-weight: 600;
+    gap: 6px;
+    letter-spacing: 0.02em;
+    margin-bottom: 8px;
+    text-transform: uppercase;
 }
 
 .tralla-detail-section > h3 .ti {
@@ -1474,9 +1727,9 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 
 .tralla-detail-description {
     color: var(--tr-text-soft);
-    font-size: 13px;
-    white-space: pre-wrap;
+    font-size: 14px;
     overflow-wrap: anywhere;
+    white-space: pre-wrap;
 }
 
 .tralla-detail-edit-actions {
@@ -1487,7 +1740,11 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 }
 
 .tralla-detail-side .tralla-card {
-    padding: 13px;
+    background: var(--tr-surface-2);
+    border: 0;
+    border-radius: 10px;
+    box-shadow: none;
+    padding: 12px;
 }
 
 .tralla-detail-side h3 {
@@ -1522,9 +1779,10 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 }
 
 .tralla-machine {
-    background: var(--tr-surface-2);
-    border: 1px solid var(--tr-border);
-    border-radius: var(--tr-radius-sm);
+    background: var(--tr-card-bg);
+    border: 0;
+    border-radius: 8px;
+    box-shadow: var(--tr-card-shadow);
     margin-bottom: 10px;
     padding: 12px;
 }
@@ -1696,28 +1954,32 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 .tralla-history-item:not(:last-child)::before {
     background: var(--tr-border);
     content: "";
-    left: 10px;
+    left: 11px;
     position: absolute;
-    top: 30px;
+    top: 32px;
     bottom: -2px;
     width: 1px;
 }
 
 .tralla-history-dot {
     align-items: center;
-    background: var(--tr-surface-2);
-    border: 1px solid var(--tr-border);
+    background: transparent;
+    border: 0;
     border-radius: 50%;
-    color: var(--tr-muted);
     display: flex;
-    flex: 0 0 21px;
-    font-size: 10px;
-    height: 21px;
+    flex: 0 0 24px;
+    height: 24px;
     justify-content: center;
-    margin-top: 1px;
+    margin-top: 0;
     position: relative;
-    width: 21px;
+    width: 24px;
     z-index: 1;
+}
+
+.tralla-history-dot .tralla-avatar {
+    font-size: 9px;
+    height: 24px;
+    width: 24px;
 }
 
 .tralla-history-body {
@@ -1847,6 +2109,164 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
     overflow-wrap: anywhere;
 }
 
+/* ------------------------------------------------------------- dialogs */
+
+.tralla-dialog-layer {
+    align-items: center;
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    padding: 24px;
+    position: fixed;
+    z-index: 1300;
+}
+
+.tralla-dialog-backdrop {
+    background: rgba(0, 0, 0, 0.64);
+    inset: 0;
+    position: absolute;
+}
+
+.tralla-dialog {
+    animation: tralla-dialog-in 140ms ease-out;
+    margin: 0;
+    max-width: 420px;
+    position: relative;
+    width: 100%;
+    z-index: 1;
+}
+
+.tralla-dialog-head {
+    align-items: flex-start;
+    display: flex;
+    gap: 12px;
+    padding: 20px 20px 0;
+}
+
+.tralla-dialog-icon {
+    align-items: center;
+    background: #deebff;
+    border-radius: 50%;
+    color: #0052cc;
+    display: flex;
+    flex: 0 0 34px;
+    height: 34px;
+    justify-content: center;
+    width: 34px;
+}
+
+.tralla-dialog-icon .ti {
+    font-size: 18px;
+}
+
+.tralla-dialog-danger .tralla-dialog-icon {
+    background: #ffebe6;
+    color: #de350b;
+}
+
+.tralla-dialog-copy {
+    min-width: 0;
+    padding-top: 1px;
+}
+
+.tralla-dialog-title {
+    color: var(--tr-text);
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.35;
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.tralla-dialog-message {
+    color: var(--tr-muted);
+    font-size: 13px;
+    line-height: 1.5;
+    margin-top: 4px;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.tralla-dialog-message:empty {
+    display: none;
+}
+
+.tralla-dialog-field {
+    margin: 14px 20px 0;
+}
+
+.tralla-dialog-field label {
+    color: var(--tr-muted);
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.tralla-dialog-field input,
+.tralla-dialog-field textarea {
+    background: var(--tr-surface);
+    border: 1.5px solid var(--tr-border);
+    border-radius: 6px;
+    color: var(--tr-text);
+    font-family: inherit;
+    font-size: 14px;
+    padding: 8px 10px;
+    width: 100%;
+}
+
+.tralla-dialog-field textarea {
+    min-height: 76px;
+    resize: vertical;
+}
+
+.tralla-dialog-field input:focus,
+.tralla-dialog-field textarea:focus {
+    border-color: #4c9aff;
+    box-shadow: 0 0 0 3px rgba(76, 154, 255, 0.22);
+    outline: 0;
+}
+
+.tralla-dialog-error {
+    color: var(--tr-danger);
+    font-size: 12px;
+    margin: 6px 20px 0;
+}
+
+.tralla-dialog-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    padding: 16px 20px 20px;
+}
+
+html[data-theme="dark"] .tralla-dialog-icon,
+body[data-theme="dark"] .tralla-dialog-icon,
+.tralla-modal[data-theme="dark"] .tralla-dialog-icon {
+    background: rgba(76, 154, 255, 0.18);
+}
+
+html[data-theme="dark"] .tralla-dialog-danger .tralla-dialog-icon,
+body[data-theme="dark"] .tralla-dialog-danger .tralla-dialog-icon,
+.tralla-modal[data-theme="dark"] .tralla-dialog-danger .tralla-dialog-icon {
+    background: rgba(235, 90, 70, 0.18);
+}
+
+@keyframes tralla-dialog-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+body.tralla-dialog-open {
+    overflow: hidden;
+}
+
 /* --------------------------------------------------------------- toast */
 
 #tralla-toast-root {
@@ -1854,19 +2274,19 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    left: 22px;
     pointer-events: none;
     position: fixed;
-    right: 22px;
     z-index: 1200;
 }
 
 .tralla-toast {
     align-items: flex-start;
     animation: tralla-toast-in 180ms ease-out;
-    background: var(--tr-text);
-    border-radius: var(--tr-radius-sm);
-    box-shadow: var(--tr-shadow);
-    color: var(--tr-surface);
+    background: var(--tr-toast-bg);
+    border-radius: 6px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+    color: var(--tr-toast-text);
     display: flex;
     font-family: var(--tr-font);
     font-size: 13px;
@@ -1877,12 +2297,12 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 }
 
 .tralla-toast.is-error {
-    background: var(--tr-danger);
+    background: #bf2600;
     color: #fff;
 }
 
 .tralla-toast.is-success {
-    background: var(--tr-success);
+    background: #006644;
     color: #fff;
 }
 
@@ -2015,6 +2435,73 @@ body.tralla-modal-open {
         min-height: 60vh;
         scroll-snap-align: start;
         width: 86vw;
+    }
+
+    .tralla-add-list-column {
+        flex-basis: 86vw;
+        scroll-snap-align: start;
+        width: 86vw;
+    }
+
+    .tralla-list-head-actions {
+        opacity: 1;
+    }
+
+    .tralla-kanban-title {
+        width: 100%;
+    }
+
+    .tralla-board-heading {
+        max-width: 100%;
+    }
+
+    .tralla-head-actions {
+        flex-wrap: wrap;
+    }
+
+    .tralla-kanban-title h1 {
+        font-size: 18px;
+    }
+
+    .tralla-dialog-layer {
+        align-items: flex-end;
+        padding: 0;
+    }
+
+    .tralla-dialog {
+        border-radius: 12px 12px 0 0;
+        max-height: 92vh;
+        max-width: none;
+        width: 100%;
+    }
+
+    .tralla-dialog-head {
+        padding: 18px 16px 0;
+    }
+
+    .tralla-dialog-field {
+        margin-left: 16px;
+        margin-right: 16px;
+    }
+
+    .tralla-dialog-error {
+        margin-left: 16px;
+        margin-right: 16px;
+    }
+
+    .tralla-dialog-actions {
+        padding: 15px 16px 18px;
+    }
+
+    #tralla-toast-root {
+        bottom: 14px;
+        left: 14px;
+        right: 14px;
+    }
+
+    .tralla-toast {
+        max-width: none;
+        width: 100%;
     }
 
     .tralla-board-grid {

@@ -68,6 +68,229 @@
         syncBoardColorValue();
     }
 
+    /* ------------------------------------------------------- dialogs */
+
+    var activePluginDialog = null;
+
+    function dialogEscape(value) {
+        return String(value === null || value === undefined ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function openPluginDialog(config) {
+        config = config || {};
+
+        return new Promise(function (resolve) {
+            if (activePluginDialog) {
+                activePluginDialog.cancel();
+            }
+
+            var mode = config.mode === 'prompt' ? 'prompt' : 'confirm';
+            var tone = config.tone === 'danger' ? 'danger' : 'primary';
+            var icon = config.icon || (tone === 'danger' ? 'ti-alert-triangle' : 'ti-info-circle');
+            var title = config.title || 'Confirmar';
+            var message = config.message || '';
+            var confirmLabel = config.confirmLabel || 'Confirmar';
+            var cancelLabel = config.cancelLabel || 'Cancelar';
+            var uid = 'tralla-dialog-' + Date.now();
+            var previousFocus = document.activeElement;
+            var fieldHtml = '';
+
+            if (mode === 'prompt') {
+                var label = config.label || '';
+                var maxlength = Number(config.maxlength || 255);
+                var value = config.value === null || config.value === undefined ? '' : String(config.value);
+                var labelHtml = label
+                    ? '<label for="' + uid + '-input">' + dialogEscape(label) + '</label>'
+                    : '';
+                if (config.multiline) {
+                    fieldHtml = '<div class="tralla-dialog-field">' + labelHtml
+                        + '<textarea id="' + uid + '-input" rows="3" maxlength="' + maxlength + '" placeholder="'
+                        + dialogEscape(config.placeholder || '') + '">' + dialogEscape(value) + '</textarea></div>';
+                } else {
+                    fieldHtml = '<div class="tralla-dialog-field">' + labelHtml
+                        + '<input id="' + uid + '-input" type="text" maxlength="' + maxlength + '" value="'
+                        + dialogEscape(value) + '" placeholder="' + dialogEscape(config.placeholder || '') + '"></div>';
+                }
+            }
+
+            var layer = document.createElement('div');
+            layer.className = 'tralla-dialog-layer';
+            layer.innerHTML = '<div class="tralla-dialog-backdrop" data-dialog-cancel></div>'
+                + '<div class="tralla-modal tralla-dialog tralla-dialog-' + tone + '" role="alertdialog" aria-modal="true"'
+                + ' aria-labelledby="' + uid + '-title" aria-describedby="' + uid + '-message">'
+                + '<div class="tralla-dialog-head">'
+                + '<span class="tralla-dialog-icon" aria-hidden="true"><i class="ti ' + dialogEscape(icon) + '"></i></span>'
+                + '<div class="tralla-dialog-copy">'
+                + '<h2 class="tralla-dialog-title" id="' + uid + '-title">' + dialogEscape(title) + '</h2>'
+                + '<p class="tralla-dialog-message" id="' + uid + '-message">' + dialogEscape(message) + '</p>'
+                + '</div></div>'
+                + fieldHtml
+                + '<p class="tralla-dialog-error" hidden></p>'
+                + '<div class="tralla-dialog-actions">'
+                + '<button type="button" class="tralla-btn tralla-btn-ghost" data-dialog-cancel>' + dialogEscape(cancelLabel) + '</button>'
+                + '<button type="button" class="tralla-btn ' + (tone === 'danger' ? 'tralla-btn-danger' : 'tralla-btn-primary') + '" data-dialog-confirm>'
+                + dialogEscape(confirmLabel) + '</button>'
+                + '</div></div>';
+
+            document.body.appendChild(layer);
+            document.body.classList.add('tralla-dialog-open');
+
+            var inputEl = layer.querySelector('input, textarea');
+            var errorEl = layer.querySelector('.tralla-dialog-error');
+            var confirmEl = layer.querySelector('[data-dialog-confirm]');
+            var closed = false;
+
+            function focusables() {
+                return Array.prototype.slice.call(layer.querySelectorAll('button, input, textarea, select, a[href]'))
+                    .filter(function (element) {
+                        return !element.disabled && element.offsetParent !== null;
+                    });
+            }
+
+            function finish(result) {
+                if (closed) {
+                    return;
+                }
+                closed = true;
+                document.removeEventListener('keydown', onKeydown, true);
+                layer.remove();
+                activePluginDialog = null;
+                if (!document.querySelector('.tralla-dialog-layer')) {
+                    document.body.classList.remove('tralla-dialog-open');
+                }
+                if (previousFocus && typeof previousFocus.focus === 'function' && document.contains(previousFocus)) {
+                    previousFocus.focus();
+                }
+                resolve(result);
+            }
+
+            function cancel() {
+                finish(mode === 'prompt' ? null : false);
+            }
+
+            function submit() {
+                if (mode === 'prompt') {
+                    var text = inputEl ? inputEl.value.trim() : '';
+                    if (config.required && !text) {
+                        if (errorEl) {
+                            errorEl.hidden = false;
+                            errorEl.textContent = config.requiredMessage || 'Preencha este campo.';
+                        }
+                        if (inputEl) {
+                            inputEl.focus();
+                        }
+                        return;
+                    }
+                    finish(text);
+                    return;
+                }
+                finish(true);
+            }
+
+            function onKeydown(event) {
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    cancel();
+                    return;
+                }
+                if (event.key === 'Tab') {
+                    var items = focusables();
+                    if (!items.length) {
+                        return;
+                    }
+                    var first = items[0];
+                    var last = items[items.length - 1];
+                    if (event.shiftKey && document.activeElement === first) {
+                        event.preventDefault();
+                        last.focus();
+                    } else if (!event.shiftKey && document.activeElement === last) {
+                        event.preventDefault();
+                        first.focus();
+                    }
+                    return;
+                }
+                if (event.key === 'Enter') {
+                    if (inputEl && inputEl.tagName === 'TEXTAREA' && !event.ctrlKey && !event.metaKey) {
+                        return;
+                    }
+                    event.preventDefault();
+                    event.stopPropagation();
+                    submit();
+                }
+            }
+
+            layer.addEventListener('click', function (event) {
+                if (event.target.closest('[data-dialog-confirm]')) {
+                    submit();
+                    return;
+                }
+                if (event.target.closest('[data-dialog-cancel]')) {
+                    cancel();
+                }
+            });
+
+            activePluginDialog = { cancel: cancel };
+            document.addEventListener('keydown', onKeydown, true);
+
+            window.setTimeout(function () {
+                if (inputEl) {
+                    inputEl.focus();
+                    if (inputEl.tagName === 'INPUT' && config.select !== false) {
+                        inputEl.select();
+                    }
+                } else if (confirmEl) {
+                    confirmEl.focus();
+                }
+            }, 30);
+        });
+    }
+
+    function confirmDialog(options) {
+        return openPluginDialog(Object.assign({ mode: 'confirm' }, options || {}))
+            .then(function (confirmed) {
+                return confirmed === true;
+            });
+    }
+
+    function promptDialog(options) {
+        return openPluginDialog(Object.assign({ mode: 'prompt' }, options || {}));
+    }
+
+    document.addEventListener('click', function (event) {
+        var trigger = event.target.closest('[data-tralla-confirm]');
+        if (!trigger) {
+            return;
+        }
+        if (trigger.dataset.trallaConfirmBypass === '1') {
+            delete trigger.dataset.trallaConfirmBypass;
+            return;
+        }
+        event.preventDefault();
+        confirmDialog({
+            title: trigger.dataset.trallaConfirmTitle || 'Confirmar ação',
+            message: trigger.dataset.trallaConfirm || '',
+            tone: trigger.dataset.trallaConfirmTone === 'danger' ? 'danger' : 'primary',
+            confirmLabel: trigger.dataset.trallaConfirmLabel || 'Confirmar',
+            icon: trigger.dataset.trallaConfirmIcon || 'ti-alert-triangle'
+        }).then(function (confirmed) {
+            if (!confirmed) {
+                return;
+            }
+            if (trigger.form && typeof trigger.form.requestSubmit === 'function') {
+                trigger.form.requestSubmit(trigger);
+                return;
+            }
+            trigger.dataset.trallaConfirmBypass = '1';
+            trigger.click();
+        });
+    }, true);
+
     if (!bootstrapEl || !root) {
         return;
     }
@@ -264,16 +487,18 @@
     }
 
     function progressMarkup(progress, total, filled) {
+        var safeTotal = Number(total) || 0;
+        var safeFilled = Number(filled) || 0;
         var percent = progress && typeof progress.percent === 'number'
             ? progress.percent
-            : (total > 0 ? Math.round((filled / total) * 100) : 0);
+            : (safeTotal > 0 ? Math.round((safeFilled / safeTotal) * 100) : 0);
         var complete = percent >= 100;
-        return '<div class="tralla-card-progress">'
-            + '<div class="tralla-progress' + (complete ? ' is-complete' : '') + '">'
-            + '<span style="width:' + Math.max(0, Math.min(100, percent)) + '%"></span>'
-            + '</div>'
-            + '<small>' + (filled || 0) + '/' + (total || 0) + '</small>'
-            + '</div>';
+        return '<span class="tralla-card-badge tralla-card-progress" title="' + safeFilled + ' de ' + safeTotal + ' máquinas preenchidas">'
+            + '<i class="ti ti-checkup-list" aria-hidden="true"></i>'
+            + '<span>' + safeFilled + '/' + safeTotal + '</span>'
+            + '<span class="tralla-progress' + (complete ? ' is-complete' : '') + '" aria-hidden="true">'
+            + '<span style="width:' + Math.max(0, Math.min(100, percent)) + '%"></span></span>'
+            + '</span>';
     }
 
     function renderBoard() {
@@ -297,7 +522,14 @@
             return;
         }
 
-        listsEl.innerHTML = lists.map(renderList).join('');
+        var addListColumn = can.create
+            ? '<button type="button" class="tralla-add-list-column" data-add-list>'
+                + '<i class="ti ti-plus" aria-hidden="true"></i>'
+                + '<span>Adicionar outra lista</span>'
+                + '</button>'
+            : '';
+
+        listsEl.innerHTML = lists.map(renderList).join('') + addListColumn;
         listsEl.scrollLeft = scrollLeft;
     }
 
@@ -326,10 +558,14 @@
                 + '<i class="ti ti-plus"></i> Adicionar card</button>'
             : '';
 
+        var categoryDot = list.category
+            ? '<span class="tralla-list-dot" style="--tr-list-color:' + attr(color) + '" aria-hidden="true"></span>'
+            : '';
+
         return '<section class="tralla-list" data-list-id="' + listId + '">'
             + '<header class="tralla-list-head" style="--tr-list-color:' + attr(color) + '">'
-            + '<div><h3>' + esc(list.name)
-            + '<span class="tralla-list-count">' + listCards.length + '</span></h3></div>'
+            + '<div class="tralla-list-title">' + categoryDot + '<h3>' + esc(list.name) + '</h3>'
+            + '<span class="tralla-list-count">' + listCards.length + '</span></div>'
             + (actions ? '<div class="tralla-list-head-actions">' + actions + '</div>' : '')
             + '</header>'
             + '<div class="tralla-cards" data-list-id="' + listId + '">'
@@ -345,41 +581,55 @@
         var machineCount = Number(card.machine_count || 0);
         var progress = card.progress || { total: machineCount, filled: 0, percent: 0 };
         var showProgress = isMaintenance && (machineCount > 0 || Number(progress.total) > 0);
+        var statusLabel = isMaintenance ? (card.status_label || labels.statuses[card.status] || '') : '';
+        var statusClass = statusClasses[card.status] || '';
+        var label = statusLabel
+            ? '<span class="tralla-card-label tralla-card-label-' + esc(statusClass) + '">' + esc(statusLabel) + '</span>'
+            : '';
         var tech = '';
 
         if (card.technician_name) {
-            tech = '<span class="tralla-card-tech"><span class="tralla-avatar">' + esc(initials(card.technician_name))
-                + '</span>' + esc(card.technician_name) + '</span>';
+            tech = '<span class="tralla-card-avatar" title="Responsável: ' + attr(card.technician_name) + '">'
+                + '<span class="tralla-avatar">' + esc(initials(card.technician_name)) + '</span></span>';
         }
 
         var source = '';
         if (card.source && card.source !== 'manual' && card.source_label) {
-            source = '<span class="tralla-card-source">' + esc(card.source_label) + '</span>';
+            source = '<span class="tralla-card-source" title="Origem: ' + attr(card.source_label) + '">'
+                + esc(card.source_label) + '</span>';
         }
 
         var lock = card.is_locked
-            ? '<span class="tralla-card-lock" title="Card bloqueado"><i class="ti ti-lock"></i></span>'
+            ? '<span class="tralla-card-badge tralla-card-lock" title="Card bloqueado"><i class="ti ti-lock" aria-hidden="true"></i></span>'
             : '';
+
+        var machineBadge = machineCount
+            ? '<span class="tralla-card-badge" title="' + machineCount + ' máquina(s)">'
+                + '<i class="ti ti-device-desktop" aria-hidden="true"></i><span>' + machineCount + '</span></span>'
+            : '';
+
+        var badges = '';
+        if (showProgress) {
+            badges += progressMarkup(progress, Number(progress.total || machineCount), Number(progress.filled || 0));
+        }
+        badges += machineBadge + lock;
 
         return '<article class="tralla-card' + (card.is_locked ? ' is-locked' : '')
             + '" data-card-id="' + cardId + '"'
             + (canDrag ? ' draggable="true"' : '')
             + ' tabindex="0" role="button" aria-label="Abrir card ' + attr(card.name) + '">'
+            + '<span class="tralla-card-edit" aria-hidden="true"><i class="ti ti-pencil"></i></span>'
+            + label
             + '<div class="tralla-card-top">'
             + '<span class="tralla-card-code">' + esc(card.code || ('#' + cardId)) + '</span>'
             + source
             + '</div>'
             + '<h4>' + esc(card.name) + '</h4>'
             + (card.description ? '<p class="tralla-card-desc">' + esc(card.description) + '</p>' : '')
-            + '<div class="tralla-card-meta">'
-            + statusPill(card)
-            + (showProgress ? progressMarkup(progress, Number(progress.total || machineCount), Number(progress.filled || 0)) : '')
-            + lock
-            + '</div>'
-            + ((tech || card.machine_count)
+            + ((badges || tech)
                 ? '<div class="tralla-card-footer">'
-                    + (tech || '<span></span>')
-                    + (machineCount ? '<span><i class="ti ti-device-desktop"></i> ' + machineCount + '</span>' : '')
+                    + '<div class="tralla-card-badges">' + badges + '</div>'
+                    + tech
                     + '</div>'
                 : '')
             + '</article>';
@@ -573,7 +823,7 @@
             + '<div class="tralla-history">'
             + history.map(function (entry) {
                 return '<div class="tralla-history-item">'
-                    + '<div class="tralla-history-dot"><i class="ti ti-point"></i></div>'
+                    + '<div class="tralla-history-dot"><span class="tralla-avatar">' + esc(initials(entry.user_name || 'Sistema')) + '</span></div>'
                     + '<div class="tralla-history-body">'
                     + '<strong>' + esc(entry.action_label || entry.action) + '</strong>'
                     + '<small>' + esc(entry.user_name || 'Sistema') + ' · ' + esc(entry.date_formatted || formatDate(entry.date_creation)) + '</small>'
@@ -812,7 +1062,14 @@
 
         try {
             if (action === 'delete') {
-                if (!window.confirm('Excluir este card definitivamente?')) {
+                var deleteConfirmed = await confirmDialog({
+                    title: 'Excluir card',
+                    message: 'Excluir este card definitivamente? Esta ação não pode ser desfeita.',
+                    icon: 'ti-trash',
+                    tone: 'danger',
+                    confirmLabel: 'Excluir card'
+                });
+                if (!deleteConfirmed) {
                     return;
                 }
                 setBusy(button, true);
@@ -824,7 +1081,16 @@
             }
 
             if (action === 'reject') {
-                var reason = window.prompt('Motivo da reprovação (opcional):', '');
+                var reason = await promptDialog({
+                    title: 'Reprovar manutenção',
+                    message: 'O card voltará para Em Andamento com este registro no histórico.',
+                    label: 'Motivo (opcional)',
+                    multiline: true,
+                    placeholder: 'Descreva o motivo da reprovação...',
+                    icon: 'ti-shield-x',
+                    tone: 'danger',
+                    confirmLabel: 'Reprovar'
+                });
                 if (reason === null) {
                     return;
                 }
@@ -836,16 +1102,40 @@
                 return;
             }
 
-            if (action === 'withdraw' && !window.confirm('Confirmar a retirada de todas as máquinas deste card?')) {
-                return;
+            if (action === 'withdraw') {
+                var withdrawConfirmed = await confirmDialog({
+                    title: 'Confirmar retirada',
+                    message: 'Confirmar a retirada de todas as máquinas deste card?',
+                    icon: 'ti-package-export',
+                    confirmLabel: 'Confirmar retirada'
+                });
+                if (!withdrawConfirmed) {
+                    return;
+                }
             }
 
-            if (action === 'finalize' && !window.confirm('Finalizar a manutenção e enviar para aprovação?')) {
-                return;
+            if (action === 'finalize') {
+                var finalizeConfirmed = await confirmDialog({
+                    title: 'Finalizar manutenção',
+                    message: 'Finalizar a manutenção e enviar para aprovação?',
+                    icon: 'ti-checkup-list',
+                    confirmLabel: 'Finalizar'
+                });
+                if (!finalizeConfirmed) {
+                    return;
+                }
             }
 
-            if (action === 'approve' && !window.confirm('Aprovar esta manutenção e liberar a retirada?')) {
-                return;
+            if (action === 'approve') {
+                var approveConfirmed = await confirmDialog({
+                    title: 'Aprovar manutenção',
+                    message: 'Aprovar esta manutenção e liberar a retirada?',
+                    icon: 'ti-shield-check',
+                    confirmLabel: 'Aprovar'
+                });
+                if (!approveConfirmed) {
+                    return;
+                }
             }
 
             setBusy(button, true);
@@ -1064,7 +1354,7 @@
                 + '</section>'
             : '';
 
-        showModal('<form id="tralla-create-card-form" class="tralla-form" data-list-id="' + Number(listId) + '">'
+        showModal('<form id="tralla-create-card-form" class="tralla-form" data-list-id="' + Number(listId) + '" novalidate>'
             + '<div class="tralla-modal-head"><div>'
             + '<h2><i class="ti ti-plus"></i> Novo card</h2>'
             + '<p>' + esc(list.name) + ' · ' + (isMaintenance ? 'Fluxo de manutenção' : 'Quadro normal') + '</p>'
@@ -1178,7 +1468,7 @@
         var color = safeColor(existing && existing.color, palette[existing && existing.category] || '#97a0af');
 
         showModal('<form id="tralla-list-form" class="tralla-form" data-list-id="'
-            + (existing ? Number(existing.id) : '') + '">'
+            + (existing ? Number(existing.id) : '') + '" novalidate>'
             + '<div class="tralla-modal-head"><div>'
             + '<h2><i class="ti ti-list"></i> ' + (existing ? 'Editar lista' : 'Nova lista') + '</h2>'
             + '<p>' + esc(state.board.name) + '</p>'
@@ -1240,7 +1530,18 @@
         var list = state.lists.find(function (item) {
             return Number(item.id) === Number(listId);
         });
-        if (!list || !window.confirm('Excluir a lista "' + list.name + '"? Os cards precisam ter sido movidos antes.')) {
+        if (!list) {
+            return;
+        }
+
+        var listConfirmed = await confirmDialog({
+            title: 'Excluir lista',
+            message: 'Excluir a lista "' + list.name + '"? Os cards precisam ter sido movidos antes.',
+            icon: 'ti-trash',
+            tone: 'danger',
+            confirmLabel: 'Excluir lista'
+        });
+        if (!listConfirmed) {
             return;
         }
         try {
@@ -1267,8 +1568,17 @@
 
         var modelId = Number(modelSelect.value);
         if (modelSelect.value === '__new') {
-            var modelName = window.prompt('Nome do novo modelo de máquina:');
-            if (!modelName) {
+            var modelName = await promptDialog({
+                title: 'Novo modelo de máquina',
+                message: 'Cadastre um modelo para usar nas máquinas deste card.',
+                label: 'Nome do modelo',
+                placeholder: 'Ex.: Notebook Dell Latitude',
+                icon: 'ti-device-desktop',
+                required: true,
+                requiredMessage: 'Informe o nome do modelo.',
+                confirmLabel: 'Cadastrar modelo'
+            });
+            if (modelName === null) {
                 modelSelect.value = '';
                 return;
             }
@@ -1313,7 +1623,14 @@
         if (!activeCard || !machineId) {
             return;
         }
-        if (!window.confirm('Remover esta máquina do card?')) {
+        var machineConfirmed = await confirmDialog({
+            title: 'Remover máquina',
+            message: 'Remover esta máquina do card? O relatório registrado será perdido.',
+            icon: 'ti-trash',
+            tone: 'danger',
+            confirmLabel: 'Remover máquina'
+        });
+        if (!machineConfirmed) {
             return;
         }
 
@@ -1558,8 +1875,17 @@
 
         var modelSelect = event.target.closest('[data-create-model]');
         if (modelSelect && modelSelect.value === '__new') {
-            var modelName = window.prompt('Nome do novo modelo de máquina:');
-            if (!modelName) {
+            var modelName = await promptDialog({
+                title: 'Novo modelo de máquina',
+                message: 'Cadastre um modelo para usar nas máquinas deste card.',
+                label: 'Nome do modelo',
+                placeholder: 'Ex.: Notebook Dell Latitude',
+                icon: 'ti-device-desktop',
+                required: true,
+                requiredMessage: 'Informe o nome do modelo.',
+                confirmLabel: 'Cadastrar modelo'
+            });
+            if (modelName === null) {
                 modelSelect.value = '';
                 return;
             }

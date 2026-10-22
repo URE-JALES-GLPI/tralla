@@ -91,15 +91,17 @@ Html::header($board->fields['name'] . ' — [URE] Tralla', $_SERVER['PHP_SELF'],
 <div class="tralla-page tralla-kanban-page tr-bg-<?= tralla_h($background) ?>" id="tralla-kanban">
     <header class="tralla-kanban-head">
         <div class="tralla-kanban-title">
-            <a class="tralla-icon-btn" href="<?= tralla_h($pluginUrl) ?>/front/board.php" title="Voltar aos quadros">
-                <i class="ti ti-arrow-left"></i>
+            <a class="tralla-icon-btn tralla-back-btn" href="<?= tralla_h($pluginUrl) ?>/front/board.php" title="Voltar aos quadros" aria-label="Voltar aos quadros">
+                <i class="ti ti-arrow-left" aria-hidden="true"></i>
             </a>
-            <div>
-                <span class="tralla-board-type <?= $isMaintenance ? 'is-maintenance' : '' ?>">
-                    <i class="ti <?= $isMaintenance ? 'ti-tool' : 'ti-layout-kanban' ?>"></i>
-                    <?= $isMaintenance ? 'Manutenção' : 'Normal' ?>
-                </span>
-                <h1><?= tralla_h($board->fields['name']) ?></h1>
+            <div class="tralla-board-heading">
+                <div class="tralla-board-title-row">
+                    <h1><?= tralla_h($board->fields['name']) ?></h1>
+                    <span class="tralla-board-type <?= $isMaintenance ? 'is-maintenance' : '' ?>">
+                        <i class="ti <?= $isMaintenance ? 'ti-tool' : 'ti-layout-kanban' ?>" aria-hidden="true"></i>
+                        <?= $isMaintenance ? 'Manutenção' : 'Normal' ?>
+                    </span>
+                </div>
                 <?php if (trim((string) $board->fields['comment']) !== ''): ?>
                     <p><?= tralla_h($board->fields['comment']) ?></p>
                 <?php endif; ?>
@@ -107,16 +109,16 @@ Html::header($board->fields['name'] . ' — [URE] Tralla', $_SERVER['PHP_SELF'],
         </div>
         <div class="tralla-head-actions">
             <?php if ($canCreate): ?>
-                <button type="button" class="tralla-btn tralla-btn-ghost" data-tralla-add-list>
-                    <i class="ti ti-plus"></i> Lista
+                <button type="button" class="tralla-btn tralla-kanban-action" data-tralla-add-list>
+                    <i class="ti ti-plus" aria-hidden="true"></i> Lista
                 </button>
             <?php endif; ?>
             <?php if ($canUpdate): ?>
-                <a class="tralla-btn tralla-btn-ghost" href="<?= tralla_h($pluginUrl) ?>/front/board.form.php?id=<?= (int) $boards_id ?>">
-                    <i class="ti ti-pencil"></i> Editar quadro
+                <a class="tralla-btn tralla-kanban-action" href="<?= tralla_h($pluginUrl) ?>/front/board.form.php?id=<?= (int) $boards_id ?>">
+                    <i class="ti ti-pencil" aria-hidden="true"></i> Editar quadro
                 </a>
-                <a class="tralla-btn tralla-btn-ghost" href="<?= tralla_h($pluginUrl) ?>/front/config.form.php" title="Configurações do Tralla">
-                    <i class="ti ti-settings"></i>
+                <a class="tralla-btn tralla-kanban-action tralla-kanban-action-icon" href="<?= tralla_h($pluginUrl) ?>/front/config.form.php" title="Configurações do Tralla" aria-label="Configurações do Tralla">
+                    <i class="ti ti-settings" aria-hidden="true"></i>
                 </a>
             <?php endif; ?>
         </div>
