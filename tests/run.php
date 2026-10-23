@@ -56,6 +56,10 @@ check('purge without entity cannot see', !tralla_role_can_view(false, true, fals
 check('no member no purge cannot see', !tralla_role_can_view(false, false, true, true));
 check('admin cannot manage members', !tralla_can_manage_members('admin', true));
 check('superadmin manages members', tralla_can_manage_members('superadmin', true));
+check('superadmin can govern', tralla_can_manage_members('superadmin', true));
+check('admin cannot govern', !tralla_can_manage_members('admin', true));
+check('view requires entity', !tralla_role_can_view(true, false, false, true));
+check('view requires read', !tralla_role_can_view(true, false, true, false));
 check('admin can restore', tralla_can_restore('admin', true));
 
 check('restore lock dropped on status fallback',

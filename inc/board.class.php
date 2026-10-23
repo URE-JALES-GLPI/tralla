@@ -4,6 +4,7 @@ if (!defined('GLPI_ROOT')) {
 }
 
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/boarduser.class.php';
 
 /**
  * Quadro do Tralla.
@@ -54,12 +55,17 @@ class PluginTrallaBoard extends CommonDBTM
 
     public function canUpdateItem(): bool
     {
-        return Session::haveRight(self::$rightname, UPDATE) && self::canViewBoard((int) $this->getID());
+        return Session::haveRight(self::$rightname, UPDATE) && self::canAdminBoard((int) $this->getID());
+    }
+
+    public function canDeleteItem(): bool
+    {
+        return Session::haveRight(self::$rightname, DELETE) && self::canGovernBoard((int) $this->getID());
     }
 
     public function canPurgeItem(): bool
     {
-        return Session::haveRight(self::$rightname, PURGE);
+        return Session::haveRight(self::$rightname, PURGE) && self::canGovernBoard((int) $this->getID());
     }
 
     public static function getTypeChoices(): array
@@ -168,6 +174,8 @@ class PluginTrallaBoard extends CommonDBTM
             ]);
             $rank += 1000.0;
         }
+
+        PluginTrallaBoardUser::addCreator($boardId, (int) Session::getLoginUserID());
     }
 
     public function cleanDBonPurge()
@@ -195,6 +203,7 @@ class PluginTrallaBoard extends CommonDBTM
             $DB->delete('glpi_plugin_tralla_cards', ['id' => $cardIds]);
         }
 
+        $DB->delete('glpi_plugin_tralla_boards_users', ['plugin_tralla_boards_id' => $boardId]);
         $DB->delete('glpi_plugin_tralla_lists', ['plugin_tralla_boards_id' => $boardId]);
     }
 
@@ -208,6 +217,29 @@ class PluginTrallaBoard extends CommonDBTM
         return ($board->fields['type'] ?? '') === 'maintenance';
     }
 
+    public static function roleFor(int $boardId, int $userId = 0): string
+    {
+        $userId = $userId > 0 ? $userId : (int) Session::getLoginUserID();
+
+        $board = new self();
+        if ($boardId <= 0 || !$board->getFromDB($boardId)) {
+            return '';
+        }
+
+        if (!Session::haveAccessToEntity(
+            (int) $board->fields['entities_id'],
+            (bool) $board->fields['is_recursive']
+        )) {
+            return '';
+        }
+
+        if (Session::haveRight(self::$rightname, PURGE)) {
+            return 'superadmin';
+        }
+
+        return PluginTrallaBoardUser::getRole($boardId, $userId);
+    }
+
     public static function canViewBoard(int $boards_id): bool
     {
         if (!self::canView() || $boards_id <= 0) {
@@ -219,10 +251,45 @@ class PluginTrallaBoard extends CommonDBTM
             return false;
         }
 
-        return Session::haveAccessToEntity(
+        $role = self::roleFor($boards_id);
+        $hasEntity = Session::haveAccessToEntity(
             (int) $board->fields['entities_id'],
             (bool) $board->fields['is_recursive']
         );
+
+        return tralla_role_can_view(
+            $role !== '',
+            $role === 'superadmin',
+            $hasEntity,
+            Session::haveRight(self::$rightname, READ)
+        );
+    }
+
+    public static function canOperateBoard(int $boardId, int $userId = 0): bool
+    {
+        if (!self::canViewBoard($boardId)) {
+            return false;
+        }
+
+        return self::roleFor($boardId, $userId) !== '';
+    }
+
+    public static function canAdminBoard(int $boardId, int $userId = 0): bool
+    {
+        if (!self::canOperateBoard($boardId, $userId)) {
+            return false;
+        }
+
+        return tralla_role_at_least(self::roleFor($boardId, $userId), 'admin');
+    }
+
+    public static function canGovernBoard(int $boardId, int $userId = 0): bool
+    {
+        if (!self::canOperateBoard($boardId, $userId)) {
+            return false;
+        }
+
+        return self::roleFor($boardId, $userId) === 'superadmin';
     }
 
     /**
@@ -237,6 +304,23 @@ class PluginTrallaBoard extends CommonDBTM
         $where = [];
         if (!$includeArchived) {
             $where['is_archived'] = 0;
+        }
+
+        if (!Session::haveRight(self::$rightname, PURGE)) {
+            $membershipIds = [];
+            foreach ($DB->request([
+                'SELECT' => ['plugin_tralla_boards_id'],
+                'FROM'   => 'glpi_plugin_tralla_boards_users',
+                'WHERE'  => ['users_id' => (int) Session::getLoginUserID()],
+            ]) as $membership) {
+                $membershipIds[] = (int) $membership['plugin_tralla_boards_id'];
+            }
+
+            if ($membershipIds === []) {
+                return [];
+            }
+
+            $where['id'] = $membershipIds;
         }
 
         $boards = [];
@@ -294,10 +378,14 @@ class PluginTrallaBoard extends CommonDBTM
             'WHERE'  => [
                 'plugin_tralla_boards_id' => $boards_id,
                 'is_archived'             => 0,
+                'is_deleted'              => 0,
             ],
             'GROUPBY' => ['status'],
         ]) as $row) {
             $status = (string) $row['status'];
+            if ($status === 'deletion_pending') {
+                continue;
+            }
             $total = (int) $row['total'];
             $stats['cards'] += $total;
             if (array_key_exists($status, $stats)) {
@@ -313,16 +401,22 @@ class PluginTrallaBoard extends CommonDBTM
         return countElementsInTable('glpi_plugin_tralla_cards', [
             'plugin_tralla_boards_id' => $boards_id,
             'is_archived'             => 0,
+            'is_deleted'              => 0,
         ]);
     }
 
     public static function countMaintenanceByStatus(int $boards_id, string $status): int
     {
+        if ($status === 'deletion_pending') {
+            return 0;
+        }
+
         return countElementsInTable('glpi_plugin_tralla_cards', [
             'plugin_tralla_boards_id' => $boards_id,
             'stage'                   => 1,
             'status'                  => $status,
             'is_archived'             => 0,
+            'is_deleted'              => 0,
         ]);
     }
 }

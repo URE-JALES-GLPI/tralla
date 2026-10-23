@@ -18,6 +18,18 @@ if ($boards_id <= 0 || !$board->getFromDB($boards_id) || !PluginTrallaBoard::can
 $pluginUrl = (string) $CFG_GLPI['root_doc'] . '/plugins/tralla';
 $isMaintenance = ($board->fields['type'] ?? '') === 'maintenance';
 
+$userId = (int) Session::getLoginUserID();
+$role = PluginTrallaBoard::roleFor($boards_id);
+$roleLabel = tralla_board_role_label($role);
+$canManageLists = PluginTrallaBoard::canAdminBoard($boards_id) && Session::haveRight('plugin_tralla', UPDATE);
+$canManageBoard = $canManageLists;
+$canManageMembers = PluginTrallaBoard::canGovernBoard($boards_id) && Session::haveRight('plugin_tralla', UPDATE);
+$canViewDeleted = PluginTrallaBoard::canAdminBoard($boards_id);
+$canRestore = tralla_can_restore($role, Session::haveRight('plugin_tralla', UPDATE));
+$canCreateCard = PluginTrallaBoard::canOperateBoard($boards_id) && Session::haveRight('plugin_tralla', CREATE);
+$canMoveCard = PluginTrallaBoard::canOperateBoard($boards_id) && Session::haveRight('plugin_tralla', UPDATE) && !$isMaintenance;
+$canApprove = PluginTrallaCard::userIsApprover($userId, $boards_id);
+
 $lists = PluginTrallaList::getListsForBoard($boards_id);
 $cards = PluginTrallaCard::getCardsForBoard($boards_id);
 $models = PluginTrallaMachineModel::getModels();
@@ -33,6 +45,8 @@ $bootstrap = [
         'comment'        => (string) $board->fields['comment'],
         'is_maintenance' => $isMaintenance,
         'entities_id'    => (int) $board->fields['entities_id'],
+        'role'           => $role,
+        'role_label'     => $roleLabel,
     ],
     'lists' => array_map(static function (array $list): array {
         return [
@@ -67,11 +81,21 @@ $bootstrap = [
         'update'  => Session::haveRight('plugin_tralla', UPDATE),
         'delete'  => Session::haveRight('plugin_tralla', DELETE),
         'purge'   => Session::haveRight('plugin_tralla', PURGE),
-        'approve' => PluginTrallaCard::userIsApprover(),
+        'approve' => $canApprove,
+    ],
+    'can' => [
+        'create_card'    => $canCreateCard,
+        'move_card'      => $canMoveCard,
+        'manage_lists'   => $canManageLists,
+        'manage_board'   => $canManageBoard,
+        'manage_members' => $canManageMembers,
+        'view_deleted'   => $canViewDeleted,
+        'restore'        => $canRestore,
+        'approve'        => $canApprove,
     ],
     'user' => [
-        'id'   => (int) Session::getLoginUserID(),
-        'name' => tralla_user_name((int) Session::getLoginUserID()),
+        'id'   => $userId,
+        'name' => tralla_user_name($userId),
     ],
     'urls' => [
         'ajax'       => $pluginUrl . '/front/ajax.php',
@@ -85,8 +109,6 @@ $bootstrap = [
 ];
 
 $background = tralla_valid_background((string) $board->fields['background']);
-$canCreate = Session::haveRight('plugin_tralla', CREATE);
-$canUpdate = Session::haveRight('plugin_tralla', UPDATE);
 
 Html::header($board->fields['name'] . ' — [URE] Tralla', $_SERVER['PHP_SELF'], 'tools', 'PluginTrallaBoard');
 ?>
@@ -110,12 +132,12 @@ Html::header($board->fields['name'] . ' — [URE] Tralla', $_SERVER['PHP_SELF'],
             </div>
         </div>
         <div class="tralla-head-actions">
-            <?php if ($canCreate): ?>
+            <?php if ($canManageLists): ?>
                 <button type="button" class="tralla-btn tralla-kanban-action" data-tralla-add-list>
                     <i class="ti ti-plus" aria-hidden="true"></i> Lista
                 </button>
             <?php endif; ?>
-            <?php if ($canUpdate): ?>
+            <?php if ($canManageBoard): ?>
                 <a class="tralla-btn tralla-kanban-action" href="<?= tralla_h($pluginUrl) ?>/front/board.form.php?id=<?= (int) $boards_id ?>">
                     <i class="ti ti-pencil" aria-hidden="true"></i> Editar quadro
                 </a>
