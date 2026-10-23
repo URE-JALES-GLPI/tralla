@@ -52,6 +52,13 @@ if (!function_exists('tralla_board_role_label')) {
     }
 }
 
+if (!function_exists('tralla_should_backfill_creator')) {
+    function tralla_should_backfill_creator(int $memberCount, int $creatorId): bool
+    {
+        return $memberCount === 0 && $creatorId > 0;
+    }
+}
+
 if (!function_exists('tralla_parse_history_card_filter')) {
     function tralla_parse_history_card_filter(string $value): array
     {

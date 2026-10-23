@@ -13,6 +13,10 @@ check('superadmin reaches admin', tralla_role_at_least('superadmin', 'admin') ==
 check('invalid role normalizes empty', tralla_normalize_board_role('owner') === '');
 check('role label', tralla_board_role_label('admin') === 'Admin');
 
+check('backfill needs empty board', tralla_should_backfill_creator(0, 5));
+check('backfill skips non-empty board', !tralla_should_backfill_creator(1, 5));
+check('backfill skips missing creator', !tralla_should_backfill_creator(0, 0));
+
 $f = tralla_parse_history_card_filter('123');
 check('plain id', $f['ok'] && $f['type'] === 'all' && $f['id'] === 123);
 $f = tralla_parse_history_card_filter('#123');

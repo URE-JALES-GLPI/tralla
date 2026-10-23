@@ -275,18 +275,13 @@ function plugin_tralla_install(): bool
         'FROM'   => 'glpi_plugin_tralla_boards',
         'WHERE'  => ['users_id' => ['>', 0]],
     ]) as $board) {
-        $membership = $DB->request([
-            'SELECT' => ['id'],
-            'FROM'   => 'glpi_plugin_tralla_boards_users',
-            'WHERE'  => [
-                'plugin_tralla_boards_id' => (int) $board['id'],
-                'users_id'                => (int) $board['users_id'],
-            ],
-            'LIMIT'  => 1,
-        ])->current();
-        if (!is_array($membership)) {
-            PluginTrallaBoardUser::addCreator((int) $board['id'], (int) $board['users_id']);
+        $memberCount = countElementsInTable('glpi_plugin_tralla_boards_users', [
+            'plugin_tralla_boards_id' => (int) $board['id'],
+        ]);
+        if (!tralla_should_backfill_creator($memberCount, (int) $board['users_id'])) {
+            continue;
         }
+        PluginTrallaBoardUser::addCreator((int) $board['id'], (int) $board['users_id']);
     }
 
     // Configurações padrão — nunca sobrescreve ajuste do administrador.
