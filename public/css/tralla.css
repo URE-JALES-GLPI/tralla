@@ -655,21 +655,23 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
     font-size: 15px;
 }
 
-.tralla-kanban-search input[type="search"] {
-    background: transparent;
-    border: 0;
-    color: #fff;
+.tralla-kanban-search #tralla-board-search {
+    /* O estilo global dos inputs do GLPI não deve cobrir a barra translúcida. */
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    color: #fff !important;
     flex: 1 1 auto;
     font-family: var(--tr-font);
     font-size: 13px;
     height: 30px;
     min-width: 0;
-    outline: 0;
+    outline: 0 !important;
     padding: 0;
 }
 
-.tralla-kanban-search input[type="search"]::placeholder {
-    color: rgba(255, 255, 255, 0.65);
+.tralla-kanban-search #tralla-board-search::placeholder {
+    color: rgba(255, 255, 255, 0.65) !important;
 }
 
 .tralla-kanban-search input[type="search"]::-webkit-search-cancel-button {
