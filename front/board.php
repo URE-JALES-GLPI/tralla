@@ -20,9 +20,12 @@ $pluginUrl = $root . '/plugins/tralla';
 ?>
 <div class="tralla-page tralla-boards-page">
     <header class="tralla-page-head">
-        <div>
-            <h1><i class="ti ti-layout-kanban"></i> Quadros Tralla</h1>
-            <p>Organize projetos e o fluxo de manutenção sem sair do GLPI.</p>
+        <div class="tralla-brand">
+            <img class="tralla-brand-logo" src="<?= tralla_h($pluginUrl) ?>/logo.png?v=<?= (int) @filemtime(GLPI_ROOT . '/plugins/tralla/logo.png') ?>" alt="">
+            <div>
+                <h1>Quadros Tralla</h1>
+                <p>Organize projetos e o fluxo de manutenção sem sair do GLPI.</p>
+            </div>
         </div>
         <div class="tralla-head-actions">
             <a class="tralla-btn tralla-btn-ghost" href="?archived=<?= $showArchived ? '0' : '1' ?>">

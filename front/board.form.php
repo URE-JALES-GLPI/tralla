@@ -163,9 +163,12 @@ Html::header('Editar quadro — [URE] Tralla', $_SERVER['PHP_SELF'], 'tools', 'P
 ?>
 <div class="tralla-page tralla-form-page">
     <header class="tralla-page-head">
-        <div>
-            <h1><i class="ti ti-edit"></i> Editar quadro</h1>
-            <p><?= tralla_h($board->fields['name']) ?></p>
+        <div class="tralla-brand">
+            <img class="tralla-brand-logo" src="<?= tralla_h($pluginUrl) ?>/logo.png?v=<?= (int) @filemtime(GLPI_ROOT . '/plugins/tralla/logo.png') ?>" alt="">
+            <div>
+                <h1>Editar quadro</h1>
+                <p><?= tralla_h($board->fields['name']) ?></p>
+            </div>
         </div>
         <div class="tralla-head-actions">
             <a class="tralla-btn tralla-btn-ghost" href="<?= tralla_h($pluginUrl) ?>/front/kanban.php?boards_id=<?= (int) $id ?>">

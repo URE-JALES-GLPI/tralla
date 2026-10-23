@@ -157,6 +157,34 @@ body[data-theme="dark"] .tralla-toast,
     margin-bottom: 24px;
 }
 
+.tralla-brand {
+    align-items: center;
+    display: flex;
+    gap: 14px;
+    min-width: 0;
+}
+
+.tralla-brand-logo {
+    border-radius: 14px;
+    box-shadow: 0 7px 20px rgba(8, 31, 69, 0.16);
+    flex: 0 0 60px;
+    height: 60px;
+    object-fit: cover;
+    width: 60px;
+}
+
+.tralla-brand > div {
+    min-width: 0;
+}
+
+@media (max-width: 650px) {
+    .tralla-brand-logo {
+        flex-basis: 48px;
+        height: 48px;
+        width: 48px;
+    }
+}
+
 .tralla-page-head h1 {
     align-items: center;
     display: flex;
