@@ -3522,6 +3522,7 @@ body.tralla-modal-open {
     background: color-mix(in srgb, var(--tr-surface) 70%, transparent);
     border: 1px solid var(--tr-border);
     border-radius: var(--tr-radius-sm);
+    color: var(--tr-text);
     display: grid;
     gap: 8px;
     grid-template-columns: minmax(120px, 1fr) minmax(110px, 1fr) 18px minmax(110px, 1fr);
@@ -3745,5 +3746,9 @@ body.tralla-modal-open {
     margin: 12px 0;
     padding: 16px;
     text-align: center;
+    text-transform: uppercase;
+}
+
+.tralla-challenge-input {
     text-transform: uppercase;
 }

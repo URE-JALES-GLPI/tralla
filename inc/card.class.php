@@ -265,6 +265,7 @@ class PluginTrallaCard extends CommonDBTM
         $card['pending_approval_kind'] = '';
         $card['pending_approval_id'] = 0;
         $card['split_from'] = null;
+        $rawEditPayload = (string) ($card['edit_payload'] ?? '');
         $card['edit_payload'] = null;
         $card['edit_changes'] = [];
 
@@ -316,7 +317,7 @@ class PluginTrallaCard extends CommonDBTM
         }
 
         if ((int) $card['stage'] === 2 && (string) ($card['approval_kind'] ?? '') === 'edit') {
-            $payload = json_decode((string) ($card['edit_payload'] ?? ''), true);
+            $payload = json_decode($rawEditPayload, true);
             if (is_array($payload)) {
                 $card['edit_payload'] = $payload;
                 if ($parentCard !== null) {
@@ -2356,7 +2357,7 @@ class PluginTrallaCard extends CommonDBTM
             return 'Máquina #' . (int) ($machine['id'] ?? 0);
         };
 
-        $statusLabels = tralla_machine_status_choices();
+        $statusLabels = tralla_machine_status_labels();
         $kept = [];
         $entries = is_array($payload['machines'] ?? null) ? $payload['machines'] : [];
         foreach ($entries as $entry) {
@@ -2375,7 +2376,7 @@ class PluginTrallaCard extends CommonDBTM
             $label = $machineLabel($current);
 
             $status = (string) ($entry['status'] ?? '');
-            if ($status !== '' && $status !== (string) $current['status']) {
+            if ($status !== (string) $current['status']) {
                 $changes[] = [
                     'type'       => 'machine_status',
                     'label'      => $label . ': status',

@@ -531,9 +531,9 @@
                     : '—';
                 return '<div class="tralla-edit-diff-row">'
                     + '<span class="tralla-edit-diff-label">' + esc(label) + '</span>'
-                    + '<span class="tralla-edit-diff-before">' + esc(before) + '</span>'
-                    + '<i class="ti ti-arrow-right" aria-hidden="true"></i>'
-                    + '<span class="tralla-edit-diff-after">' + esc(after) + '</span>'
+                    + '<span class="tralla-edit-diff-before"><strong>Antes</strong>' + esc(before) + '</span>'
+                    + '<i class="ti ti-arrow-right tralla-edit-diff-arrow" aria-hidden="true"></i>'
+                    + '<span class="tralla-edit-diff-after"><strong>Depois</strong>' + esc(after) + '</span>'
                     + '</div>';
             }).join('')
             + '</div>';
@@ -1587,7 +1587,7 @@
                 + '</div></div>'
                 + '<div class="tralla-challenge-word">' + word + '</div>'
                 + '<div class="tralla-dialog-field"><label for="' + uid + '-input">Palavra</label>'
-                + '<input id="' + uid + '-input" type="text" autocomplete="off" placeholder="Digite aqui"></div>'
+                + '<input id="' + uid + '-input" class="tralla-challenge-input" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Digite aqui"></div>'
                 + '<p class="tralla-dialog-error" hidden></p>'
                 + '<div class="tralla-dialog-actions">'
                 + '<button type="button" class="tralla-btn tralla-btn-ghost" data-dialog-cancel>Cancelar</button>'
@@ -1622,6 +1622,19 @@
             layer.querySelector('[data-dialog-confirm]').addEventListener('click', submit);
             layer.querySelector('[data-dialog-backdrop]').addEventListener('click', function () { finish(false); });
             layer.querySelector('[data-dialog-cancel]').addEventListener('click', function () { finish(false); });
+            function uppercaseInput() {
+                var start = inputEl.selectionStart;
+                var end = inputEl.selectionEnd;
+                var upper = inputEl.value.toUpperCase();
+                if (inputEl.value !== upper) {
+                    inputEl.value = upper;
+                    inputEl.setSelectionRange(start, end);
+                }
+            }
+            inputEl.addEventListener('input', function (e) {
+                if (!e.isComposing) uppercaseInput();
+            });
+            inputEl.addEventListener('compositionend', uppercaseInput);
             inputEl.addEventListener('keydown', function (e) {
                 if (e.key === 'Enter') { e.preventDefault(); submit(); }
                 if (e.key === 'Escape') { e.preventDefault(); finish(false); }
