@@ -236,8 +236,40 @@ try {
                 'approval' => $result['approval'],
             ]]);
 
-        case 'deleted_cards':
-            $boards_id = tralla_post_int('boards_id');
+        case 'split_card':
+            tralla_ajax_require(UPDATE);
+            $cardId = tralla_post_int('id');
+            $machineIds = json_decode(tralla_post_string('machine_ids', '[]'), true);
+            if (!is_array($machineIds)) {
+                throw new RuntimeException('Selecione ao menos uma máquina.');
+            }
+            $result = PluginTrallaCard::split($cardId, $machineIds, $userId, $isAdmin);
+            tralla_json(['ok' => true, 'data' => [
+                'state' => tralla_ajax_state((int) $result['card']['plugin_tralla_boards_id']),
+                'card'  => $result['card'],
+                'child' => $result['child'],
+            ]]);
+
+        case 'edit_request':
+            tralla_ajax_require(UPDATE);
+            $cardId = tralla_post_int('id');
+            $machines = json_decode(tralla_post_string('machines', '[]'), true);
+            $newMachines = json_decode(tralla_post_string('new_machines', '[]'), true);
+            if (!is_array($machines) || !is_array($newMachines)) {
+                throw new RuntimeException('Dados da edição inválidos.');
+            }
+            $result = PluginTrallaCard::requestEdit($cardId, [
+                'name'         => tralla_post_string('name'),
+                'machines'     => $machines,
+                'new_machines' => $newMachines,
+            ], $userId, $isAdmin);
+            tralla_json(['ok' => true, 'data' => [
+                'state'    => tralla_ajax_state((int) $result['card']['plugin_tralla_boards_id']),
+                'card'     => $result['card'],
+                'approval' => $result['approval'],
+            ]]);
+
+        case 'deleted_cards':            $boards_id = tralla_post_int('boards_id');
             if (!PluginTrallaBoard::canAdminBoard($boards_id)) {
                 throw new RuntimeException('Você não tem acesso aos cards excluídos deste quadro.');
             }

@@ -213,25 +213,61 @@ if (!function_exists('tralla_valid_background')) {
 
 if (!function_exists('tralla_display_code')) {
     /**
-     * Código do card: 300/1, 300/2 ou #300.
+     * Código do card: AP-<raiz>/<seq> para aprovação, <raiz>/<seq> para
+     * manutenção e #<id> para quadros normais.
      */
     function tralla_display_code(array $card, string $board_type = ''): string
     {
         $stage = (int) ($card['stage'] ?? 1);
-        $parent = (int) ($card['parent_cards_id'] ?? 0);
         $id = (int) ($card['id'] ?? 0);
+        $familyRoot = (int) ($card['family_cards_id'] ?? 0);
+        $familySeq = (int) ($card['family_seq'] ?? 0);
 
-        if ($stage === 2 && $parent > 0) {
-            return $parent . '/2';
+        if ($stage === 2) {
+            if ($familyRoot <= 0) {
+                $familyRoot = (int) ($card['parent_cards_id'] ?? 0);
+            }
+            if ($familySeq <= 0) {
+                $familySeq = 1;
+            }
+
+            return $familyRoot > 0 ? 'AP-' . $familyRoot . '/' . $familySeq : '';
         }
 
         $isMaintenance = $board_type === 'maintenance' || !empty($card['is_maintenance']);
 
         if ($isMaintenance && $id > 0) {
-            return $id . '/1';
+            if ($familyRoot <= 0) {
+                $familyRoot = $id;
+            }
+            if ($familySeq <= 0) {
+                $familySeq = 1;
+            }
+
+            return $familyRoot . '/' . $familySeq;
         }
 
         return $id > 0 ? '#' . $id : '';
+    }
+}
+
+if (!function_exists('tralla_approval_kind_labels')) {
+    function tralla_approval_kind_labels(): array
+    {
+        return [
+            'maintenance' => 'Aprovação de finalização',
+            'deletion'    => 'Aprovação de exclusão',
+            'edit'        => 'Aprovação de edição',
+        ];
+    }
+}
+
+if (!function_exists('tralla_approval_kind_label')) {
+    function tralla_approval_kind_label(string $kind): string
+    {
+        $labels = tralla_approval_kind_labels();
+
+        return $labels[$kind] ?? $labels['maintenance'];
     }
 }
 

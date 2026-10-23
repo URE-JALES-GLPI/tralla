@@ -362,6 +362,8 @@
     var pollTimer = null;
     var pollInFlight = false;
     var pendingPoll = false;
+    var departingCards = {};
+    var departingTimers = {};
 
     var palette = {
         '': '#97a0af',
@@ -444,6 +446,96 @@
         return state.cards.find(function (card) {
             return Number(card.id) === numeric;
         }) || null;
+    }
+
+    function approvalKind(card) {
+        if (!card || Number(card.stage) !== 2) {
+            return '';
+        }
+        var kind = String(card.approval_kind || 'maintenance');
+        return kind === 'maintenance' ? 'final' : kind;
+    }
+
+    function approvalKindClass(card) {
+        var kind = approvalKind(card);
+        return kind ? 'approval-' + kind : '';
+    }
+
+    function approvalKindLabel(card) {
+        if (card && card.approval_kind_label) {
+            return String(card.approval_kind_label);
+        }
+        var kind = approvalKind(card);
+        if (kind === 'deletion') {
+            return 'Aprovação de exclusão';
+        }
+        if (kind === 'edit') {
+            return 'Aprovação de edição';
+        }
+        return 'Aprovação de finalização';
+    }
+
+    function machineDisplayTitle(machine, sequence) {
+        var model = String((machine && machine.model_name) || '').trim();
+        if (model !== '') {
+            return model + (sequence ? ' · unidade ' + sequence : '');
+        }
+
+        return 'Máquina #' + Number((machine && machine.id) || 0);
+    }
+
+    function scheduleDepartingCard(card, outcome) {
+        if (!card || !card.id) {
+            return;
+        }
+        var id = String(card.id);
+        if (departingTimers[id]) {
+            window.clearInterval(departingTimers[id]);
+            delete departingTimers[id];
+        }
+        var ghost = {
+            card: Object.assign({}, card),
+            outcome: outcome === 'rejected' ? 'rejected' : 'approved',
+            remaining: 10
+        };
+        departingCards[id] = ghost;
+        departingTimers[id] = window.setInterval(function () {
+            ghost.remaining -= 1;
+            if (ghost.remaining <= 0) {
+                window.clearInterval(departingTimers[id]);
+                delete departingTimers[id];
+                delete departingCards[id];
+            }
+            renderBoard();
+        }, 1000);
+
+        renderBoard();
+    }
+
+    function renderEditDiff(card) {
+        var changes = Array.isArray(card && card.edit_changes) ? card.edit_changes : [];
+        if (!changes.length) {
+            return '';
+        }
+
+        return '<div class="tralla-edit-diff">'
+            + '<h4><i class="ti ti-list-details"></i> Alterações solicitadas</h4>'
+            + changes.map(function (change) {
+                var label = String((change && change.label) || 'Alteração');
+                var before = change && change.before !== null && change.before !== undefined && String(change.before) !== ''
+                    ? String(change.before)
+                    : '—';
+                var after = change && change.after !== null && change.after !== undefined && String(change.after) !== ''
+                    ? String(change.after)
+                    : '—';
+                return '<div class="tralla-edit-diff-row">'
+                    + '<span class="tralla-edit-diff-label">' + esc(label) + '</span>'
+                    + '<span class="tralla-edit-diff-before">' + esc(before) + '</span>'
+                    + '<i class="ti ti-arrow-right" aria-hidden="true"></i>'
+                    + '<span class="tralla-edit-diff-after">' + esc(after) + '</span>'
+                    + '</div>';
+            }).join('')
+            + '</div>';
     }
 
     function toast(message, type, duration) {
@@ -658,7 +750,10 @@
         if (!label) {
             return '';
         }
-        return '<span class="tralla-pill ' + esc(statusClasses[card.status] || '') + '">'
+        var classes = [statusClasses[card.status] || '', approvalKindClass(card)].filter(function (value) {
+            return value !== '';
+        }).join(' ');
+        return '<span class="tralla-pill ' + esc(classes) + '">'
             + esc(label) + '</span>';
     }
 
@@ -687,15 +782,24 @@
 
         var cardId = String(card.id || '');
         var code = String(card.code || ('#' + cardId));
-        var haystack = normalizeSearchText([
+        var familyRoot = Number(card.family_cards_id || 0);
+        var familySeq = Number(card.family_seq || 0);
+        var parts = [
             card.name,
             card.technician_name,
             code,
             cardId,
-            '#' + cardId,
-            cardId + '/1',
-            cardId + '/2'
-        ].join(' '));
+            '#' + cardId
+        ];
+        if (familyRoot > 0) {
+            parts.push(String(familyRoot));
+            parts.push(familyRoot + '/' + familySeq);
+            parts.push('AP-' + familyRoot + '/' + familySeq);
+        }
+        if (Number(card.stage) === 2 && card.parent && card.parent.code) {
+            parts.push(card.parent.code);
+        }
+        var haystack = normalizeSearchText(parts.join(' '));
 
         return terms.every(function (term) {
             return haystack.indexOf(term) !== -1;
@@ -766,6 +870,22 @@
         var lists = Array.isArray(state.lists) ? state.lists : [];
         var visibleCards = (Array.isArray(state.cards) ? state.cards : []).filter(function (card) {
             return cardMatchesSearch(card, searchQuery);
+        });
+        Object.keys(departingCards).forEach(function (id) {
+            var ghost = departingCards[id];
+            if (!ghost || !ghost.card) {
+                return;
+            }
+            var exists = visibleCards.some(function (card) {
+                return Number(card.id) === Number(ghost.card.id);
+            });
+            if (exists) {
+                return;
+            }
+            var ghostCard = Object.assign({}, ghost.card, { _departing: ghost });
+            if (cardMatchesSearch(ghostCard, searchQuery)) {
+                visibleCards.push(ghostCard);
+            }
         });
 
         if (!lists.length) {
@@ -845,14 +965,17 @@
 
     function renderCard(card) {
         var cardId = Number(card.id);
-        var canDrag = !isMaintenance && !!can.move_card && searchQuery === '';
+        var departing = card._departing || null;
+        var departingClass = departing ? ' is-departing' : '';
+        var canDrag = !isMaintenance && !!can.move_card && searchQuery === '' && !departing;
         var machineCount = Number(card.machine_count || 0);
         var progress = card.progress || { total: machineCount, filled: 0, percent: 0 };
         var showProgress = isMaintenance && (machineCount > 0 || Number(progress.total) > 0);
         var statusLabel = isMaintenance ? (card.status_label || labels.statuses[card.status] || '') : '';
         var statusClass = statusClasses[card.status] || '';
+        var labelClass = approvalKindClass(card) || statusClass;
         var label = statusLabel
-            ? '<span class="tralla-card-label tralla-card-label-' + esc(statusClass) + '">' + esc(statusLabel) + '</span>'
+            ? '<span class="tralla-card-label tralla-card-label-' + esc(labelClass) + '">' + esc(statusLabel) + '</span>'
             : '';
         var tech = '';
 
@@ -871,6 +994,15 @@
             ? '<span class="tralla-card-badge tralla-card-lock" title="Card bloqueado"><i class="ti ti-lock" aria-hidden="true"></i></span>'
             : '';
 
+        var departingBadge = '';
+        if (departing) {
+            var departingOutcome = departing.outcome === 'rejected' ? 'rejected' : 'approved';
+            departingBadge = '<span class="tralla-card-departing is-' + departingOutcome + '">'
+                + '<i class="ti ' + (departingOutcome === 'rejected' ? 'ti-x' : 'ti-check') + '" aria-hidden="true"></i>'
+                + '<span>' + (departingOutcome === 'rejected' ? 'Reprovado' : 'Aprovado')
+                + ' · saindo em ' + Math.max(0, Number(departing.remaining) || 0) + 's</span></span>';
+        }
+
         var machineSummaryText = String(card.machine_summary || '').trim();
         var machineBadgeText = machineSummaryText || (machineCount ? machineCount + ' máquina(s)' : '');
         var machineBadge = machineCount
@@ -878,13 +1010,13 @@
                 + '<i class="ti ti-device-desktop" aria-hidden="true"></i><span>' + esc(machineBadgeText) + '</span></span>'
             : '';
 
-        var badges = source;
+        var badges = departingBadge + source;
         if (showProgress) {
             badges += progressMarkup(progress, Number(progress.total || machineCount), Number(progress.filled || 0));
         }
         badges += machineBadge + lock;
 
-        var takeButton = card.permissions && card.permissions.take
+        var takeButton = !departing && card.permissions && card.permissions.take
             ? '<button type="button" class="tralla-card-take" data-card-take="' + cardId + '" title="Pegar para mim">'
                 + '<i class="ti ti-hand-stop" aria-hidden="true"></i> Pegar</button>'
             : '';
@@ -896,7 +1028,7 @@
             + (label || '<span class="tralla-card-top-spacer" aria-hidden="true"></span>')
             + '</div>';
 
-        return '<article class="tralla-card' + (card.is_locked ? ' is-locked' : '')
+        return '<article class="tralla-card' + (card.is_locked ? ' is-locked' : '') + departingClass
             + '" data-card-id="' + cardId + '"'
             + (canDrag ? ' draggable="true"' : '')
             + ' tabindex="0" role="button" aria-label="Abrir card ' + attr(card.name) + '">'
@@ -1063,11 +1195,27 @@
         }
 
         if (permissions.approve) {
-            var isDeletionApproval = card.approval_kind === 'deletion';
+            var kind = approvalKind(card);
+            var approveLabel = kind === 'deletion'
+                ? 'Aprovar exclusão'
+                : (kind === 'edit' ? 'Aprovar edição' : 'Aprovar');
+            var rejectLabel = kind === 'deletion'
+                ? 'Recusar exclusão'
+                : (kind === 'edit' ? 'Recusar edição' : 'Reprovar');
             buttons += '<button type="button" class="tralla-btn tralla-btn-primary" data-card-action="approve">'
-                + '<i class="ti ti-shield-check"></i> ' + (isDeletionApproval ? 'Aprovar exclusão' : 'Aprovar') + '</button>';
+                + '<i class="ti ti-shield-check"></i> ' + approveLabel + '</button>';
             buttons += '<button type="button" class="tralla-btn tralla-btn-danger" data-card-action="reject">'
-                + '<i class="ti ti-shield-x"></i> ' + (isDeletionApproval ? 'Recusar exclusão' : 'Reprovar') + '</button>';
+                + '<i class="ti ti-shield-x"></i> ' + rejectLabel + '</button>';
+        }
+
+        if (permissions.split) {
+            buttons += '<button type="button" class="tralla-btn tralla-btn-ghost" data-card-action="split">'
+                + '<i class="ti ti-git-branch"></i> Separar card</button>';
+        }
+
+        if (permissions.edit_request) {
+            buttons += '<button type="button" class="tralla-btn tralla-btn-ghost" data-card-action="edit">'
+                + '<i class="ti ti-pencil"></i> Solicitar edição</button>';
         }
 
         if (permissions.withdraw) {
@@ -1138,33 +1286,21 @@
 
     function renderMachine(machine, canEdit, permissions, sequence) {
         var id = Number(machine.id);
-        var modelName = String(machine.model_name || '');
-        var title = machine.label
-            || (modelName ? modelName + (sequence ? ' · unidade ' + sequence : '') : ('Máquina #' + id));
+        var title = machineDisplayTitle(machine, sequence);
         var disabled = canEdit ? '' : ' disabled';
-        var deleteButton = (canEdit && permissions.delete_machine)
-            ? '<button type="button" class="tralla-icon-btn" data-delete-machine="' + id + '" title="Remover máquina">'
-                + '<i class="ti ti-trash"></i></button>'
-            : '';
 
         return '<div class="tralla-machine" data-machine-id="' + id + '">'
             + '<div class="tralla-machine-head">'
             + '<div class="tralla-machine-title">'
             + '<span data-machine-title-text>' + esc(title) + '</span>'
-            + '<small>' + esc(machine.model_name || 'Modelo não informado')
-            + (machine.serial ? ' · Série ' + esc(machine.serial) : '') + '</small>'
+            + '<small>' + esc(machine.model_name || 'Modelo não informado') + '</small>'
             + '</div>'
-            + '<div style="align-items:center;display:flex;gap:6px">'
-            + '<span class="tralla-save-state" data-machine-state></span>'
-            + deleteButton
-            + '</div></div>'
-            + '<div class="tralla-machine-grid">'
+            + '<span class="tralla-pill ' + (machine.is_filled ? 'done' : 'pending') + '">'
+            + (machine.is_filled ? 'Preenchida' : 'Pendente') + '</span>'
+            + '</div>'
+            + '<div class="tralla-machine-grid is-single">'
             + '<div class="tralla-field"><label>Status</label>'
             + '<select data-machine-field="status"' + disabled + '>' + machineStatusOptions(machine.status || '') + '</select></div>'
-            + '<div class="tralla-field"><label>Etiqueta / patrimônio</label>'
-            + '<input type="text" data-machine-field="label" maxlength="255" value="' + attr(machine.label || '') + '"' + disabled + '></div>'
-            + '<div class="tralla-field"><label>Número de série</label>'
-            + '<input type="text" data-machine-field="serial" maxlength="255" value="' + attr(machine.serial || '') + '"' + disabled + '></div>'
             + '</div>'
             + '<div class="tralla-field" style="margin-top:9px"><label>Relatório técnico</label>'
             + '<textarea class="tralla-machine-report" data-machine-field="report" maxlength="200000"'
@@ -1174,32 +1310,17 @@
             + (Number(machine.service_done) ? ' checked' : '') + disabled + '> Serviço realizado</label>'
             + '<label class="tralla-check"><input type="checkbox" data-machine-field="needs_inventory" value="1"'
             + (Number(machine.needs_inventory) ? ' checked' : '') + disabled + '> Necessita inventariar</label>'
-            + '<span class="tralla-pill ' + (machine.is_filled ? 'done' : 'pending') + '">'
-            + (machine.is_filled ? 'Preenchida' : 'Pendente') + '</span>'
             + '</div></div>';
     }
 
     function renderMachines(card) {
-        var permissions = card.permissions || {};
         var isApproval = Number(card.stage) === 2;
         var machines = isApproval && card.parent
             ? (card.parent.machines || [])
             : (card.machines || []);
         var progress = machineProgress(machines);
+        var permissions = card.permissions || {};
         var canEdit = !isApproval && !!permissions.edit_machines;
-        var addMachine = (!isApproval && permissions.add_machine)
-            ? '<details class="tralla-add-machine"><summary><i class="ti ti-plus"></i> Adicionar máquina</summary>'
-                + '<div class="tralla-add-machine-grid">'
-                + '<div class="tralla-field"><label>Modelo</label><select id="tralla-machine-model">'
-                + modelOptions('') + '</select></div>'
-                + '<div class="tralla-field"><label>Etiqueta / patrimônio</label>'
-                + '<input type="text" id="tralla-machine-label" maxlength="255"></div>'
-                + '<div class="tralla-field"><label>Número de série</label>'
-                + '<input type="text" id="tralla-machine-serial" maxlength="255"></div>'
-                + '</div>'
-                + '<button type="button" class="tralla-btn tralla-btn-primary" data-add-machine style="margin-top:8px">'
-                + '<i class="ti ti-plus"></i> Adicionar</button></details>'
-            : '';
 
         return '<section class="tralla-detail-section">'
             + '<h3><i class="ti ti-device-desktop"></i> Máquinas</h3>'
@@ -1213,7 +1334,6 @@
                     return renderMachine(machine, canEdit, permissions, index + 1);
                 }).join('')
                 : '<p class="tralla-empty-mini">Nenhuma máquina cadastrada.</p>')
-            + addMachine
             + '</section>';
     }
 
@@ -1222,38 +1342,99 @@
             return '';
         }
 
-        var isDeletion = card.approval_kind === 'deletion';
+        var kind = approvalKind(card);
         var openParent = card.parent
             ? '<button type="button" class="tralla-btn tralla-btn-ghost" data-open-card="' + Number(card.parent.id) + '">'
                 + '<i class="ti ti-arrow-up-right"></i> Ver origem</button>'
             : '';
+        var parentLine = card.parent
+            ? '<small>Card de origem: ' + esc(card.parent.code) + ' — ' + esc(card.parent.name) + '</small>'
+            : '';
 
-        if (isDeletion) {
+        if (kind === 'deletion') {
             var reason = card.deletion_reason
                 || (card.parent && card.parent.deletion_reason)
                 || 'Motivo não informado.';
-            var parent = card.parent
-                ? '<small>Card de origem: ' + esc(card.parent.code) + ' — ' + esc(card.parent.name) + '</small>'
-                : '';
 
             return '<div class="tralla-approval-banner is-deletion">'
                 + '<i class="ti ti-trash"></i>'
-                + '<div style="flex:1"><strong>Exclusão aguardando aprovação</strong>'
-                + parent
+                + '<div class="tralla-approval-content"><strong>Exclusão aguardando aprovação</strong>'
+                + parentLine
                 + '<small class="tralla-deletion-reason">Motivo: ' + esc(reason) + '</small></div>'
                 + openParent
                 + '</div>';
         }
 
-        var parentText = card.parent
-            ? 'Card de origem: ' + card.parent.code + ' — ' + card.parent.name
-            : 'Aguardando a decisão de um aprovador.';
+        if (kind === 'edit') {
+            return '<div class="tralla-approval-banner is-edit">'
+                + '<i class="ti ti-pencil"></i>'
+                + '<div class="tralla-approval-content"><strong>Edição aguardando aprovação</strong>'
+                + parentLine
+                + '<small>As alterações só serão aplicadas depois da aprovação.</small>'
+                + renderEditDiff(card)
+                + '</div>'
+                + openParent
+                + '</div>';
+        }
 
-        return '<div class="tralla-approval-banner">'
+        return '<div class="tralla-approval-banner is-finalization">'
             + '<i class="ti ti-shield-check"></i>'
-            + '<div style="flex:1"><strong>Aguardando aprovação</strong><small>' + esc(parentText) + '</small></div>'
+            + '<div class="tralla-approval-content"><strong>Aguardando aprovação de finalização</strong>'
+            + (parentLine || '<small>Aguardando a decisão de um aprovador.</small>')
+            + '</div>'
             + openParent
             + '</div>';
+    }
+
+    function renderPendingApproval(card) {
+        var approvalId = Number(card.pending_approval_id || 0);
+        if (!approvalId) {
+            return '';
+        }
+
+        var kind = String(card.pending_approval_kind || 'maintenance');
+        var kindClass = kind === 'deletion' ? 'deletion' : (kind === 'edit' ? 'edit' : 'finalization');
+        var label = kind === 'deletion'
+            ? 'Exclusão pendente de aprovação'
+            : (kind === 'edit' ? 'Edição pendente de aprovação' : 'Finalização pendente de aprovação');
+        var icon = kind === 'deletion' ? 'ti-trash' : (kind === 'edit' ? 'ti-pencil' : 'ti-shield-check');
+
+        return '<div class="tralla-approval-banner is-' + kindClass + '">'
+            + '<i class="ti ' + icon + '"></i>'
+            + '<div class="tralla-approval-content"><strong>' + label + '</strong>'
+            + '<small>Este card está bloqueado até a decisão.</small></div>'
+            + '<button type="button" class="tralla-btn tralla-btn-ghost" data-open-card="' + approvalId + '">'
+            + '<i class="ti ti-arrow-up-right"></i> Ver aprovação</button>'
+            + '</div>';
+    }
+
+    function renderFamily(card) {
+        var members = Array.isArray(card.family_members) ? card.family_members : [];
+        var origin = card.split_from || null;
+        if (members.length <= 1 && !origin) {
+            return '';
+        }
+
+        var chips = members.map(function (member) {
+            return '<button type="button" class="tralla-family-chip' + (member.is_current ? ' is-current' : '')
+                + '" data-open-card="' + Number(member.id) + '">'
+                + '<span class="tralla-family-code">' + esc(member.code) + '</span>'
+                + '<span class="tralla-family-name">' + esc(member.name) + '</span>'
+                + '<small>' + esc(member.status_label || member.status || '') + '</small>'
+                + '</button>';
+        }).join('');
+
+        var originBlock = origin
+            ? '<p class="tralla-split-origin"><i class="ti ti-git-branch"></i> Separado de '
+                + '<button type="button" class="tralla-link-btn" data-open-card="' + Number(origin.id) + '">'
+                + esc(origin.code) + ' — ' + esc(origin.name) + '</button></p>'
+            : '';
+
+        return '<section class="tralla-detail-section tralla-family-section">'
+            + '<h3><i class="ti ti-git-branch"></i> Família do card</h3>'
+            + originBlock
+            + '<div class="tralla-family-chips">' + chips + '</div>'
+            + '</section>';
     }
 
     function renderAssignature(card) {
@@ -1286,6 +1467,8 @@
                 + '</section>';
         }
 
+        body += renderPendingApproval(card);
+        body += renderFamily(card);
         body += renderApproval(card);
 
         if (isMaintenance) {
@@ -1373,7 +1556,19 @@
         }
 
         var cardId = activeCard.id;
-        var isDeletionApproval = activeCard.approval_kind === 'deletion';
+        var kind = approvalKind(activeCard);
+        var isDeletionApproval = kind === 'deletion';
+        var isEditApproval = kind === 'edit';
+        var departingCard = Object.assign({}, activeCard);
+
+        if (action === 'split') {
+            openSplitModal(activeCard);
+            return;
+        }
+        if (action === 'edit') {
+            openEditModal(activeCard);
+            return;
+        }
 
         try {
             if (action === 'delete') {
@@ -1404,24 +1599,36 @@
             }
 
             if (action === 'reject') {
-                var rejectConfig = isDeletionApproval
-                    ? {
+                var rejectConfig;
+                if (isDeletionApproval) {
+                    rejectConfig = {
                         title: 'Recusar exclusão',
                         message: 'O card será restaurado ao quadro.',
                         label: 'Motivo (opcional)',
                         confirmLabel: 'Recusar exclusão'
-                    }
-                    : {
+                    };
+                } else if (isEditApproval) {
+                    rejectConfig = {
+                        title: 'Recusar edição',
+                        message: 'As alterações solicitadas serão descartadas.',
+                        label: 'Motivo (opcional)',
+                        confirmLabel: 'Recusar edição'
+                    };
+                } else {
+                    rejectConfig = {
                         title: 'Reprovar manutenção',
                         message: 'O card voltará para Em Andamento com este registro no histórico.',
                         label: 'Motivo (opcional)',
                         confirmLabel: 'Reprovar'
                     };
+                }
                 var rejectReason = await promptDialog(Object.assign({
                     multiline: true,
                     placeholder: isDeletionApproval
                         ? 'Descreva o motivo da recusa...'
-                        : 'Descreva o motivo da reprovação...',
+                        : (isEditApproval
+                            ? 'Descreva o motivo da recusa da edição...'
+                            : 'Descreva o motivo da reprovação...'),
                     icon: 'ti-shield-x',
                     tone: 'danger'
                 }, rejectConfig));
@@ -1431,10 +1638,13 @@
                 setBusy(button, true);
                 var rejected = await api('reject_card', { id: cardId, reason: rejectReason });
                 applyState(rejected);
+                scheduleDepartingCard(departingCard, 'rejected');
                 toast(
                     isDeletionApproval
                         ? 'Exclusão recusada. Card restaurado.'
-                        : 'Manutenção reprovada. O card voltou para Em Andamento.',
+                        : (isEditApproval
+                            ? 'Edição recusada. Alterações descartadas.'
+                            : 'Manutenção reprovada. O card voltou para Em Andamento.'),
                     'success'
                 );
                 await openCard(rejected.card.id);
@@ -1466,19 +1676,30 @@
             }
 
             if (action === 'approve') {
-                var approveConfirmed = await confirmDialog(isDeletionApproval
-                    ? {
+                var approveConfig;
+                if (isDeletionApproval) {
+                    approveConfig = {
                         title: 'Aprovar exclusão',
                         message: 'Aprovar a exclusão deste card? Ele será movido para Excluídos.',
                         icon: 'ti-shield-check',
                         confirmLabel: 'Aprovar exclusão'
-                    }
-                    : {
+                    };
+                } else if (isEditApproval) {
+                    approveConfig = {
+                        title: 'Aprovar edição',
+                        message: 'Aplicar as alterações solicitadas a este card?',
+                        icon: 'ti-shield-check',
+                        confirmLabel: 'Aprovar edição'
+                    };
+                } else {
+                    approveConfig = {
                         title: 'Aprovar manutenção',
                         message: 'Aprovar esta manutenção e liberar a retirada?',
                         icon: 'ti-shield-check',
                         confirmLabel: 'Aprovar'
-                    });
+                    };
+                }
+                var approveConfirmed = await confirmDialog(approveConfig);
                 if (!approveConfirmed) {
                     return;
                 }
@@ -1500,9 +1721,13 @@
             } else if (action === 'approve') {
                 data = await api('approve_card', { id: cardId });
                 applyState(data);
+                scheduleDepartingCard(departingCard, 'approved');
                 if (isDeletionApproval) {
                     toast('Exclusão aprovada. Card movido para Excluídos.', 'success');
                     closeModal();
+                } else if (isEditApproval) {
+                    toast('Edição aprovada e aplicada.', 'success');
+                    await openCard(data.card.id);
                 } else {
                     toast('Manutenção aprovada. Card liberado para retirada.', 'success');
                     await openCard(data.card.id);
@@ -1516,6 +1741,227 @@
         } catch (error) {
             toast(error.message, 'error');
             setBusy(button, false);
+        }
+    }
+
+    function openSplitModal(card) {
+        var machines = Array.isArray(card.machines) ? card.machines : [];
+        if (machines.length < 2) {
+            toast('O card precisa ter ao menos duas máquinas para ser separado.', 'error');
+            return;
+        }
+
+        var rows = machines.map(function (machine, index) {
+            return '<label class="tralla-split-row">'
+                + '<input type="checkbox" data-split-machine value="' + Number(machine.id) + '">'
+                + '<span class="tralla-split-machine">'
+                + '<strong>' + esc(machineDisplayTitle(machine, index + 1)) + '</strong>'
+                + '<small>' + esc(machine.status_label || '') + '</small>'
+                + '</span></label>';
+        }).join('');
+
+        showModal('<form id="tralla-split-form" class="tralla-form" novalidate>'
+            + '<div class="tralla-modal-head"><div>'
+            + '<h2><i class="ti ti-git-branch"></i> Separar card</h2>'
+            + '<p>' + esc(card.code || ('#' + card.id)) + ' · ' + esc(card.name) + '</p>'
+            + '</div>' + modalCloseButton() + '</div>'
+            + '<div class="tralla-modal-body">'
+            + '<p class="tralla-muted">Selecione as máquinas que serão movidas para um novo card. O card atual mantém as demais.</p>'
+            + '<div class="tralla-split-list">' + rows + '</div>'
+            + '</div>'
+            + '<div class="tralla-modal-actions">'
+            + '<button type="button" class="tralla-btn tralla-btn-ghost" data-tralla-close>Cancelar</button>'
+            + '<button type="submit" class="tralla-btn tralla-btn-primary">'
+            + '<i class="ti ti-git-branch"></i> Separar</button>'
+            + '</div></form>');
+    }
+
+    async function submitSplitCard(form) {
+        if (!activeCard) {
+            return;
+        }
+        var ids = Array.prototype.slice.call(form.querySelectorAll('[data-split-machine]:checked')).map(function (input) {
+            return Number(input.value);
+        });
+        var total = Number(activeCard.machine_count || (activeCard.machines || []).length || 0);
+        if (!ids.length) {
+            toast('Selecione ao menos uma máquina.', 'error');
+            return;
+        }
+        if (ids.length >= total) {
+            toast('Selecione menos máquinas do que o total do card.', 'error');
+            return;
+        }
+
+        var submit = form.querySelector('button[type="submit"]');
+        setBusy(submit, true);
+        try {
+            var data = await api('split_card', { id: activeCard.id, machine_ids: ids });
+            var child = data.child;
+            applyState(data);
+            closeModal();
+            toast('Card separado. Novo card ' + (child.code || ('#' + child.id)) + '.', 'success');
+            await openCard(child.id);
+        } catch (error) {
+            toast(error.message, 'error');
+            setBusy(submit, false);
+        }
+    }
+
+    function editMachineRow(machine, sequence) {
+        var id = Number(machine.id);
+        return '<div class="tralla-edit-machine" data-edit-machine data-machine-id="' + id + '">'
+            + '<div class="tralla-edit-machine-head">'
+            + '<strong>' + esc(machineDisplayTitle(machine, sequence)) + '</strong>'
+            + '<button type="button" class="tralla-icon-btn" data-remove-edit-machine title="Remover do card">'
+            + '<i class="ti ti-trash"></i></button></div>'
+            + '<div class="tralla-machine-grid is-single">'
+            + '<div class="tralla-field"><label>Status</label>'
+            + '<select data-edit-field="status">' + machineStatusOptions(machine.status || '') + '</select></div>'
+            + '</div>'
+            + '<div class="tralla-field" style="margin-top:9px"><label>Relatório técnico</label>'
+            + '<textarea data-edit-field="report" maxlength="200000" placeholder="Descreva o diagnóstico e o serviço executado...">'
+            + esc(machine.report || '') + '</textarea></div>'
+            + '<div class="tralla-machine-flags">'
+            + '<label class="tralla-check"><input type="checkbox" data-edit-field="service_done" value="1"'
+            + (Number(machine.service_done) ? ' checked' : '') + '> Serviço realizado</label>'
+            + '<label class="tralla-check"><input type="checkbox" data-edit-field="needs_inventory" value="1"'
+            + (Number(machine.needs_inventory) ? ' checked' : '') + '> Necessita inventariar</label>'
+            + '</div></div>';
+    }
+
+    function editNewMachineRow() {
+        return '<div class="tralla-edit-new-machine" data-edit-new-machine>'
+            + '<div class="tralla-add-machine-grid">'
+            + '<div class="tralla-field"><label>Quantidade</label>'
+            + '<input type="number" data-edit-new-quantity min="1" max="' + quantityMax() + '" step="1" value="1" inputmode="numeric"></div>'
+            + '<div class="tralla-field"><label>Modelo</label><select data-edit-new-model>'
+            + modelOptions('') + '</select></div>'
+            + '</div>'
+            + '<button type="button" class="tralla-icon-btn" data-remove-edit-new title="Remover modelo">'
+            + '<i class="ti ti-x"></i></button>'
+            + '</div>';
+    }
+
+    function openEditModal(card) {
+        var machines = Array.isArray(card.machines) ? card.machines : [];
+        var entities = Array.isArray(state.entities) ? state.entities : [];
+        var hasEntities = entities.length > 0;
+
+        var nameField = '<div class="tralla-field tralla-combobox-field">'
+            + '<label for="tralla-edit-name">Nome do card *</label>'
+            + '<div class="tralla-combobox">'
+            + '<input id="tralla-edit-name" type="text" maxlength="255" value="' + attr(card.name) + '" required autocomplete="off"'
+            + (hasEntities
+                ? ' role="combobox" aria-autocomplete="list" aria-expanded="false"'
+                    + ' aria-controls="tralla-edit-name-list" aria-haspopup="listbox"'
+                : '')
+            + '>'
+            + (hasEntities
+                ? '<div id="tralla-edit-name-list" class="tralla-combobox-list" role="listbox" hidden></div>'
+                : '')
+            + '</div></div>';
+
+        var machineRows = machines.map(function (machine, index) {
+            return editMachineRow(machine, index + 1);
+        }).join('');
+
+        showModal('<form id="tralla-edit-form" class="tralla-form" novalidate>'
+            + '<div class="tralla-modal-head"><div>'
+            + '<h2><i class="ti ti-pencil"></i> Solicitar edição</h2>'
+            + '<p>' + esc(card.code || ('#' + card.id)) + ' · ' + esc(card.name) + '</p>'
+            + '</div>' + modalCloseButton() + '</div>'
+            + '<div class="tralla-modal-body">'
+            + nameField
+            + '<section class="tralla-detail-section">'
+            + '<h3><i class="ti ti-device-desktop"></i> Máquinas</h3>'
+            + '<div id="tralla-edit-machines">'
+            + (machineRows || '<p class="tralla-empty-mini">Nenhuma máquina cadastrada.</p>')
+            + '</div>'
+            + '<button type="button" class="tralla-add-card" data-add-edit-machine>'
+            + '<i class="ti ti-plus"></i> Adicionar modelo</button>'
+            + '</section></div>'
+            + '<div class="tralla-modal-actions">'
+            + '<button type="button" class="tralla-btn tralla-btn-ghost" data-tralla-close>Cancelar</button>'
+            + '<button type="submit" class="tralla-btn tralla-btn-primary">'
+            + '<i class="ti ti-send"></i> Solicitar aprovação</button>'
+            + '</div></form>', true);
+
+        if (hasEntities) {
+            setupEntityCombobox('tralla-edit-name', 'tralla-edit-name-list');
+        }
+    }
+
+    async function submitEditRequest(form) {
+        if (!activeCard) {
+            return;
+        }
+        var nameEl = form.querySelector('#tralla-edit-name');
+        var name = nameEl ? nameEl.value.trim() : '';
+        if (!name) {
+            toast('Informe o nome do card.', 'error');
+            if (nameEl) {
+                nameEl.focus();
+            }
+            return;
+        }
+
+        var machines = [];
+        Array.prototype.forEach.call(form.querySelectorAll('[data-edit-machine]'), function (row) {
+            var id = Number(row.dataset.machineId || 0);
+            if (!id) {
+                return;
+            }
+            var status = row.querySelector('[data-edit-field="status"]');
+            var report = row.querySelector('[data-edit-field="report"]');
+            var service = row.querySelector('[data-edit-field="service_done"]');
+            var inventory = row.querySelector('[data-edit-field="needs_inventory"]');
+            machines.push({
+                id: id,
+                status: status ? status.value : '',
+                report: report ? report.value : '',
+                service_done: service && service.checked ? 1 : 0,
+                needs_inventory: inventory && inventory.checked ? 1 : 0
+            });
+        });
+
+        var newMachines = [];
+        var invalidQuantity = false;
+        Array.prototype.forEach.call(form.querySelectorAll('[data-edit-new-machine]'), function (row) {
+            var model = row.querySelector('[data-edit-new-model]');
+            var quantityEl = row.querySelector('[data-edit-new-quantity]');
+            var modelId = model ? Number(model.value) : 0;
+            if (modelId <= 0) {
+                return;
+            }
+            var quantity = quantityEl ? Number(quantityEl.value) : 1;
+            if (!Number.isInteger(quantity) || quantity < 1 || quantity > quantityMax()) {
+                invalidQuantity = true;
+                return;
+            }
+            newMachines.push({ model_id: modelId, quantity: quantity });
+        });
+        if (invalidQuantity) {
+            toast('Informe uma quantidade entre 1 e ' + quantityMax() + '.', 'error');
+            return;
+        }
+
+        var submit = form.querySelector('button[type="submit"]');
+        setBusy(submit, true);
+        try {
+            var data = await api('edit_request', {
+                id: activeCard.id,
+                name: name,
+                machines: machines,
+                new_machines: newMachines
+            });
+            applyState(data);
+            closeModal();
+            toast('Edição solicitada. Aguardando aprovação.', 'success');
+            await openCard(data.card.id);
+        } catch (error) {
+            toast(error.message, 'error');
+            setBusy(submit, false);
         }
     }
 
@@ -1832,8 +2278,7 @@
         });
     }
 
-    function renderEntityOptions(query) {
-        var list = document.getElementById('tralla-create-name-list');
+    function renderEntityOptions(query, list) {
         if (!list) {
             return;
         }
@@ -1855,23 +2300,24 @@
                 ? '<small>' + esc(complete) + '</small>'
                 : '';
             return '<button type="button" class="tralla-combobox-option" role="option"'
-                + ' id="tralla-create-entity-' + index + '" aria-selected="false"'
+                + ' id="' + attr(list.id) + '-entity-' + index + '" aria-selected="false"'
                 + ' data-entity-name="' + attr(name) + '">'
                 + '<span>' + esc(name) + '</span>' + path + '</button>';
         }).join('');
         list.hidden = false;
     }
 
-    function closeEntityOptions() {
-        var input = document.getElementById('tralla-create-name');
-        var list = document.getElementById('tralla-create-name-list');
+    function closeEntityOptions(input) {
+        if (!input) {
+            return;
+        }
+        var listId = input.getAttribute('aria-controls');
+        var list = listId ? document.getElementById(listId) : null;
         if (list) {
             list.hidden = true;
         }
-        if (input) {
-            input.setAttribute('aria-expanded', 'false');
-            input.removeAttribute('aria-activedescendant');
-        }
+        input.setAttribute('aria-expanded', 'false');
+        input.removeAttribute('aria-activedescendant');
     }
 
     function selectEntityOption(input, option) {
@@ -1879,18 +2325,20 @@
             return;
         }
         input.value = option.dataset.entityName || '';
-        closeEntityOptions();
+        closeEntityOptions(input);
     }
 
-    function setupEntityCombobox() {
-        var input = document.getElementById('tralla-create-name');
-        var list = document.getElementById('tralla-create-name-list');
+    function setupEntityCombobox(inputId, listId) {
+        inputId = inputId || 'tralla-create-name';
+        listId = listId || 'tralla-create-name-list';
+        var input = document.getElementById(inputId);
+        var list = document.getElementById(listId);
         if (!input || !list) {
             return;
         }
 
         function openList() {
-            renderEntityOptions(input.value);
+            renderEntityOptions(input.value, list);
             input.setAttribute('aria-expanded', 'true');
         }
 
@@ -1934,11 +2382,13 @@
             if (event.key === 'Escape' && !list.hidden) {
                 event.preventDefault();
                 event.stopPropagation();
-                closeEntityOptions();
+                closeEntityOptions(input);
             }
         });
         input.addEventListener('blur', function () {
-            window.setTimeout(closeEntityOptions, 120);
+            window.setTimeout(function () {
+                closeEntityOptions(input);
+            }, 120);
         });
         list.addEventListener('mousedown', function (event) {
             event.preventDefault();
@@ -2133,7 +2583,7 @@
             addCreateMachineRow();
         }
         if (hasEntities) {
-            setupEntityCombobox();
+            setupEntityCombobox('tralla-create-name', 'tralla-create-name-list');
         }
     }
 
@@ -2331,100 +2781,8 @@
         } catch (error) {
             toast(error.message, 'error');
         }
-    }
+}
 
-    async function addMachine(button) {
-        if (!activeCard) {
-            return;
-        }
-
-        var modelSelect = document.getElementById('tralla-machine-model');
-        var labelEl = document.getElementById('tralla-machine-label');
-        var serialEl = document.getElementById('tralla-machine-serial');
-
-        if (!modelSelect) {
-            return;
-        }
-
-        var modelId = Number(modelSelect.value);
-        if (modelSelect.value === '__new') {
-            var modelName = await promptDialog({
-                title: 'Novo modelo de máquina',
-                message: 'Cadastre um modelo para usar nas máquinas deste card.',
-                label: 'Nome do modelo',
-                placeholder: 'Ex.: Notebook Dell Latitude',
-                icon: 'ti-device-desktop',
-                required: true,
-                requiredMessage: 'Informe o nome do modelo.',
-                confirmLabel: 'Cadastrar modelo'
-            });
-            if (modelName === null) {
-                modelSelect.value = '';
-                return;
-            }
-            try {
-                var model = await createModel(modelName);
-                modelSelect.innerHTML = modelOptions(String(model.id));
-                modelSelect.value = String(model.id);
-                modelId = Number(model.id);
-            } catch (error) {
-                toast(error.message, 'error');
-                modelSelect.value = '';
-                return;
-            }
-        }
-
-        if (!modelId) {
-            toast('Selecione um modelo de máquina.', 'error');
-            return;
-        }
-
-        var cardId = activeCard.id;
-        setBusy(button, true);
-
-        try {
-            var data = await api('machine_add', {
-                card_id: cardId,
-                model_id: modelId,
-                label: labelEl ? labelEl.value : '',
-                serial: serialEl ? serialEl.value : ''
-            });
-            activeCard = data.card;
-            renderCardModal(activeCard);
-            refreshState().catch(function () { return null; });
-            toast('Máquina adicionada.', 'success');
-        } catch (error) {
-            toast(error.message, 'error');
-            setBusy(button, false);
-        }
-    }
-
-    async function deleteMachine(machineId) {
-        if (!activeCard || !machineId) {
-            return;
-        }
-        var machineConfirmed = await confirmDialog({
-            title: 'Remover máquina',
-            message: 'Remover esta máquina do card? O relatório registrado será perdido.',
-            icon: 'ti-trash',
-            tone: 'danger',
-            confirmLabel: 'Remover máquina'
-        });
-        if (!machineConfirmed) {
-            return;
-        }
-
-        var cardId = activeCard.id;
-        try {
-            var data = await api('machine_delete', { machine_id: machineId });
-            activeCard = data.card;
-            renderCardModal(activeCard);
-            refreshState().catch(function () { return null; });
-            toast('Máquina removida.', 'success');
-        } catch (error) {
-            toast(error.message, 'error');
-        }
-    }
 
     /* ------------------------------------------------------------ events */
 
@@ -2649,15 +3007,34 @@
             return;
         }
 
-        var addMachineButton = event.target.closest('[data-add-machine]');
-        if (addMachineButton) {
-            addMachine(addMachineButton);
+        var addEditMachineButton = event.target.closest('[data-add-edit-machine]');
+        if (addEditMachineButton) {
+            var editMachines = modalRoot.querySelector('#tralla-edit-machines');
+            if (editMachines) {
+                var emptyEdit = editMachines.querySelector('.tralla-empty-mini');
+                if (emptyEdit) {
+                    emptyEdit.remove();
+                }
+                editMachines.insertAdjacentHTML('beforeend', editNewMachineRow());
+            }
             return;
         }
 
-        var deleteMachineButton = event.target.closest('[data-delete-machine]');
-        if (deleteMachineButton) {
-            deleteMachine(Number(deleteMachineButton.dataset.deleteMachine));
+        var removeEditMachineButton = event.target.closest('[data-remove-edit-machine]');
+        if (removeEditMachineButton) {
+            var editMachineRowEl = removeEditMachineButton.closest('[data-edit-machine]');
+            if (editMachineRowEl) {
+                editMachineRowEl.remove();
+            }
+            return;
+        }
+
+        var removeEditNewButton = event.target.closest('[data-remove-edit-new]');
+        if (removeEditNewButton) {
+            var editNewMachineEl = removeEditNewButton.closest('[data-edit-new-machine]');
+            if (editNewMachineEl) {
+                editNewMachineEl.remove();
+            }
             return;
         }
 
@@ -2709,6 +3086,18 @@
 
     modalRoot.addEventListener('submit', function (event) {
         var form = event.target;
+
+        if (form.id === 'tralla-split-form') {
+            event.preventDefault();
+            submitSplitCard(form);
+            return;
+        }
+
+        if (form.id === 'tralla-edit-form') {
+            event.preventDefault();
+            submitEditRequest(form);
+            return;
+        }
 
         if (form.id === 'tralla-create-card-form') {
             event.preventDefault();
@@ -2814,6 +3203,37 @@
                 if (createRow) {
                     updateCreateMachineSummary(createRow);
                 }
+            }
+        }
+
+        var editModelSelect = event.target.closest('[data-edit-new-model]');
+        if (editModelSelect && editModelSelect.value === '__new') {
+            var editModelName = await promptDialog({
+                title: 'Novo modelo de máquina',
+                message: 'Cadastre um modelo para usar nas máquinas deste card.',
+                label: 'Nome do modelo',
+                placeholder: 'Ex.: Notebook Dell Latitude',
+                icon: 'ti-device-desktop',
+                required: true,
+                requiredMessage: 'Informe o nome do modelo.',
+                confirmLabel: 'Cadastrar modelo'
+            });
+            if (editModelName === null) {
+                editModelSelect.value = '';
+                return;
+            }
+            try {
+                var editModel = await createModel(editModelName);
+                Array.prototype.forEach.call(modalRoot.querySelectorAll('[data-edit-new-model]'), function (select) {
+                    var option = document.createElement('option');
+                    option.value = String(editModel.id);
+                    option.textContent = editModel.name;
+                    select.appendChild(option);
+                });
+                editModelSelect.value = String(editModel.id);
+            } catch (error) {
+                toast(error.message, 'error');
+                editModelSelect.value = '';
             }
         }
     });

@@ -56,7 +56,7 @@ Modelos arquivados continuam visíveis em cards e relatórios antigos, mas não 
    - Manutenção Aprovação
    - Manutenção Retirada
    - Manutenção Concluído
-3. Crie um card informando o nome, o modelo e a quantidade de máquinas. Etiqueta, número de série e relatório podem ser preenchidos depois, no detalhe do card.
+3. Crie um card informando o nome, o modelo e a quantidade de máquinas. O relatório por máquina pode ser preenchido depois, no detalhe do card.
 4. O fluxo é controlado pelo servidor; arrastar cards de manutenção não altera o status.
 
 ### 4. Fluxo de manutenção
@@ -74,7 +74,10 @@ Pendente --Pegar--> Em Andamento --Finalizar--> Aprovação (/2)
 - **Finalizar**: exige todas as máquinas preenchidas (relatório não vazio + status `done` ou `not_repairable`). Cria o card de aprovação `/2` e bloqueia o card `/1`.
 - **Aprovar**: move o `/1` para Retirada, desbloqueia e arquiva o `/2` como aprovado.
 - **Reprovar**: devolve o `/1` para Em Andamento com o motivo registrado e arquiva o `/2`.
-- **Confirmar retirada**: move o `/1` para Concluído e grava a data de retirada.
+- **Confirmar retirada**: move o `/1` para Concluído e grava a data de retirada. Em cards com família, confirmar em um membro confirma a retirada de toda a família.
+- **Separar card**: seleciona máquinas de um card em andamento e cria um card irmão `/N` com o mesmo responsável; bloqueado quando algum membro da família está em aprovação ou retirada.
+- **Solicitar edição**: técnico ou admin com atualização solicita alteração de nome e máquinas; cria card `/2` de aprovação de edição. Aprovar aplica as alterações; reprovar descarta.
+- **Cards decididos**: após aprovação ou reprovação, o card de aprovação permanece no quadro por 10 segundos com selo `Aprovado` ou `Reprovado` antes de sair.
 - **Concluído**: somente leitura.
 
 ## Membros e papéis
@@ -202,7 +205,7 @@ tralla/
 
 ## Limitações desta versão
 
-- Separar card (split) e etapa de CRM não estão implementados.
+- A etapa de CRM entre finalização e retirada não está implementada.
 - A exclusão definitiva de cards e a exclusão em lote não estão implementadas; a lixeira é sempre reversível.
 - A flag **Necessita inventariar** é registrada, mas não cria automaticamente Computer/Asset.
 - O envio/push para o assignat-ure é manual; o plugin disponibiliza o link e o endpoint de consulta.

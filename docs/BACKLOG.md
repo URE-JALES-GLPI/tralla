@@ -4,7 +4,6 @@ Itens conscientemente fora da primeira versão ou que dependem de definição fu
 
 ## Produto
 
-- **Separar card (split)**: o fluxograma original não descreve regras de rateio de máquinas, histórico e aprovação. Definir antes de implementar.
 - **CRM entre finalização e retirada**: etapa sem contrato funcional; não bloquear o fluxo atual.
 - **Push automático para o assignat-ure**: hoje existe endpoint de leitura e link manual. Definir autenticação, payload e política de reenvio.
 - **Vínculo automático com inventário**: a flag `needs_inventory` é registrada, mas não cria Computer/Asset. Definir mapeamento de modelo, entidade e campos.

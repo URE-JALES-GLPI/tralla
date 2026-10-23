@@ -110,6 +110,9 @@ function plugin_tralla_install(): bool
                 `stage`                   TINYINT(1)   NOT NULL DEFAULT '1' COMMENT '1=manutenção, 2=aprovação',
                 `parent_cards_id`         INT {$sign} NOT NULL DEFAULT '0' COMMENT 'card /1 de origem quando stage=2',
                 `approval_cards_id`       INT {$sign} NOT NULL DEFAULT '0' COMMENT 'card /2 gerado pelo /1',
+                `family_cards_id`         INT {$sign} NOT NULL DEFAULT '0' COMMENT 'card raiz da família',
+                `family_seq`              INT {$sign} NOT NULL DEFAULT '1' COMMENT 'posição na família',
+                `split_from_cards_id`     INT {$sign} NOT NULL DEFAULT '0' COMMENT 'card que originou a separação',
                 `status`                  VARCHAR(30)  NOT NULL DEFAULT '' COMMENT 'normal,pending,in_progress,waiting_approval,withdrawal,done,approved,rejected,deletion_pending,deleted',
                 `is_locked`               TINYINT(1)   NOT NULL DEFAULT '0',
                 `is_archived`             TINYINT(1)   NOT NULL DEFAULT '0',
@@ -125,7 +128,8 @@ function plugin_tralla_install(): bool
                 `rejection_reason`        TEXT         DEFAULT NULL,
                 `users_id_approver`       INT {$sign} NOT NULL DEFAULT '0',
                 `is_deleted`              TINYINT(1)   NOT NULL DEFAULT 0,
-                `approval_kind`           VARCHAR(20)  NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|deletion',
+                `approval_kind`           VARCHAR(20)  NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|deletion|edit',
+                `edit_payload`            LONGTEXT     DEFAULT NULL COMMENT 'JSON de edição pendente',
                 `deletion_reason`         TEXT         DEFAULT NULL,
                 `deletion_requested_at`   DATETIME     DEFAULT NULL,
                 `deletion_requested_by`   INT {$sign} NOT NULL DEFAULT 0,
@@ -140,6 +144,9 @@ function plugin_tralla_install(): bool
                 KEY `plugin_tralla_boards_id` (`plugin_tralla_boards_id`),
                 KEY `plugin_tralla_lists_id` (`plugin_tralla_lists_id`),
                 KEY `parent_cards_id` (`parent_cards_id`),
+                KEY `family_cards_id` (`family_cards_id`),
+                KEY `family_seq` (`family_seq`),
+                KEY `split_from_cards_id` (`split_from_cards_id`),
                 KEY `stage` (`stage`),
                 KEY `status` (`status`),
                 KEY `rank` (`rank`)
@@ -150,7 +157,11 @@ function plugin_tralla_install(): bool
     // Colunas de exclusão em tabelas de cards já existentes.
     $cards_columns = [
         'is_deleted'                  => 'TINYINT(1)   NOT NULL DEFAULT 0',
-        'approval_kind'               => "VARCHAR(20)  NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|deletion'",
+        'approval_kind'               => "VARCHAR(20)  NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|deletion|edit'",
+        'edit_payload'                => 'LONGTEXT     DEFAULT NULL',
+        'family_cards_id'             => "INT {$sign} NOT NULL DEFAULT 0",
+        'family_seq'                  => "INT {$sign} NOT NULL DEFAULT 1",
+        'split_from_cards_id'         => "INT {$sign} NOT NULL DEFAULT 0",
         'deletion_reason'             => 'TEXT         DEFAULT NULL',
         'deletion_requested_at'       => 'DATETIME     DEFAULT NULL',
         'deletion_requested_by'       => "INT {$sign} NOT NULL DEFAULT 0",
@@ -188,10 +199,33 @@ function plugin_tralla_install(): bool
             ['id' => ['>', 0]]
         );
     }
+    // Famílias: todo card stage 1 é raiz da própria família; stage 2 herda do pai.
+    // Idempotente: só toca linhas ainda não preenchidas.
+    $DB->doQuery("
+        UPDATE `glpi_plugin_tralla_cards`
+        SET `family_cards_id` = `id`, `family_seq` = 1
+        WHERE `stage` = 1 AND (`family_cards_id` = 0 OR `family_seq` = 0)
+    ") or die($DB->error());
+    $DB->doQuery("
+        UPDATE `glpi_plugin_tralla_cards` AS c2
+        INNER JOIN `glpi_plugin_tralla_cards` AS c1 ON c1.id = c2.parent_cards_id
+        SET c2.family_cards_id = c1.family_cards_id, c2.family_seq = c1.family_seq
+        WHERE c2.stage = 2 AND (c2.family_cards_id = 0 OR c2.family_seq = 0)
+    ") or die($DB->error());
+    $DB->doQuery("
+        UPDATE `glpi_plugin_tralla_cards`
+        SET `family_cards_id` = `parent_cards_id`, `family_seq` = 1
+        WHERE `stage` = 2 AND `parent_cards_id` > 0 AND (`family_cards_id` = 0 OR `family_seq` = 0)
+    ") or die($DB->error());
+
     if ($cards_table_existed) {
         $DB->doQuery("
             ALTER TABLE `glpi_plugin_tralla_cards`
             MODIFY `status` VARCHAR(30) NOT NULL DEFAULT '' COMMENT 'normal,pending,in_progress,waiting_approval,withdrawal,done,approved,rejected,deletion_pending,deleted'
+        ") or die($DB->error());
+        $DB->doQuery("
+            ALTER TABLE `glpi_plugin_tralla_cards`
+            MODIFY `approval_kind` VARCHAR(20) NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|deletion|edit'
         ") or die($DB->error());
     }
 

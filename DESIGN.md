@@ -29,6 +29,7 @@ The existing `tralla.css` tokens are the source of truth. New UI must use these 
 | Status/warning | `--tr-warning` | `#b26a00` | `#f6c26b` | Pending |
 | Status/danger | `--tr-danger` | `#c62828` | `#f28b82` | Rejected/destructive |
 | Status/purple | `--tr-purple` | `#7b1fa2` | `#d7aefb` | Approval |
+| Status/deletion | `--tr-approval-deletion` | `#42526e` | `#b6c2cf` | Exclusion approval |
 
 Rules:
 - The primary accent is reserved for the one likely action: "Adicionar card", "Criar card", and focus.

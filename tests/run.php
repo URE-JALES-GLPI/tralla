@@ -24,7 +24,8 @@ check('hash id', $f['ok'] && $f['id'] === 123);
 $f = tralla_parse_history_card_filter('123/2');
 check('stage id', $f['ok'] && $f['type'] === 'stage' && $f['stage'] === 2);
 check('bad filter', tralla_parse_history_card_filter('abc')['ok'] === false);
-check('bad stage', tralla_parse_history_card_filter('123/3')['ok'] === false);
+$f = tralla_parse_history_card_filter('123/3');
+check('any positive stage parsed', $f['ok'] && $f['type'] === 'stage' && $f['stage'] === 3);
 
 $d = tralla_validate_history_dates('2026-10-01', '2026-10-22');
 check('date end inclusive', $d['ok'] && $d['to'] === '2026-10-22 23:59:59');

@@ -94,16 +94,14 @@ class PluginTrallaHistory extends CommonDBTM
             $type = (string) ($cardFilter['type'] ?? 'all');
             $id = (int) ($cardFilter['id'] ?? 0);
 
-            if ($type === 'stage' && (int) ($cardFilter['stage'] ?? 0) === 1) {
-                $where['c.id'] = $id;
-            } elseif ($type === 'stage') {
-                $where['c.parent_cards_id'] = $id;
-                $where['c.stage'] = 2;
+            if ($type === 'stage') {
+                $where['c.family_cards_id'] = $id;
+                $where['c.family_seq'] = (int) ($cardFilter['stage'] ?? 1);
             } else {
                 $where[] = [
                     'OR' => [
+                        'c.family_cards_id' => $id,
                         'c.id'              => $id,
-                        'c.parent_cards_id' => $id,
                     ],
                 ];
             }
@@ -159,6 +157,8 @@ class PluginTrallaHistory extends CommonDBTM
                     'c.name AS card_name',
                     'c.stage AS stage',
                     'c.parent_cards_id AS parent_cards_id',
+                    'c.family_cards_id AS family_cards_id',
+                    'c.family_seq AS family_seq',
                     'c.is_deleted AS is_deleted',
                     'h.action AS action',
                     'h.details AS details',
@@ -191,6 +191,8 @@ class PluginTrallaHistory extends CommonDBTM
                     'id'              => (int) $row['card_id'],
                     'stage'           => (int) $row['stage'],
                     'parent_cards_id' => (int) $row['parent_cards_id'],
+                    'family_cards_id' => (int) $row['family_cards_id'],
+                    'family_seq'      => (int) $row['family_seq'],
                 ];
 
                 $rows[] = [
@@ -282,6 +284,8 @@ class PluginTrallaHistory extends CommonDBTM
                 'c.name AS card_name',
                 'c.stage AS stage',
                 'c.parent_cards_id AS parent_cards_id',
+                'c.family_cards_id AS family_cards_id',
+                'c.family_seq AS family_seq',
                 'h.action AS action',
                 'h.details AS details',
                 'h.date_creation AS date_creation',
@@ -336,6 +340,8 @@ class PluginTrallaHistory extends CommonDBTM
                 'id'              => (int) $row['card_id'],
                 'stage'           => (int) $row['stage'],
                 'parent_cards_id' => (int) $row['parent_cards_id'],
+                'family_cards_id' => (int) $row['family_cards_id'],
+                'family_seq'      => (int) $row['family_seq'],
             ];
 
             $rows[] = [
@@ -382,6 +388,11 @@ class PluginTrallaHistory extends CommonDBTM
             'withdrawal_confirmed'  => 'Retirada confirmada',
             'withdrawal_reminded'   => 'Lembrete de retirada enviado',
             'pending_notified'      => 'Notificação de pendente enviada',
+            'card_split'            => 'Card separado',
+            'edit_requested'        => 'Edição solicitada',
+            'edit_approved'         => 'Edição aprovada',
+            'edit_rejected'         => 'Edição recusada',
+            'family_withdrawal_ready' => 'Família liberada para retirada',
         ];
 
         return $labels[$action] ?? $action;

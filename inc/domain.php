@@ -91,8 +91,8 @@ if (!function_exists('tralla_parse_history_card_filter')) {
             $idPart = trim($parts[0]);
             $stagePart = trim($parts[1]);
 
-            if ($stagePart !== '1' && $stagePart !== '2') {
-                $result['error'] = 'Etapa inválida.';
+            if (!ctype_digit($stagePart) || (int) $stagePart <= 0) {
+                $result['error'] = 'Posição inválida.';
 
                 return $result;
             }

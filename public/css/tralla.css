@@ -26,6 +26,8 @@
     --tr-danger-soft: #fdecea;
     --tr-purple: #7b1fa2;
     --tr-purple-soft: #f3e5f5;
+    --tr-approval-deletion: #42526e;
+    --tr-approval-deletion-soft: #e9edf2;
     --tr-yellow: #f2d600;
     --tr-radius-sm: 6px;
     --tr-radius: 10px;
@@ -76,6 +78,8 @@ body[data-theme="dark"] .tralla-toast,
     --tr-danger-soft: #3b2020;
     --tr-purple: #d7aefb;
     --tr-purple-soft: #33243d;
+    --tr-approval-deletion: #b6c2cf;
+    --tr-approval-deletion-soft: #262f38;
     --tr-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
     --tr-shadow: 0 12px 32px rgba(0, 0, 0, 0.38);
     --tr-shadow-lg: 0 28px 72px rgba(0, 0, 0, 0.55);
@@ -3434,5 +3438,263 @@ body.tralla-modal-open {
     .tralla-toast {
         animation-duration: 0.01ms !important;
         transition-duration: 0.01ms !important;
+    }
+}
+.tralla-card-take {
+    background: var(--tr-primary);
+    border-color: var(--tr-primary);
+    color: #ffffff;
+}
+
+.tralla-card-take .ti {
+    color: #ffffff;
+}
+
+.tralla-card-take:hover {
+    background: var(--tr-primary-strong);
+    border-color: var(--tr-primary-strong);
+    color: #ffffff;
+}
+
+.tralla-card-label-approval-final {
+    background: var(--tr-primary);
+}
+
+.tralla-card-label-approval-deletion {
+    background: var(--tr-approval-deletion);
+}
+
+.tralla-card-label-approval-edit {
+    background: var(--tr-success);
+}
+
+.tralla-pill.approval-final {
+    background: var(--tr-primary-soft);
+    color: var(--tr-primary);
+}
+
+.tralla-pill.approval-deletion {
+    background: var(--tr-approval-deletion-soft);
+    color: var(--tr-approval-deletion);
+}
+
+.tralla-pill.approval-edit {
+    background: var(--tr-success-soft);
+    color: var(--tr-success);
+}
+
+.tralla-approval-banner.is-finalization {
+    background: var(--tr-primary-soft);
+    border-color: color-mix(in srgb, var(--tr-primary) 25%, transparent);
+    color: var(--tr-primary);
+}
+
+.tralla-approval-banner.is-deletion {
+    background: var(--tr-approval-deletion-soft);
+    border-color: color-mix(in srgb, var(--tr-approval-deletion) 25%, transparent);
+    color: var(--tr-approval-deletion);
+}
+
+.tralla-approval-banner.is-edit {
+    background: var(--tr-success-soft);
+    border-color: color-mix(in srgb, var(--tr-success) 25%, transparent);
+    color: var(--tr-success);
+}
+
+.tralla-approval-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.tralla-edit-diff {
+    display: grid;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.tralla-edit-diff-row {
+    background: color-mix(in srgb, var(--tr-surface) 70%, transparent);
+    border: 1px solid var(--tr-border);
+    border-radius: var(--tr-radius-sm);
+    display: grid;
+    gap: 8px;
+    grid-template-columns: minmax(120px, 1fr) minmax(110px, 1fr) 18px minmax(110px, 1fr);
+    padding: 8px;
+}
+
+.tralla-edit-diff-row > span {
+    font-size: 12px;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.tralla-edit-diff-row > span strong {
+    display: block;
+    font-size: 10px;
+    margin-bottom: 2px;
+    text-transform: uppercase;
+}
+
+.tralla-edit-diff-arrow {
+    align-self: center;
+    color: var(--tr-muted);
+    font-size: 14px;
+    text-align: center;
+}
+
+.tralla-family {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-top: 8px;
+}
+
+.tralla-family-title {
+    color: var(--tr-muted);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.tralla-family-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.tralla-family-chip {
+    background: var(--tr-surface-2);
+    border: 1px solid var(--tr-border);
+    border-radius: 999px;
+    color: var(--tr-text-soft);
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 11px;
+    gap: 6px;
+    padding: 4px 10px;
+}
+
+.tralla-family-chip.is-current {
+    background: var(--tr-primary-soft);
+    border-color: var(--tr-primary);
+    color: var(--tr-primary);
+    font-weight: 700;
+}
+
+.tralla-split-origin {
+    color: var(--tr-muted);
+    font-size: 11px;
+    margin-top: 4px;
+}
+
+.tralla-link-btn {
+    background: none;
+    border: none;
+    color: var(--tr-primary);
+    cursor: pointer;
+    font: inherit;
+    font-size: 11px;
+    padding: 0;
+    text-decoration: underline;
+}
+
+.tralla-split-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.tralla-split-row {
+    align-items: center;
+    background: var(--tr-surface-2);
+    border: 1px solid var(--tr-border);
+    border-radius: var(--tr-radius-sm);
+    display: flex;
+    gap: 10px;
+    padding: 10px;
+}
+
+.tralla-split-machine {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.tralla-split-machine small {
+    color: var(--tr-muted);
+    font-size: 11px;
+}
+
+.tralla-edit-machine {
+    background: var(--tr-surface-2);
+    border: 1px solid var(--tr-border);
+    border-radius: var(--tr-radius-sm);
+    margin-bottom: 12px;
+    padding: 12px;
+    position: relative;
+}
+
+.tralla-edit-machine-head {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.tralla-edit-new-machine {
+    background: var(--tr-surface);
+    border: 1px dashed var(--tr-border-strong);
+    border-radius: var(--tr-radius-sm);
+    margin-bottom: 12px;
+    padding: 12px;
+    position: relative;
+}
+
+.tralla-add-machine-grid {
+    display: grid;
+    gap: 9px;
+    grid-template-columns: 120px 1fr;
+}
+
+.tralla-machine-grid.is-single {
+    grid-template-columns: 1fr;
+}
+
+.tralla-card.is-departing {
+    opacity: 0.72;
+    pointer-events: none;
+    filter: grayscale(0.08);
+}
+
+.tralla-card-departing {
+    align-items: center;
+    background: var(--tr-surface);
+    border: 1px solid var(--tr-border);
+    border-radius: 999px;
+    color: var(--tr-muted);
+    display: inline-flex;
+    font-size: 11px;
+    font-weight: 600;
+    gap: 6px;
+    padding: 4px 10px;
+}
+
+.tralla-card-departing.is-approved {
+    background: var(--tr-success-soft);
+    color: var(--tr-success);
+}
+
+.tralla-card-departing.is-rejected {
+    background: var(--tr-danger-soft);
+    color: var(--tr-danger);
+}
+
+@media (max-width: 680px) {
+    .tralla-edit-diff-row {
+        grid-template-columns: 1fr;
+    }
+    .tralla-add-machine-grid {
+        grid-template-columns: 1fr;
     }
 }

@@ -135,6 +135,29 @@ class PluginTrallaCard extends CommonDBTM
         $userId = (int) Session::getLoginUserID();
         $isAdmin = Session::haveRight(self::$rightname, PURGE);
 
+        $familyBusy = [];
+        $pendingApprovalKinds = [];
+        foreach ($cards as $row) {
+            $root = self::familyRoot($row);
+            if ($root <= 0) {
+                continue;
+            }
+            if ((int) ($row['stage'] ?? 1) === 2) {
+                $familyBusy[$root] = true;
+                if ((int) ($row['parent_cards_id'] ?? 0) > 0) {
+                    $pendingApprovalKinds[(int) $row['parent_cards_id']]
+                        = (string) ($row['approval_kind'] ?? 'maintenance');
+                }
+                continue;
+            }
+            $status = (string) ($row['status'] ?? '');
+            if (!in_array($status, ['pending', 'in_progress'], true)
+                || !empty($row['is_locked'])
+                || (int) ($row['approval_cards_id'] ?? 0) > 0) {
+                $familyBusy[$root] = true;
+            }
+        }
+
         foreach ($cards as &$card) {
             $machineCardId = ((int) $card['stage'] === 2 && (int) $card['parent_cards_id'] > 0)
                 ? (int) $card['parent_cards_id']
@@ -143,7 +166,17 @@ class PluginTrallaCard extends CommonDBTM
             $list = $lists[(int) $card['plugin_tralla_lists_id']] ?? [];
             $card['board_type'] = $boardType;
             $card['code'] = tralla_display_code($card, $boardType);
-            $card['status_label'] = tralla_status_label((string) $card['status']);
+            $card['approval_kind_label'] = '';
+            $card['pending_approval_kind'] = '';
+            if ((int) $card['stage'] === 2) {
+                $card['approval_kind_label'] = tralla_approval_kind_label(
+                    (string) ($card['approval_kind'] ?? 'maintenance')
+                );
+                $card['status_label'] = $card['approval_kind_label'];
+            } else {
+                $card['status_label'] = tralla_status_label((string) $card['status']);
+                $card['pending_approval_kind'] = $pendingApprovalKinds[(int) $card['id']] ?? '';
+            }
             $card['source_label'] = tralla_source_label((string) $card['source']);
             $card['technician_name'] = tralla_user_name((int) $card['technician_id']);
             $card['creator_name'] = tralla_user_name((int) $card['users_id']);
@@ -154,6 +187,12 @@ class PluginTrallaCard extends CommonDBTM
             $card['progress'] = tralla_machines_progress($machines);
             $card['is_filled'] = tralla_all_machines_filled($machines);
             $card['permissions'] = self::permissionsFor($card, $boardType, $userId, $isAdmin);
+            if ((int) $card['stage'] === 1) {
+                $root = self::familyRoot($card);
+                if (!empty($familyBusy[$root]) || (int) $card['machine_count'] < 2) {
+                    $card['permissions']['split'] = false;
+                }
+            }
         }
         unset($card);
 
@@ -165,6 +204,8 @@ class PluginTrallaCard extends CommonDBTM
      */
     public static function getCardDetail(int $id, int $userId = 0): array
     {
+        global $DB;
+
         $card = self::getCard($id);
         if ($card === null) {
             throw new RuntimeException('Card não encontrado.');
@@ -179,6 +220,7 @@ class PluginTrallaCard extends CommonDBTM
         $list = PluginTrallaList::getList((int) $card['plugin_tralla_lists_id']);
         $machines = $boardType === 'maintenance' ? PluginTrallaMachine::getMachinesForCard($id) : [];
         $parent = null;
+        $parentCard = null;
 
         if ((int) $card['stage'] === 2 && (int) $card['parent_cards_id'] > 0) {
             $parentCard = self::getCard((int) $card['parent_cards_id']);
@@ -203,6 +245,13 @@ class PluginTrallaCard extends CommonDBTM
         $card['category'] = (string) ($list['category'] ?? '');
         $card['code'] = tralla_display_code($card, $boardType);
         $card['status_label'] = tralla_status_label((string) $card['status']);
+        $card['approval_kind_label'] = '';
+        if ((int) $card['stage'] === 2) {
+            $card['approval_kind_label'] = tralla_approval_kind_label(
+                (string) ($card['approval_kind'] ?? 'maintenance')
+            );
+            $card['status_label'] = $card['approval_kind_label'];
+        }
         $card['source_label'] = tralla_source_label((string) $card['source']);
         $card['technician_name'] = tralla_user_name((int) $card['technician_id']);
         $card['creator_name'] = tralla_user_name((int) $card['users_id']);
@@ -211,10 +260,81 @@ class PluginTrallaCard extends CommonDBTM
         $card['machines_progress'] = tralla_machines_progress($machines);
         $card['history'] = PluginTrallaHistory::getForCard($id);
         $card['parent'] = $parent;
+        $card['family_ready'] = false;
+        $card['family_members'] = [];
+        $card['pending_approval_kind'] = '';
+        $card['pending_approval_id'] = 0;
+        $card['split_from'] = null;
+        $card['edit_payload'] = null;
+        $card['edit_changes'] = [];
+
+        if ((int) $card['stage'] === 1) {
+            $root = self::familyRoot($card);
+            if ($root > 0) {
+                foreach ($DB->request([
+                    'FROM'  => 'glpi_plugin_tralla_cards',
+                    'WHERE' => [
+                        'family_cards_id' => $root,
+                        'stage'           => 1,
+                        'is_deleted'      => 0,
+                        'is_archived'     => 0,
+                    ],
+                    'ORDER' => 'family_seq ASC, id ASC',
+                ]) as $member) {
+                    $memberList = PluginTrallaList::getList((int) ($member['plugin_tralla_lists_id'] ?? 0));
+                    $card['family_members'][] = [
+                        'id'              => (int) $member['id'],
+                        'code'            => tralla_display_code($member, $boardType),
+                        'name'            => (string) $member['name'],
+                        'status'          => (string) $member['status'],
+                        'status_label'    => tralla_status_label((string) $member['status']),
+                        'technician_name' => tralla_user_name((int) ($member['technician_id'] ?? 0)),
+                        'list_name'       => (string) ($memberList['name'] ?? ''),
+                        'is_current'      => ((int) $member['id'] === $id),
+                    ];
+                }
+            }
+        }
+
+        if ((int) $card['stage'] === 1 && (int) ($card['approval_cards_id'] ?? 0) > 0) {
+            $pendingApproval = self::getCard((int) $card['approval_cards_id']);
+            if ($pendingApproval !== null && empty($pendingApproval['is_archived'])) {
+                $card['pending_approval_kind'] = (string) ($pendingApproval['approval_kind'] ?? 'maintenance');
+                $card['pending_approval_id'] = (int) $pendingApproval['id'];
+            }
+        }
+
+        if ((int) ($card['split_from_cards_id'] ?? 0) > 0) {
+            $origin = self::getCard((int) $card['split_from_cards_id']);
+            if ($origin !== null) {
+                $card['split_from'] = [
+                    'id'   => (int) $origin['id'],
+                    'code' => tralla_display_code($origin, $boardType),
+                    'name' => (string) $origin['name'],
+                ];
+            }
+        }
+
+        if ((int) $card['stage'] === 2 && (string) ($card['approval_kind'] ?? '') === 'edit') {
+            $payload = json_decode((string) ($card['edit_payload'] ?? ''), true);
+            if (is_array($payload)) {
+                $card['edit_payload'] = $payload;
+                if ($parentCard !== null) {
+                    $card['edit_changes'] = self::buildEditChanges($parentCard, $payload);
+                }
+            }
+        }
+
         $card['assignature_url'] = ((string) $card['status'] === 'withdrawal')
             ? PluginTrallaConfig::assignatureCardUrl($id)
             : '';
         $card['permissions'] = self::permissionsFor($card, $boardType, $userId, $isAdmin);
+        if ((int) $card['stage'] === 1 && !empty($card['permissions']['split'])) {
+            $root = self::familyRoot($card);
+            if (count($machines) < 2 || !self::familyIsIdle($root)) {
+                $card['permissions']['split'] = false;
+            }
+        }
         $card['current_user_id'] = $userId;
 
         return $card;
@@ -231,18 +351,41 @@ class PluginTrallaCard extends CommonDBTM
         $isTechnician = (int) ($card['technician_id'] ?? 0) > 0
             && (int) $card['technician_id'] === $userId;
         $canUpdate = Session::haveRight(self::$rightname, UPDATE);
+        $isBoardAdmin = $isAdmin || tralla_role_at_least($role, 'admin');
 
-        $canEditMachines = $isMember
+        $canEditMachines = false;
+
+        $canFinalize = $isMember
             && $boardType === 'maintenance'
             && $stage === 1
             && $status === 'in_progress'
             && !$locked
-            && ($isTechnician || $isAdmin);
+            && ($isTechnician || $isAdmin)
+            && tralla_all_machines_filled($card['machines'] ?? []);
 
         $canEditCard = $isMember
-            && ($boardType === 'normal'
-                ? $canUpdate
-                : ($stage === 1 && $status === 'in_progress' && !$locked && ($isTechnician || $isAdmin)));
+            && $boardType === 'normal'
+            && $canUpdate;
+
+        $canSplit = $isMember
+            && $boardType === 'maintenance'
+            && $stage === 1
+            && in_array($status, ['pending', 'in_progress'], true)
+            && !$locked
+            && (int) ($card['approval_cards_id'] ?? 0) === 0
+            && $canUpdate;
+        if ($canSplit && $status === 'in_progress') {
+            $canSplit = $isTechnician || $isBoardAdmin;
+        }
+
+        $canEditRequest = $isMember
+            && $boardType === 'maintenance'
+            && $stage === 1
+            && in_array($status, ['in_progress', 'withdrawal'], true)
+            && !$locked
+            && (int) ($card['approval_cards_id'] ?? 0) === 0
+            && $canUpdate
+            && ($isTechnician || $isBoardAdmin);
 
         $canTake = $isMember
             && $boardType === 'maintenance'
@@ -277,8 +420,10 @@ class PluginTrallaCard extends CommonDBTM
             'edit_machines'    => $canEditMachines,
             'add_machine'      => $canEditMachines,
             'delete_machine'   => $canEditMachines,
+            'split'            => $canSplit,
+            'edit_request'     => $canEditRequest,
             'take'             => $canTake,
-            'finalize'         => $canEditMachines && tralla_all_machines_filled($card['machines'] ?? []),
+            'finalize'         => $canFinalize,
             'approve'          => $canApprove,
             'reject'           => $canApprove,
             'withdraw'         => $canConfirm,
@@ -391,6 +536,9 @@ class PluginTrallaCard extends CommonDBTM
                 'stage'                   => 1,
                 'parent_cards_id'         => 0,
                 'approval_cards_id'       => 0,
+                'family_cards_id'         => 0,
+                'family_seq'              => 1,
+                'split_from_cards_id'     => 0,
                 'status'                  => 'pending',
                 'is_locked'               => 0,
                 'is_archived'             => 0,
@@ -400,6 +548,11 @@ class PluginTrallaCard extends CommonDBTM
                 'date_mod'                => $now,
             ]);
             $cardId = (int) $DB->insertId();
+
+            $DB->update('glpi_plugin_tralla_cards', [
+                'family_cards_id' => $cardId,
+                'family_seq'      => 1,
+            ], ['id' => $cardId]);
 
             $rank = 1024.0;
             foreach ($machines as $machine) {
@@ -724,6 +877,9 @@ class PluginTrallaCard extends CommonDBTM
             'stage'                   => 2,
             'parent_cards_id'         => $id,
             'approval_cards_id'       => 0,
+            'family_cards_id'         => self::familyRoot($card),
+            'family_seq'              => self::familySequence($card),
+            'split_from_cards_id'     => 0,
             'approval_kind'           => 'maintenance',
             'status'                  => 'waiting_approval',
             'is_locked'               => 0,
@@ -744,7 +900,15 @@ class PluginTrallaCard extends CommonDBTM
             'date_mod'          => $now,
         ], ['id' => $id]);
 
-        PluginTrallaHistory::log($id, $userId, 'card_finalized', 'Manutenção finalizada; card de aprovação ' . $id . '/2 criado.');
+        $approvalCode = tralla_display_code([
+            'id'              => $approvalId,
+            'stage'           => 2,
+            'parent_cards_id' => $id,
+            'family_cards_id' => self::familyRoot($card),
+            'family_seq'      => self::familySequence($card),
+        ], $boardType);
+
+        PluginTrallaHistory::log($id, $userId, 'card_finalized', 'Manutenção finalizada; card de aprovação ' . $approvalCode . ' criado.');
         PluginTrallaHistory::log($approvalId, $userId, 'approval_created', 'Aguardando decisão de aprovação.');
 
         return [
@@ -765,8 +929,12 @@ class PluginTrallaCard extends CommonDBTM
         if ($approval === null || (int) $approval['stage'] !== 2) {
             throw new RuntimeException('Card de aprovação não encontrado.');
         }
-        if ((string) ($approval['approval_kind'] ?? 'maintenance') === 'deletion') {
+        $kind = (string) ($approval['approval_kind'] ?? 'maintenance');
+        if ($kind === 'deletion') {
             return self::decideDeletion($approvalId, $approve, $reason, $userId, $isAdmin);
+        }
+        if ($kind === 'edit') {
+            return self::decideEdit($approvalId, $approve, $reason, $userId, $isAdmin);
         }
         if (!tralla_can_transition($approval, $approve ? 'approve' : 'reject', 'maintenance')) {
             throw new RuntimeException('Este card não está aguardando aprovação.');
@@ -787,64 +955,648 @@ class PluginTrallaCard extends CommonDBTM
         $boards_id = (int) $parent['plugin_tralla_boards_id'];
         $now = tralla_now();
         $reason = trim(strip_tags($reason));
+        $familyReady = false;
 
-        if ($approve) {
-            $list = PluginTrallaBoard::findListByCategory($boards_id, 'maintenance_withdrawal');
-            if ($list === null) {
-                throw new RuntimeException('O quadro não possui a lista "Manutenção Retirada".');
+        $DB->beginTransaction();
+        try {
+            self::lockCardRow($parentId);
+
+            $approval = self::getCard($approvalId);
+            $parent = self::getCard($parentId);
+            if ($approval === null
+                || (int) $approval['stage'] !== 2
+                || (string) ($approval['approval_kind'] ?? 'maintenance') !== 'maintenance'
+                || (string) $approval['status'] !== 'waiting_approval'
+                || !empty($approval['is_archived'])
+                || (int) $approval['parent_cards_id'] !== $parentId) {
+                throw new RuntimeException('Card de aprovação não encontrado.');
+            }
+            if ($parent === null) {
+                throw new RuntimeException('Card de manutenção de origem não encontrado.');
+            }
+            self::assertBoardAccess($parent);
+            if ((string) $parent['status'] !== 'waiting_approval'
+                || (int) ($parent['approval_cards_id'] ?? 0) !== $approvalId) {
+                throw new RuntimeException('O card de origem não está aguardando aprovação.');
+            }
+            if (!self::userIsApprover($userId, $boards_id)) {
+                throw new RuntimeException('Sem permissão para aprovar ou reprovar.');
             }
 
-            $DB->update('glpi_plugin_tralla_cards', [
-                'plugin_tralla_lists_id' => (int) $list['id'],
-                'status'                 => 'withdrawal',
-                'is_locked'              => 0,
-                'users_id_approver'      => $userId,
-                'date_approved'          => $now,
-                'assignature_sent'       => 1,
-                'withdrawal_reminded_at' => null,
-                'rejection_reason'       => null,
-                'date_mod'               => $now,
-                'rank'                   => self::nextRankForList((int) $list['id']),
-            ], ['id' => $parentId]);
+            if ($approve) {
+                $DB->update('glpi_plugin_tralla_cards', [
+                    'status'            => 'approved',
+                    'is_locked'         => 1,
+                    'approval_cards_id' => 0,
+                    'users_id_approver' => $userId,
+                    'date_approved'     => $now,
+                    'rejection_reason'  => null,
+                    'date_mod'          => $now,
+                ], ['id' => $parentId]);
+
+                $DB->update('glpi_plugin_tralla_cards', [
+                    'status'            => 'approved',
+                    'is_archived'       => 1,
+                    'users_id_approver' => $userId,
+                    'date_mod'          => $now,
+                ], ['id' => $approvalId]);
+
+                $familyReady = self::syncFamilyWithdrawal(
+                    $boards_id,
+                    self::familyRoot($parent),
+                    $userId
+                );
+
+                PluginTrallaHistory::log(
+                    $parentId,
+                    $userId,
+                    'approval_approved',
+                    $familyReady
+                        ? 'Manutenção aprovada; família liberada para retirada.'
+                        : 'Manutenção aprovada; aguardando os demais cards da família.'
+                );
+                PluginTrallaHistory::log($approvalId, $userId, 'approval_approved', 'Aprovação concluída.');
+            } else {
+                $list = PluginTrallaBoard::findListByCategory($boards_id, 'maintenance_in_progress');
+                if ($list === null) {
+                    throw new RuntimeException('O quadro não possui a lista "Manutenção Em Andamento".');
+                }
+
+                $DB->update('glpi_plugin_tralla_cards', [
+                    'plugin_tralla_lists_id' => (int) $list['id'],
+                    'status'                 => 'in_progress',
+                    'is_locked'              => 0,
+                    'approval_cards_id'      => 0,
+                    'users_id_approver'      => $userId,
+                    'rejection_reason'       => $reason !== '' ? $reason : null,
+                    'date_mod'               => $now,
+                    'rank'                   => self::nextRankForList((int) $list['id']),
+                ], ['id' => $parentId]);
+
+                $DB->update('glpi_plugin_tralla_cards', [
+                    'status'            => 'rejected',
+                    'is_archived'       => 1,
+                    'users_id_approver' => $userId,
+                    'rejection_reason'  => $reason !== '' ? $reason : null,
+                    'date_mod'          => $now,
+                ], ['id' => $approvalId]);
+
+                PluginTrallaHistory::log(
+                    $parentId,
+                    $userId,
+                    'approval_rejected',
+                    'Manutenção reprovada; card voltou para Em Andamento.' . ($reason !== '' ? ' Motivo: ' . $reason : '')
+                );
+                PluginTrallaHistory::log($approvalId, $userId, 'approval_rejected', 'Aprovação recusada.');
+            }
+
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
+        }
+
+        $detail = self::getCardDetail($parentId, $userId);
+        $detail['family_ready'] = $familyReady;
+
+        return $detail;
+    }
+
+    public static function decideEdit(int $approvalId, bool $approve, string $reason, int $userId, bool $isAdmin): array
+    {
+        global $DB;
+
+        if ($userId <= 0) {
+            $userId = (int) Session::getLoginUserID();
+        }
+
+        $approval = self::getCard($approvalId);
+        if ($approval === null
+            || (int) $approval['stage'] !== 2
+            || (string) ($approval['approval_kind'] ?? '') !== 'edit'
+            || (string) $approval['status'] !== 'waiting_approval'
+            || !empty($approval['is_archived'])) {
+            throw new RuntimeException('Card de aprovação não encontrado.');
+        }
+
+        $parentId = (int) $approval['parent_cards_id'];
+        $parent = $parentId > 0 ? self::getCard($parentId) : null;
+        if ($parent === null) {
+            throw new RuntimeException('Card de origem não encontrado.');
+        }
+        self::assertBoardAccess($parent);
+        $boardId = (int) $parent['plugin_tralla_boards_id'];
+        if (!self::userIsApprover($userId, $boardId)) {
+            throw new RuntimeException('Sem permissão para aprovar ou reprovar.');
+        }
+        if (!in_array((string) $parent['status'], ['in_progress', 'withdrawal'], true)
+            || (int) ($parent['approval_cards_id'] ?? 0) !== $approvalId) {
+            throw new RuntimeException('O card de origem não está com edição pendente.');
+        }
+
+        $DB->beginTransaction();
+        try {
+            self::lockCardRow($parentId);
+
+            $approval = self::getCard($approvalId);
+            $parent = self::getCard($parentId);
+            if ($approval === null
+                || (int) $approval['stage'] !== 2
+                || (string) ($approval['approval_kind'] ?? '') !== 'edit'
+                || (string) $approval['status'] !== 'waiting_approval'
+                || !empty($approval['is_archived'])
+                || (int) $approval['parent_cards_id'] !== $parentId) {
+                throw new RuntimeException('Card de aprovação não encontrado.');
+            }
+            if ($parent === null) {
+                throw new RuntimeException('Card de origem não encontrado.');
+            }
+            self::assertBoardAccess($parent);
+            if (!in_array((string) $parent['status'], ['in_progress', 'withdrawal'], true)
+                || (int) ($parent['approval_cards_id'] ?? 0) !== $approvalId) {
+                throw new RuntimeException('O card de origem não está com edição pendente.');
+            }
+            if (!self::userIsApprover($userId, $boardId)) {
+                throw new RuntimeException('Sem permissão para aprovar ou reprovar.');
+            }
+
+            $now = tralla_now();
+            $reason = trim(strip_tags($reason));
+
+            if ($approve) {
+                $payload = json_decode((string) ($approval['edit_payload'] ?? ''), true);
+                if (!is_array($payload)) {
+                    throw new RuntimeException('Payload da edição inválido.');
+                }
+
+                $proposedName = tralla_normalize_label($payload['name'] ?? '');
+                if ($proposedName === '') {
+                    throw new RuntimeException('Informe o nome do card.');
+                }
+
+                $machinesPayload = is_array($payload['machines'] ?? null) ? $payload['machines'] : [];
+                $newPayload = is_array($payload['new_machines'] ?? null) ? $payload['new_machines'] : [];
+
+                $currentMachines = PluginTrallaMachine::getMachinesForCard($parentId);
+                $currentById = [];
+                foreach ($currentMachines as $machine) {
+                    $currentById[(int) $machine['id']] = $machine;
+                }
+
+                $keptIds = [];
+                foreach ($machinesPayload as $entry) {
+                    if (!is_array($entry)) {
+                        continue;
+                    }
+                    $machineId = (int) ($entry['id'] ?? 0);
+                    if ($machineId <= 0 || !isset($currentById[$machineId])) {
+                        throw new RuntimeException('Máquina da edição não pertence ao card.');
+                    }
+                    if (isset($keptIds[$machineId])) {
+                        throw new RuntimeException('Máquina repetida na edição.');
+                    }
+                    $keptIds[$machineId] = true;
+
+                    $status = (string) ($entry['status'] ?? '');
+                    if ($status !== '' && !array_key_exists($status, tralla_machine_status_choices())) {
+                        throw new RuntimeException('Status de máquina inválido.');
+                    }
+
+                    PluginTrallaMachine::updateMachine($machineId, [
+                        'status'          => $status,
+                        'report'          => tralla_normalize_report($entry['report'] ?? ''),
+                        'service_done'    => !empty($entry['service_done']) ? 1 : 0,
+                        'needs_inventory' => !empty($entry['needs_inventory']) ? 1 : 0,
+                    ]);
+                }
+
+                foreach (array_keys($currentById) as $machineId) {
+                    if (!isset($keptIds[$machineId])) {
+                        PluginTrallaMachine::deleteMachine($machineId);
+                    }
+                }
+
+                $newTotal = count($keptIds);
+                foreach ($newPayload as $entry) {
+                    if (!is_array($entry)) {
+                        continue;
+                    }
+                    $modelId = (int) ($entry['model_id'] ?? 0);
+                    if ($modelId <= 0 || PluginTrallaMachineModel::getModel($modelId, true) === null) {
+                        throw new RuntimeException('Modelo de máquina inválido.');
+                    }
+                    $quantity = filter_var(
+                        $entry['quantity'] ?? 1,
+                        FILTER_VALIDATE_INT,
+                        ['options' => ['min_range' => 1, 'max_range' => self::MAX_MACHINE_QUANTITY]]
+                    );
+                    if ($quantity === false) {
+                        throw new RuntimeException('Quantidade de máquina inválida.');
+                    }
+                    for ($index = 0; $index < (int) $quantity; $index++) {
+                        PluginTrallaMachine::insertForCard($parentId, ['model_id' => $modelId]);
+                    }
+                    $newTotal += (int) $quantity;
+                }
+
+                if ($newTotal < 1) {
+                    throw new RuntimeException('O card deve manter ao menos uma máquina.');
+                }
+
+                $DB->update('glpi_plugin_tralla_cards', [
+                    'name'              => $proposedName,
+                    'approval_cards_id' => 0,
+                    'is_locked'         => 0,
+                    'date_mod'          => $now,
+                ], ['id' => $parentId]);
+                PluginTrallaMachine::refreshCardTotal($parentId);
+
+                $DB->update('glpi_plugin_tralla_cards', [
+                    'status'            => 'approved',
+                    'is_archived'       => 1,
+                    'users_id_approver' => $userId,
+                    'date_mod'          => $now,
+                ], ['id' => $approvalId]);
+
+                PluginTrallaHistory::log($parentId, $userId, 'edit_approved', 'Edição aprovada; alterações aplicadas ao card.');
+                PluginTrallaHistory::log($approvalId, $userId, 'edit_approved', 'Aprovação da edição concluída.');
+            } else {
+                $DB->update('glpi_plugin_tralla_cards', [
+                    'approval_cards_id' => 0,
+                    'is_locked'         => 0,
+                    'date_mod'          => $now,
+                ], ['id' => $parentId]);
+
+                $DB->update('glpi_plugin_tralla_cards', [
+                    'status'            => 'rejected',
+                    'is_archived'       => 1,
+                    'users_id_approver' => $userId,
+                    'rejection_reason'  => $reason !== '' ? $reason : null,
+                    'date_mod'          => $now,
+                ], ['id' => $approvalId]);
+
+                PluginTrallaHistory::log(
+                    $parentId,
+                    $userId,
+                    'edit_rejected',
+                    'Edição recusada; card mantido.' . ($reason !== '' ? ' Motivo: ' . $reason : '')
+                );
+                PluginTrallaHistory::log(
+                    $approvalId,
+                    $userId,
+                    'edit_rejected',
+                    'Pedido de edição recusado.' . ($reason !== '' ? ' Motivo: ' . $reason : '')
+                );
+            }
+
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
+        }
+
+        return self::getCardDetail($parentId, $userId);
+    }
+
+    public static function requestEdit(int $id, array $data, int $userId = 0, bool $isAdmin = false): array
+    {
+        global $DB;
+
+        if ($userId <= 0) {
+            $userId = (int) Session::getLoginUserID();
+        }
+
+        $card = self::getCard($id);
+        if ($card === null) {
+            throw new RuntimeException('Card não encontrado.');
+        }
+        self::assertBoardAccess($card);
+        $boards_id = (int) $card['plugin_tralla_boards_id'];
+        $boardType = self::getBoardType($boards_id);
+        $permissions = self::permissionsFor($card, $boardType, $userId, $isAdmin);
+        if (empty($permissions['edit_request'])) {
+            throw new RuntimeException('Sem permissão para solicitar edição deste card.');
+        }
+
+        $proposedName = tralla_normalize_label($data['name'] ?? '');
+        if ($proposedName === '') {
+            throw new RuntimeException('Informe o nome do card.');
+        }
+
+        $currentMachines = PluginTrallaMachine::getMachinesForCard($id);
+        $currentById = [];
+        foreach ($currentMachines as $machine) {
+            $currentById[(int) $machine['id']] = $machine;
+        }
+
+        $machinesInput = is_array($data['machines'] ?? null) ? $data['machines'] : [];
+        $newInput = is_array($data['new_machines'] ?? null) ? $data['new_machines'] : [];
+        $machines = [];
+        $seen = [];
+        $hasChange = false;
+
+        foreach ($machinesInput as $entry) {
+            if (!is_array($entry)) {
+                throw new RuntimeException('Máquina inválida.');
+            }
+            $machineId = (int) ($entry['id'] ?? 0);
+            if ($machineId <= 0 || !isset($currentById[$machineId])) {
+                throw new RuntimeException('Máquina da edição não pertence ao card.');
+            }
+            if (isset($seen[$machineId])) {
+                throw new RuntimeException('Máquina repetida na edição.');
+            }
+            $seen[$machineId] = true;
+
+            $status = (string) ($entry['status'] ?? '');
+            if ($status !== '' && !array_key_exists($status, tralla_machine_status_choices())) {
+                throw new RuntimeException('Status de máquina inválido.');
+            }
+            $report = tralla_normalize_report($entry['report'] ?? '');
+            $serviceDone = !empty($entry['service_done']) ? 1 : 0;
+            $needsInventory = !empty($entry['needs_inventory']) ? 1 : 0;
+            $current = $currentById[$machineId];
+
+            if ($status !== (string) $current['status']
+                || $report !== trim((string) $current['report'])
+                || $serviceDone !== (int) $current['service_done']
+                || $needsInventory !== (int) $current['needs_inventory']) {
+                $hasChange = true;
+            }
+
+            $machines[] = [
+                'id'              => $machineId,
+                'status'          => $status,
+                'report'          => $report,
+                'service_done'    => $serviceDone,
+                'needs_inventory' => $needsInventory,
+            ];
+        }
+
+        if (count($seen) !== count($currentById)) {
+            $hasChange = true;
+        }
+
+        $newMachines = [];
+        $newTotal = count($seen);
+        foreach ($newInput as $entry) {
+            if (!is_array($entry)) {
+                throw new RuntimeException('Modelo de máquina inválido.');
+            }
+            $modelId = (int) ($entry['model_id'] ?? 0);
+            if ($modelId <= 0 || !PluginTrallaMachineModel::canUseModel($modelId)) {
+                throw new RuntimeException('Modelo de máquina inválido.');
+            }
+            $quantity = filter_var(
+                $entry['quantity'] ?? 1,
+                FILTER_VALIDATE_INT,
+                ['options' => ['min_range' => 1, 'max_range' => self::MAX_MACHINE_QUANTITY]]
+            );
+            if ($quantity === false) {
+                throw new RuntimeException('Quantidade de máquina inválida.');
+            }
+            $newMachines[] = ['model_id' => $modelId, 'quantity' => (int) $quantity];
+            $newTotal += (int) $quantity;
+            $hasChange = true;
+        }
+
+        if ($newTotal < 1) {
+            throw new RuntimeException('O card deve manter ao menos uma máquina.');
+        }
+        if ($proposedName !== (string) $card['name']) {
+            $hasChange = true;
+        }
+        if (!$hasChange) {
+            throw new RuntimeException('Nenhuma alteração para solicitar.');
+        }
+
+        $approvalId = 0;
+        $DB->beginTransaction();
+        try {
+            self::lockCardRow($id);
+
+            $fresh = self::getCard($id);
+            if ($fresh === null) {
+                throw new RuntimeException('Card não encontrado.');
+            }
+            self::assertBoardAccess($fresh);
+            $freshPermissions = self::permissionsFor($fresh, $boardType, $userId, $isAdmin);
+            if (empty($freshPermissions['edit_request'])) {
+                throw new RuntimeException('Sem permissão para solicitar edição deste card.');
+            }
+
+            $approvalList = PluginTrallaBoard::findListByCategory($boards_id, 'maintenance_approval');
+            if ($approvalList === null) {
+                throw new RuntimeException('O quadro não possui a lista "Manutenção Aprovação".');
+            }
+
+            $payload = [
+                'name'         => $proposedName,
+                'machines'     => $machines,
+                'new_machines' => $newMachines,
+            ];
+            $now = tralla_now();
+
+            $DB->insert('glpi_plugin_tralla_cards', [
+                'plugin_tralla_boards_id' => $boards_id,
+                'plugin_tralla_lists_id'  => (int) $approvalList['id'],
+                'name'                    => $proposedName,
+                'description'             => $fresh['description'],
+                'rank'                    => self::nextRankForList((int) $approvalList['id']),
+                'users_id'                => $userId,
+                'technician_id'           => (int) $fresh['technician_id'],
+                'stage'                   => 2,
+                'parent_cards_id'         => $id,
+                'approval_cards_id'       => 0,
+                'family_cards_id'         => self::familyRoot($fresh),
+                'family_seq'              => self::familySequence($fresh),
+                'split_from_cards_id'     => 0,
+                'approval_kind'           => 'edit',
+                'edit_payload'            => json_encode($payload, JSON_UNESCAPED_UNICODE),
+                'status'                  => 'waiting_approval',
+                'is_locked'               => 0,
+                'is_archived'             => 0,
+                'source'                  => (string) $fresh['source'],
+                'machines_total'          => $newTotal,
+                'date_creation'           => $now,
+                'date_mod'                => $now,
+            ]);
+            $approvalId = (int) $DB->insertId();
 
             $DB->update('glpi_plugin_tralla_cards', [
-                'status'            => 'approved',
-                'is_archived'       => 1,
-                'users_id_approver' => $userId,
+                'is_locked'         => 1,
+                'approval_cards_id' => $approvalId,
                 'date_mod'          => $now,
-            ], ['id' => $approvalId]);
+            ], ['id' => $id]);
 
-            PluginTrallaHistory::log($parentId, $userId, 'approval_approved', 'Manutenção aprovada. Card liberado para retirada.');
-            PluginTrallaHistory::log($approvalId, $userId, 'approval_approved', 'Aprovação concluída.');
-        } else {
+            PluginTrallaHistory::log($id, $userId, 'edit_requested', 'Edição solicitada; aguardando aprovação.');
+            PluginTrallaHistory::log($approvalId, $userId, 'approval_created', 'Aguardando decisão da edição.');
+
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
+        }
+
+        return [
+            'card'     => self::getCardDetail($id, $userId),
+            'approval' => self::getCardDetail($approvalId, $userId),
+        ];
+    }
+
+    public static function split(int $id, array $machineIds, int $userId = 0, bool $isAdmin = false): array
+    {
+        global $DB;
+
+        if ($userId <= 0) {
+            $userId = (int) Session::getLoginUserID();
+        }
+
+        $card = self::getCard($id);
+        if ($card === null) {
+            throw new RuntimeException('Card não encontrado.');
+        }
+        self::assertBoardAccess($card);
+        $boards_id = (int) $card['plugin_tralla_boards_id'];
+        $boardType = self::getBoardType($boards_id);
+        $permissions = self::permissionsFor($card, $boardType, $userId, $isAdmin);
+        if (empty($permissions['split'])) {
+            throw new RuntimeException('Sem permissão para separar este card.');
+        }
+
+        $ids = [];
+        foreach ($machineIds as $machineId) {
+            $machineId = (int) $machineId;
+            if ($machineId <= 0) {
+                throw new RuntimeException('Máquina inválida.');
+            }
+            if (isset($ids[$machineId])) {
+                throw new RuntimeException('Máquina repetida na separação.');
+            }
+            $ids[$machineId] = true;
+        }
+        if ($ids === []) {
+            throw new RuntimeException('Selecione ao menos uma máquina.');
+        }
+
+        $machines = PluginTrallaMachine::getMachinesForCard($id);
+        $mine = [];
+        foreach ($machines as $machine) {
+            $mine[(int) $machine['id']] = $machine;
+        }
+        foreach (array_keys($ids) as $machineId) {
+            if (!isset($mine[$machineId])) {
+                throw new RuntimeException('Máquina selecionada não pertence ao card.');
+            }
+        }
+        if (count($ids) >= count($machines)) {
+            throw new RuntimeException('Selecione menos máquinas do que o total do card.');
+        }
+
+        $root = self::familyRoot($card);
+        if (!self::familyIsIdle($root)) {
+            throw new RuntimeException('A família precisa estar toda Pendente ou Em Andamento para ser separada.');
+        }
+
+        $childId = 0;
+        $DB->beginTransaction();
+        try {
+            self::lockCardRow($id);
+            self::lockFamilyRows($root);
+
+            $fresh = self::getCard($id);
+            if ($fresh === null) {
+                throw new RuntimeException('Card não encontrado.');
+            }
+            self::assertBoardAccess($fresh);
+            $freshPermissions = self::permissionsFor($fresh, $boardType, $userId, $isAdmin);
+            if (empty($freshPermissions['split'])) {
+                throw new RuntimeException('Sem permissão para separar este card.');
+            }
+            if (!self::familyIsIdle($root)) {
+                throw new RuntimeException('A família precisa estar toda Pendente ou Em Andamento para ser separada.');
+            }
+
+            $freshMachines = PluginTrallaMachine::getMachinesForCard($id);
+            $freshById = [];
+            foreach ($freshMachines as $machine) {
+                $freshById[(int) $machine['id']] = $machine;
+            }
+            foreach (array_keys($ids) as $machineId) {
+                if (!isset($freshById[$machineId])) {
+                    throw new RuntimeException('Máquina selecionada não pertence ao card.');
+                }
+            }
+            if (count($ids) >= count($freshMachines)) {
+                throw new RuntimeException('Selecione menos máquinas do que o total do card.');
+            }
+
             $list = PluginTrallaBoard::findListByCategory($boards_id, 'maintenance_in_progress');
             if ($list === null) {
                 throw new RuntimeException('O quadro não possui a lista "Manutenção Em Andamento".');
             }
 
-            $DB->update('glpi_plugin_tralla_cards', [
-                'plugin_tralla_lists_id' => (int) $list['id'],
-                'status'                 => 'in_progress',
-                'is_locked'              => 0,
-                'users_id_approver'      => $userId,
-                'rejection_reason'       => $reason !== '' ? $reason : null,
+            $seqRow = $DB->request([
+                'SELECT' => ['MAX' => 'family_seq AS max_seq'],
+                'FROM'   => 'glpi_plugin_tralla_cards',
+                'WHERE'  => [
+                    'family_cards_id' => $root,
+                    'stage'           => 1,
+                ],
+            ])->current();
+            $nextSeq = max(1, (int) ($seqRow['max_seq'] ?? 0)) + 1;
+
+            $now = tralla_now();
+            $DB->insert('glpi_plugin_tralla_cards', [
+                'plugin_tralla_boards_id' => $boards_id,
+                'plugin_tralla_lists_id'  => (int) $list['id'],
+                'name'                    => (string) $fresh['name'],
+                'description'             => $fresh['description'],
+                'rank'                    => self::nextRankForList((int) $list['id']),
+                'users_id'                => $userId,
+                'technician_id'           => $userId,
+                'stage'                   => 1,
+                'parent_cards_id'         => 0,
+                'approval_cards_id'       => 0,
+                'family_cards_id'         => $root,
+                'family_seq'              => $nextSeq,
+                'split_from_cards_id'     => $id,
+                'approval_kind'           => 'maintenance',
+                'status'                  => 'in_progress',
+                'is_locked'               => 0,
+                'is_archived'             => 0,
+                'source'                  => (string) $fresh['source'],
+                'machines_total'          => count($ids),
+                'date_taken'              => $now,
+                'date_creation'           => $now,
+                'date_mod'                => $now,
+            ]);
+            $childId = (int) $DB->insertId();
+
+            $DB->update('glpi_plugin_tralla_machines', [
+                'plugin_tralla_cards_id' => $childId,
                 'date_mod'               => $now,
-                'rank'                   => self::nextRankForList((int) $list['id']),
-            ], ['id' => $parentId]);
+            ], ['id' => array_keys($ids)]);
 
-            $DB->update('glpi_plugin_tralla_cards', [
-                'status'            => 'rejected',
-                'is_archived'       => 1,
-                'users_id_approver' => $userId,
-                'rejection_reason'  => $reason !== '' ? $reason : null,
-                'date_mod'          => $now,
-            ], ['id' => $approvalId]);
+            PluginTrallaMachine::refreshCardTotal($id);
+            $DB->update('glpi_plugin_tralla_cards', ['date_mod' => $now], ['id' => $id]);
 
-            PluginTrallaHistory::log($parentId, $userId, 'approval_rejected', 'Manutenção reprovada; card voltou para Em Andamento.' . ($reason !== '' ? ' Motivo: ' . $reason : ''));
-            PluginTrallaHistory::log($approvalId, $userId, 'approval_rejected', 'Aprovação recusada.');
+            $parentDetail = self::getCardDetail($id, $userId);
+            $childDetail = self::getCardDetail($childId, $userId);
+
+            PluginTrallaHistory::log($id, $userId, 'card_split', 'Card separado; novo card ' . $childDetail['code'] . ' criado.');
+            PluginTrallaHistory::log($childId, $userId, 'card_split', 'Card criado a partir da separação de ' . $parentDetail['code'] . '.');
+
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
         }
 
-        return self::getCardDetail($parentId, $userId);
+        return [
+            'card'  => self::getCardDetail($id, $userId),
+            'child' => self::getCardDetail($childId, $userId),
+        ];
     }
 
     public static function decideDeletion(int $approvalId, bool $approve, string $reason, int $userId, bool $isAdmin): array
@@ -909,6 +1661,7 @@ class PluginTrallaCard extends CommonDBTM
                     'status'              => 'deleted',
                     'is_deleted'          => 1,
                     'is_locked'           => 1,
+                    'approval_cards_id'   => 0,
                     'deletion_decided_at' => $now,
                     'deletion_decided_by' => $userId,
                     'date_mod'            => $now,
@@ -921,6 +1674,8 @@ class PluginTrallaCard extends CommonDBTM
                     'rejection_reason'  => null,
                     'date_mod'          => $now,
                 ], ['id' => $approvalId]);
+
+                self::syncFamilyWithdrawal($boardId, self::familyRoot($parent), $userId);
 
                 PluginTrallaHistory::log($parentId, $userId, 'card_deletion_approved', 'Exclusão aprovada; card movido para Excluídos.');
                 PluginTrallaHistory::log($approvalId, $userId, 'card_deletion_approved', 'Aprovação da exclusão concluída.');
@@ -994,30 +1749,80 @@ class PluginTrallaCard extends CommonDBTM
         self::assertBoardAccess($card);
         $boards_id = (int) $card['plugin_tralla_boards_id'];
         $boardType = self::getBoardType($boards_id);
-        if (!tralla_can_transition($card, 'withdraw', $boardType)) {
-            throw new RuntimeException('Este card não está aguardando retirada.');
+        $root = self::familyRoot($card);
+
+        $DB->beginTransaction();
+        try {
+            self::lockCardRow($id);
+            self::lockFamilyRows($root);
+
+            $card = self::getCard($id);
+            if ($card === null) {
+                throw new RuntimeException('Card não encontrado.');
+            }
+            self::assertBoardAccess($card);
+
+            if (!tralla_can_transition($card, 'withdraw', $boardType)) {
+                throw new RuntimeException('Este card não está aguardando retirada.');
+            }
+
+            $permissions = self::permissionsFor($card, $boardType, $userId, $isAdmin);
+            if (empty($permissions['withdraw'])) {
+                throw new RuntimeException('Sem permissão para confirmar a retirada.');
+            }
+
+            $members = [];
+            foreach ($DB->request([
+                'FROM'  => 'glpi_plugin_tralla_cards',
+                'WHERE' => [
+                    'family_cards_id' => $root,
+                    'stage'           => 1,
+                    'is_archived'     => 0,
+                    'is_deleted'      => 0,
+                ],
+            ]) as $row) {
+                $members[] = $row;
+            }
+            if ($members === []) {
+                throw new RuntimeException('Cards da família não encontrados.');
+            }
+            foreach ($members as $member) {
+                if (!in_array((string) $member['status'], ['withdrawal', 'done'], true)) {
+                    throw new RuntimeException('Todos os cards da família precisam estar aprovados para confirmar a retirada.');
+                }
+            }
+
+            $list = PluginTrallaBoard::findListByCategory($boards_id, 'maintenance_done');
+            if ($list === null) {
+                throw new RuntimeException('O quadro não possui a lista "Manutenção Concluído".');
+            }
+
+            $now = tralla_now();
+            foreach ($members as $member) {
+                if ((string) $member['status'] !== 'withdrawal') {
+                    continue;
+                }
+                $DB->update('glpi_plugin_tralla_cards', [
+                    'plugin_tralla_lists_id' => (int) $list['id'],
+                    'status'                 => 'done',
+                    'date_withdrawn'         => $now,
+                    'date_mod'               => $now,
+                    'rank'                   => self::nextRankForList((int) $list['id']),
+                ], ['id' => (int) $member['id']]);
+
+                PluginTrallaHistory::log(
+                    (int) $member['id'],
+                    $userId,
+                    'withdrawal_confirmed',
+                    'Retirada confirmada; manutenção concluída.'
+                );
+            }
+
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
         }
-
-        $permissions = self::permissionsFor($card, $boardType, $userId, $isAdmin);
-        if (empty($permissions['withdraw'])) {
-            throw new RuntimeException('Sem permissão para confirmar a retirada.');
-        }
-
-        $list = PluginTrallaBoard::findListByCategory($boards_id, 'maintenance_done');
-        if ($list === null) {
-            throw new RuntimeException('O quadro não possui a lista "Manutenção Concluído".');
-        }
-
-        $now = tralla_now();
-        $DB->update('glpi_plugin_tralla_cards', [
-            'plugin_tralla_lists_id' => (int) $list['id'],
-            'status'                 => 'done',
-            'date_withdrawn'         => $now,
-            'date_mod'               => $now,
-            'rank'                   => self::nextRankForList((int) $list['id']),
-        ], ['id' => $id]);
-
-        PluginTrallaHistory::log($id, $userId, 'withdrawal_confirmed', 'Retirada confirmada; manutenção concluída.');
 
         return self::getCardDetail($id, $userId);
     }
@@ -1088,6 +1893,9 @@ class PluginTrallaCard extends CommonDBTM
                     'stage'                   => 2,
                     'parent_cards_id'         => $id,
                     'approval_cards_id'       => 0,
+                    'family_cards_id'         => self::familyRoot($fresh),
+                    'family_seq'              => self::familySequence($fresh),
+                    'split_from_cards_id'     => 0,
                     'approval_kind'           => 'deletion',
                     'status'                  => 'waiting_approval',
                     'is_locked'               => 0,
@@ -1302,6 +2110,275 @@ class PluginTrallaCard extends CommonDBTM
      * por isso o SQL bruto é necessário. Deve ser executado dentro da transação
      * que faz a leitura e a escrita, para que o bloqueio valha até o commit.
      */
+    private static function familyRoot(array $card): int
+    {
+        $root = (int) ($card['family_cards_id'] ?? 0);
+        if ($root > 0) {
+            return $root;
+        }
+        if ((int) ($card['stage'] ?? 1) === 2) {
+            $parentId = (int) ($card['parent_cards_id'] ?? 0);
+            if ($parentId > 0) {
+                return $parentId;
+            }
+        }
+
+        return (int) ($card['id'] ?? 0);
+    }
+
+    private static function familySequence(array $card): int
+    {
+        $sequence = (int) ($card['family_seq'] ?? 0);
+        if ($sequence > 0) {
+            return $sequence;
+        }
+
+        return (int) ($card['stage'] ?? 1) === 2 ? 2 : 1;
+    }
+
+    private static function familyIsIdle(int $root): bool
+    {
+        global $DB;
+
+        if ($root <= 0) {
+            return false;
+        }
+
+        $found = false;
+        foreach ($DB->request([
+            'FROM'  => 'glpi_plugin_tralla_cards',
+            'WHERE' => [
+                'family_cards_id' => $root,
+                'stage'           => 1,
+                'is_archived'     => 0,
+                'is_deleted'      => 0,
+            ],
+        ]) as $member) {
+            $found = true;
+            if (!in_array((string) $member['status'], ['pending', 'in_progress'], true)) {
+                return false;
+            }
+            if ((int) $member['is_locked'] !== 0) {
+                return false;
+            }
+            if ((int) ($member['approval_cards_id'] ?? 0) !== 0) {
+                return false;
+            }
+        }
+
+        return $found;
+    }
+
+    private static function lockFamilyRows(int $root): void
+    {
+        global $DB;
+
+        if ($root <= 0) {
+            return;
+        }
+
+        $DB->doQuery(sprintf(
+            'SELECT `id` FROM `glpi_plugin_tralla_cards`
+             WHERE `family_cards_id` = %d
+               AND `stage` = 1
+               AND `is_archived` = 0
+               AND `is_deleted` = 0
+             FOR UPDATE',
+            $root
+        ));
+    }
+
+    private static function syncFamilyWithdrawal(int $boards_id, int $root, int $userId): void
+    {
+        global $DB;
+
+        if ($boards_id <= 0 || $root <= 0) {
+            return;
+        }
+
+        $members = [];
+        foreach ($DB->request([
+            'FROM'  => 'glpi_plugin_tralla_cards',
+            'WHERE' => [
+                'family_cards_id' => $root,
+                'stage'           => 1,
+                'is_archived'     => 0,
+                'is_deleted'      => 0,
+            ],
+        ]) as $member) {
+            $members[] = $member;
+        }
+        if ($members === []) {
+            return;
+        }
+
+        foreach ($members as $member) {
+            if (!in_array((string) $member['status'], ['approved', 'withdrawal', 'done'], true)) {
+                return;
+            }
+        }
+
+        $list = PluginTrallaBoard::findListByCategory($boards_id, 'maintenance_withdrawal');
+        if ($list === null) {
+            return;
+        }
+
+        $now = tralla_now();
+        foreach ($members as $member) {
+            if ((string) $member['status'] !== 'approved') {
+                continue;
+            }
+
+            $DB->update('glpi_plugin_tralla_cards', [
+                'plugin_tralla_lists_id' => (int) $list['id'],
+                'status'                 => 'withdrawal',
+                'date_mod'               => $now,
+                'rank'                   => self::nextRankForList((int) $list['id']),
+            ], ['id' => (int) $member['id']]);
+
+            PluginTrallaHistory::log(
+                (int) $member['id'],
+                $userId,
+                'family_withdrawal_ready',
+                'Todos os cards da família aprovados; aguardando retirada.'
+            );
+        }
+    }
+
+    private static function buildEditChanges(array $card, array $payload): array
+    {
+        $changes = [];
+        $currentName = trim((string) ($card['name'] ?? ''));
+        $proposedName = trim((string) ($payload['name'] ?? ''));
+        if ($proposedName !== '' && $proposedName !== $currentName) {
+            $changes[] = [
+                'type'   => 'name',
+                'label'  => 'Nome',
+                'before' => $currentName !== '' ? $currentName : '—',
+                'after'  => $proposedName,
+            ];
+        }
+
+        $currentMachines = PluginTrallaMachine::getMachinesForCard((int) ($card['id'] ?? 0));
+        $currentById = [];
+        foreach ($currentMachines as $machine) {
+            $currentById[(int) $machine['id']] = $machine;
+        }
+
+        $machineLabel = static function (array $machine): string {
+            $label = trim((string) ($machine['label'] ?? ''));
+            if ($label !== '') {
+                return $label;
+            }
+            $model = trim((string) ($machine['model_name'] ?? ''));
+            if ($model !== '') {
+                $sequence = (int) ($machine['sequence'] ?? 0);
+                return $sequence > 0 ? $model . ' #' . $sequence : $model;
+            }
+
+            return 'Máquina #' . (int) ($machine['id'] ?? 0);
+        };
+
+        $statusLabels = tralla_machine_status_choices();
+        $kept = [];
+        $entries = is_array($payload['machines'] ?? null) ? $payload['machines'] : [];
+        foreach ($entries as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+            $machineId = (int) ($entry['id'] ?? 0);
+            if ($machineId <= 0) {
+                continue;
+            }
+            $kept[$machineId] = true;
+            if (!isset($currentById[$machineId])) {
+                continue;
+            }
+            $current = $currentById[$machineId];
+            $label = $machineLabel($current);
+
+            $status = (string) ($entry['status'] ?? '');
+            if ($status !== '' && $status !== (string) $current['status']) {
+                $changes[] = [
+                    'type'       => 'machine_status',
+                    'label'      => $label . ': status',
+                    'before'     => $statusLabels[(string) $current['status']] ?? (string) $current['status'],
+                    'after'      => $statusLabels[$status] ?? $status,
+                    'machine_id' => $machineId,
+                ];
+            }
+
+            $report = trim((string) ($entry['report'] ?? ''));
+            $currentReport = trim((string) ($current['report'] ?? ''));
+            if ($report !== $currentReport) {
+                $changes[] = [
+                    'type'       => 'machine_report',
+                    'label'      => $label . ': relatório',
+                    'before'     => $currentReport !== '' ? $currentReport : '—',
+                    'after'      => $report !== '' ? $report : '—',
+                    'machine_id' => $machineId,
+                ];
+            }
+
+            $service = !empty($entry['service_done']) ? 1 : 0;
+            if ($service !== (int) ($current['service_done'] ?? 0)) {
+                $changes[] = [
+                    'type'       => 'machine_service',
+                    'label'      => $label . ': serviço realizado',
+                    'before'     => !empty($current['service_done']) ? 'Sim' : 'Não',
+                    'after'      => $service ? 'Sim' : 'Não',
+                    'machine_id' => $machineId,
+                ];
+            }
+
+            $inventory = !empty($entry['needs_inventory']) ? 1 : 0;
+            if ($inventory !== (int) ($current['needs_inventory'] ?? 0)) {
+                $changes[] = [
+                    'type'       => 'machine_inventory',
+                    'label'      => $label . ': necessita inventariar',
+                    'before'     => !empty($current['needs_inventory']) ? 'Sim' : 'Não',
+                    'after'      => $inventory ? 'Sim' : 'Não',
+                    'machine_id' => $machineId,
+                ];
+            }
+        }
+
+        foreach ($currentById as $machineId => $machine) {
+            if (isset($kept[$machineId])) {
+                continue;
+            }
+            $changes[] = [
+                'type'       => 'machine_removed',
+                'label'      => $machineLabel($machine),
+                'before'     => 'No card',
+                'after'      => 'Removida',
+                'machine_id' => $machineId,
+            ];
+        }
+
+        $newEntries = is_array($payload['new_machines'] ?? null) ? $payload['new_machines'] : [];
+        foreach ($newEntries as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+            $modelId = (int) ($entry['model_id'] ?? 0);
+            $quantity = (int) ($entry['quantity'] ?? 1);
+            if ($modelId <= 0 || $quantity <= 0) {
+                continue;
+            }
+            $model = PluginTrallaMachineModel::getModel($modelId, true);
+            $modelName = $model !== null ? (string) $model['name'] : ('Modelo #' . $modelId);
+            $changes[] = [
+                'type'   => 'machine_added',
+                'label'  => 'Nova máquina',
+                'before' => '—',
+                'after'  => $quantity . 'x ' . $modelName,
+            ];
+        }
+
+        return $changes;
+    }
+
     private static function lockCardRow(int $cardId): void
     {
         global $DB;
@@ -1332,7 +2409,17 @@ class PluginTrallaCard extends CommonDBTM
         ]) as $child) {
             $childIds[] = (int) $child['id'];
         }
-        foreach ($childIds as $childId) {
+        foreach ($DB->request([
+            'SELECT' => ['id'],
+            'FROM'   => 'glpi_plugin_tralla_cards',
+            'WHERE'  => [
+                'split_from_cards_id' => $id,
+                'stage'               => 1,
+            ],
+        ]) as $child) {
+            $childIds[] = (int) $child['id'];
+        }
+        foreach (array_unique($childIds) as $childId) {
             self::deleteCard($childId);
         }
 
