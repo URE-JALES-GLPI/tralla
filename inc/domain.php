@@ -3,6 +3,25 @@
  * Regras puras do Tralla. Este arquivo não depende do GLPI.
  */
 
+if (!function_exists('tralla_finalization_partition')) {
+    function tralla_finalization_partition(array $machines): array
+    {
+        $ready = [];
+        $pending = [];
+        foreach ($machines as $machine) {
+            $id = (int) ($machine['id'] ?? 0);
+            $status = (string) ($machine['status'] ?? '');
+            if ($status === 'pending') {
+                $pending[] = $id;
+            } elseif (in_array($status, ['done', 'not_repairable'], true)) {
+                $ready[] = $id;
+            }
+        }
+
+        return ['ready' => $ready, 'pending' => $pending];
+    }
+}
+
 if (!function_exists('tralla_role_rank')) {
     function tralla_role_rank(string $role): int
     {

@@ -347,6 +347,7 @@
     var lastFocused = null;
     var shouldRefreshBoard = false;
     var saveTimers = {};
+    var machineSaveQueue = Promise.resolve();
     var inlineComposerListId = null;
     var historyFilters = { card_id: '', date_from: '', date_to: '' };
     var historyPage = 1;
@@ -1192,7 +1193,7 @@
             buttons += '<button type="button" class="tralla-btn tralla-btn-primary" data-card-action="finalize">'
                 + '<i class="ti ti-checkup-list"></i> Finalizar manutenção</button>';
         } else if (card.status === 'in_progress' && Number(card.stage) === 1) {
-            note = 'Preencha o relatório e o status de todas as máquinas para liberar a finalização.';
+            note = 'Preencha o relatório, marque Serviço realizado e escolha o status de todas as máquinas. Ao menos uma deve estar Concluída ou Inservível.';
         }
 
         if (permissions.approve) {
@@ -1245,7 +1246,7 @@
         if (!activeCard) {
             return;
         }
-        var aside = document.querySelector('.tralla-detail-side');
+        var aside = modalRoot.querySelector('.tralla-detail-side');
         if (aside) {
             aside.innerHTML = renderSideMeta(activeCard) + renderSideActions(activeCard);
         }
@@ -1749,9 +1750,14 @@
                     toast('Verificação incorreta. Ação cancelada.', 'error');
                     return;
                 }
+                var pendingCount = (activeCard.machines || []).filter(function (machine) {
+                    return machine.status === 'pending';
+                }).length;
                 var finalizeConfirmed = await confirmDialog({
                     title: 'Finalizar manutenção',
-                    message: 'Finalizar a manutenção e enviar para aprovação?',
+                    message: pendingCount > 0
+                        ? 'Enviar as máquinas concluídas ou inservíveis para aprovação e reunir ' + pendingCount + ' pendente(s) em um novo card?'
+                        : 'Finalizar a manutenção e enviar para aprovação?',
                     icon: 'ti-checkup-list',
                     confirmLabel: 'Finalizar'
                 });
@@ -1806,7 +1812,9 @@
             } else if (action === 'finalize') {
                 data = await api('finalize_card', { id: cardId });
                 applyState(data);
-                toast('Manutenção finalizada e enviada para aprovação.', 'success');
+                toast(data.pending_card
+                    ? 'Manutenção enviada para aprovação. Máquinas pendentes no card ' + (data.pending_card.code || ('#' + data.pending_card.id)) + '.'
+                    : 'Manutenção finalizada e enviada para aprovação.', 'success');
                 await openCard(data.approval ? data.approval.id : cardId);
             } else if (action === 'approve') {
                 data = await api('approve_card', { id: cardId });
@@ -2280,31 +2288,39 @@
             }
             var progress = data.progress || machineProgress(machines);
             updateProgressDom(progress);
-            updateProgressDom(progress);
         }
     }
 
-    async function saveMachine(machineEl) {
+    function saveMachine(machineEl) {
         if (!machineEl || !machineEl.isConnected) {
-            return;
+            return Promise.resolve();
         }
         var machineId = Number(machineEl.dataset.machineId);
         if (!machineId) {
-            return;
+            return Promise.resolve();
         }
+        var cardId = activeCard && Number(activeCard.id);
         setSaveState(machineEl, 'saving');
-        try {
+        machineSaveQueue = machineSaveQueue.then(async function () {
+            if (!machineEl.isConnected || !activeCard || Number(activeCard.id) !== cardId) {
+                return;
+            }
             var data = await api('machine_update', collectMachineFields(machineEl));
+            if (!machineEl.isConnected || !activeCard || Number(activeCard.id) !== cardId) {
+                return;
+            }
             applyMachineResponse(machineEl, data);
             if (activeCard && activeCard.permissions) {
-                activeCard.permissions.finalize = !!data.all_filled && !!activeCard.permissions.edit_machines;
+                activeCard.permissions.finalize = !!data.can_finalize && !!activeCard.permissions.edit_machines;
             }
             refreshSideActions();
+            setSaveState(machineEl, 'saved');
             shouldRefreshBoard = true;
-        } catch (error) {
+        }).catch(function (error) {
             setSaveState(machineEl, 'error');
             toast(error.message, 'error');
-        }
+        });
+        return machineSaveQueue;
     }
 
     function scheduleMachineSave(machineEl) {

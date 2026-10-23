@@ -71,7 +71,7 @@ Pendente --Pegar--> Em Andamento --Finalizar--> Aprovação (/2)
 
 - **Pegar**: grava o técnico responsável e move o card para Em Andamento. No card minimizado em Manutenção Pendente, o botão compacto **Pegar** executa a ação sem abrir o modal.
 - **Editar máquinas**: somente o técnico responsável, enquanto o card está em andamento e desbloqueado.
-- **Finalizar**: exige todas as máquinas preenchidas (relatório não vazio + status `done` ou `not_repairable`). Cria o card de aprovação `/2` e bloqueia o card `/1`.
+- **Finalizar**: exige relatório, **Serviço realizado** e status `done`, `not_repairable` (Inservível) ou `pending` em todas as máquinas. É necessário ao menos uma máquina concluída ou inservível. As máquinas pendentes são reunidas em um novo card na lista **Manutenção Pendente**; o card atual segue para aprovação com as demais máquinas.
 - **Aprovar**: move o `/1` para Retirada, desbloqueia e arquiva o `/2` como aprovado.
 - **Reprovar**: devolve o `/1` para Em Andamento com o motivo registrado e arquiva o `/2`.
 - **Confirmar retirada**: move o `/1` para Concluído e grava a data de retirada. Em cards com família, confirmar em um membro confirma a retirada de toda a família.

@@ -339,6 +339,7 @@ try {
                 'data' => [
                     'card'     => $result['card'],
                     'approval' => $result['approval'],
+                    'pending_card' => $result['pending_card'],
                     'state'    => tralla_ajax_state((int) $result['card']['plugin_tralla_boards_id']),
                 ],
             ]);

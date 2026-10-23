@@ -68,6 +68,18 @@ check('member cannot restore', !tralla_can_restore('member', true));
 check('superadmin can restore', tralla_can_restore('superadmin', true));
 check('superadmin cannot be removed by pure rule', tralla_role_rank('superadmin') === 3);
 
+$partition = tralla_finalization_partition([
+    ['id' => 11, 'status' => 'done'],
+    ['id' => 12, 'status' => 'pending'],
+    ['id' => 13, 'status' => 'not_repairable'],
+    ['id' => 14, 'status' => 'pending'],
+]);
+check('finalization keeps completed and unserviceable machines', $partition['ready'] === [11, 13]);
+check('finalization groups all pending machines', $partition['pending'] === [12, 14]);
+check('all pending machines cannot finalize', tralla_finalization_partition([
+    ['id' => 15, 'status' => 'pending'],
+])['ready'] === []);
+
 check('restore lock dropped on status fallback',
     tralla_restore_is_locked(['deletion_previous_status' => '', 'deletion_previous_is_locked' => 1]) === 0);
 check('restore lock kept for restorable status',
