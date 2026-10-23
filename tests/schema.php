@@ -6,6 +6,7 @@ function check(string $name, bool $ok): void {
     if (!$ok) { $failures++; fwrite(STDERR, "FAIL: {$name}\n"); }
 }
 check('boards_users table', str_contains($hook, 'glpi_plugin_tralla_boards_users'));
+check('board approvers column', str_contains($hook, '`can_approve`'));
 check('is_deleted column', str_contains($hook, '`is_deleted`'));
 check('card status comment includes deleted', str_contains($hook, 'deletion_pending'));
 check('approval_kind column', str_contains($hook, '`approval_kind`'));

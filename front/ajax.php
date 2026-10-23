@@ -21,10 +21,10 @@ if (!function_exists('tralla_ajax_require')) {
 if (!function_exists('tralla_ajax_state')) {
     function tralla_ajax_state(int $boards_id): array
     {
-        return [
-            'lists' => PluginTrallaList::getListsForBoard($boards_id),
-            'cards' => PluginTrallaCard::getCardsForBoard($boards_id),
-        ];
+        return tralla_board_state(
+            $boards_id,
+            PluginTrallaCard::userIsApprover((int) Session::getLoginUserID(), $boards_id)
+        );
     }
 }
 
@@ -40,6 +40,19 @@ try {
                 throw new RuntimeException('Quadro sem acesso.');
             }
             tralla_json(['ok' => true, 'data' => tralla_ajax_state($boards_id)]);
+
+        case 'board_ping':
+            $boards_id = tralla_post_int('boards_id');
+            if (!PluginTrallaBoard::canViewBoard($boards_id)) {
+                throw new RuntimeException('Quadro sem acesso.');
+            }
+            tralla_json([
+                'ok'   => true,
+                'data' => [
+                    'version' => PluginTrallaBoard::getVersion($boards_id),
+                    'cursor'  => PluginTrallaHistory::getLatestIdForBoard($boards_id),
+                ],
+            ]);
 
         case 'board_poll':
             $boards_id = tralla_post_int('boards_id');
@@ -57,6 +70,7 @@ try {
                     'state'    => tralla_ajax_state($boards_id),
                     'activity' => $activity['rows'],
                     'cursor'   => $activity['last_id'],
+                    'version'  => PluginTrallaBoard::getVersion($boards_id),
                 ],
             ]);
 

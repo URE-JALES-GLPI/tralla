@@ -357,7 +357,8 @@
         cards: state.cards || []
     });
     var lastActivityId = Number(state.activity_cursor || 0);
-    var pollInterval = 8000;
+    var lastVersion = String(state.version || '');
+    var pollInterval = 3000;
     var pollTimer = null;
     var pollInFlight = false;
     var pendingPoll = false;
@@ -522,6 +523,9 @@
         }
         state.lists = next.lists;
         state.cards = next.cards;
+        if (data.version) {
+            lastVersion = String(data.version);
+        }
         lastStateJson = JSON.stringify({
             lists: state.lists,
             cards: state.cards
@@ -590,6 +594,14 @@
 
         pollInFlight = true;
         try {
+            var ping = await api('board_ping', { boards_id: state.board.id });
+            var hasChanges = String((ping && ping.version) || '') !== lastVersion
+                || Number((ping && ping.cursor) || 0) !== lastActivityId;
+
+            if (!hasChanges) {
+                return;
+            }
+
             var data = await api('board_poll', {
                 boards_id: state.board.id,
                 after_id: lastActivityId
@@ -601,8 +613,12 @@
                     cards: data.state.cards || []
                 });
                 if (nextJson !== lastStateJson) {
-                    applyState(data.state);
+                    applyState(data);
                 }
+            }
+
+            if (data && data.version) {
+                lastVersion = String(data.version);
             }
 
             if (data && data.cursor !== undefined) {

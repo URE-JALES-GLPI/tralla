@@ -44,14 +44,34 @@ function plugin_tralla_install(): bool
                 `plugin_tralla_boards_id` INT {$sign} NOT NULL DEFAULT '0',
                 `users_id`                INT {$sign} NOT NULL DEFAULT '0',
                 `role`                    VARCHAR(20)  NOT NULL DEFAULT '',
+                `can_approve`             TINYINT(1)   NOT NULL DEFAULT '0' COMMENT 'aprova manutenções/exclusões neste quadro',
                 `date_creation`           DATETIME     DEFAULT NULL,
                 `date_mod`                DATETIME     DEFAULT NULL,
                 PRIMARY KEY (`id`),
                 UNIQUE KEY `uniq_board_user` (`plugin_tralla_boards_id`, `users_id`),
                 KEY `users_id` (`users_id`),
-                KEY `role` (`role`)
+                KEY `role` (`role`),
+                KEY `can_approve` (`can_approve`)
             ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}
         ") or die($DB->error());
+    }
+
+    // Aprovadores por quadro: migração idempotente para instalações existentes.
+    if (!$DB->fieldExists('glpi_plugin_tralla_boards_users', 'can_approve')) {
+        $DB->doQuery("
+            ALTER TABLE `glpi_plugin_tralla_boards_users`
+            ADD COLUMN `can_approve` TINYINT(1) NOT NULL DEFAULT '0' COMMENT 'aprova manutenções/exclusões neste quadro'
+        ") or die($DB->error());
+        $DB->doQuery("
+            ALTER TABLE `glpi_plugin_tralla_boards_users`
+            ADD KEY `can_approve` (`can_approve`)
+        ") or die($DB->error());
+        // Mantém o comportamento anterior: SuperAdmins do quadro já aprovavam.
+        $DB->update(
+            'glpi_plugin_tralla_boards_users',
+            ['can_approve' => 1],
+            ['role' => 'superadmin']
+        );
     }
 
     if (!$DB->tableExists('glpi_plugin_tralla_lists')) {

@@ -21,16 +21,21 @@ class PluginTrallaBoardUser
         global $DB;
 
         $members = [];
+        $select = [
+            'glpi_plugin_tralla_boards_users.users_id AS users_id',
+            'glpi_plugin_tralla_boards_users.role AS role',
+            'glpi_plugin_tralla_boards_users.date_creation AS date_creation',
+            'glpi_users.name AS name',
+            'glpi_users.realname AS realname',
+            'glpi_users.firstname AS firstname',
+            'glpi_users.is_deleted AS is_deleted',
+        ];
+        if (self::hasApproverColumn()) {
+            $select[] = 'glpi_plugin_tralla_boards_users.can_approve AS can_approve';
+        }
+
         $rows = $DB->request([
-            'SELECT' => [
-                'glpi_plugin_tralla_boards_users.users_id AS users_id',
-                'glpi_plugin_tralla_boards_users.role AS role',
-                'glpi_plugin_tralla_boards_users.date_creation AS date_creation',
-                'glpi_users.name AS name',
-                'glpi_users.realname AS realname',
-                'glpi_users.firstname AS firstname',
-                'glpi_users.is_deleted AS is_deleted',
-            ],
+            'SELECT' => $select,
             'FROM'     => 'glpi_plugin_tralla_boards_users',
             'LEFT JOIN' => [
                 'glpi_users' => [
@@ -49,6 +54,7 @@ class PluginTrallaBoardUser
             $members[] = [
                 'users_id'      => (int) $row['users_id'],
                 'role'          => (string) $row['role'],
+                'can_approve'   => (int) ($row['can_approve'] ?? 0),
                 'date_creation' => $row['date_creation'],
                 'name'          => (string) ($row['name'] ?? ''),
                 'realname'      => (string) ($row['realname'] ?? ''),
@@ -89,6 +95,103 @@ class PluginTrallaBoardUser
         ])->current();
 
         return is_array($row) ? (string) $row['role'] : '';
+    }
+
+    public static function isApprover(int $boardId, int $userId): bool
+    {
+        global $DB;
+
+        if ($boardId <= 0 || $userId <= 0) {
+            return false;
+        }
+
+        if (!self::hasApproverColumn()) {
+            return self::getRole($boardId, $userId) !== '';
+        }
+
+        $row = $DB->request([
+            'SELECT' => ['can_approve'],
+            'FROM'   => 'glpi_plugin_tralla_boards_users',
+            'WHERE'  => [
+                'plugin_tralla_boards_id' => $boardId,
+                'users_id'                => $userId,
+            ],
+            'LIMIT'  => 1,
+        ])->current();
+
+        return is_array($row) && (int) ($row['can_approve'] ?? 0) === 1;
+    }
+
+    /**
+     * Define quem aprova manutenções/exclusões neste quadro.
+     * Somente membros do quadro podem ser aprovadores.
+     *
+     * @param array<int, int|string> $userIds
+     */
+    public static function setApprovers(int $boardId, array $userIds): void
+    {
+        global $DB;
+
+        if (!self::hasApproverColumn()) {
+            throw new RuntimeException('Atualize o plugin Tralla para definir aprovadores.');
+        }
+
+        $userIds = array_values(array_unique(array_filter(
+            array_map('intval', $userIds),
+            static fn(int $userId): bool => $userId > 0
+        )));
+
+        $DB->beginTransaction();
+        try {
+            self::lockBoard($boardId);
+
+            $memberIds = [];
+            foreach ($DB->request([
+                'SELECT' => ['users_id'],
+                'FROM'   => 'glpi_plugin_tralla_boards_users',
+                'WHERE'  => ['plugin_tralla_boards_id' => $boardId],
+            ]) as $row) {
+                $memberIds[(int) $row['users_id']] = true;
+            }
+
+            $validIds = array_values(array_filter(
+                $userIds,
+                static fn(int $userId): bool => isset($memberIds[$userId])
+            ));
+
+            if ($validIds === [] && $memberIds !== []) {
+                throw new RuntimeException('Selecione pelo menos um aprovador para o quadro.');
+            }
+
+            $now = tralla_now();
+            $DB->update(
+                'glpi_plugin_tralla_boards_users',
+                [
+                    'can_approve' => 0,
+                    'date_mod'    => $now,
+                ],
+                ['plugin_tralla_boards_id' => $boardId]
+            );
+
+            if ($validIds !== []) {
+                $DB->update(
+                    'glpi_plugin_tralla_boards_users',
+                    [
+                        'can_approve' => 1,
+                        'date_mod'    => $now,
+                    ],
+                    [
+                        'plugin_tralla_boards_id' => $boardId,
+                        'users_id'                => $validIds,
+                    ]
+                );
+            }
+
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
+        }
     }
 
     public static function setRole(int $boardId, int $userId, string $role): void
@@ -208,13 +311,29 @@ class PluginTrallaBoardUser
         }
 
         $now = tralla_now();
-        $DB->insert('glpi_plugin_tralla_boards_users', [
+        $data = [
             'plugin_tralla_boards_id' => $boardId,
             'users_id'                => $userId,
             'role'                    => 'superadmin',
             'date_creation'           => $now,
             'date_mod'                => $now,
-        ]);
+        ];
+        if (self::hasApproverColumn()) {
+            $data['can_approve'] = 1;
+        }
+        $DB->insert('glpi_plugin_tralla_boards_users', $data);
+    }
+
+    private static function hasApproverColumn(): bool
+    {
+        global $DB;
+
+        static $exists = null;
+        if ($exists === null) {
+            $exists = $DB->fieldExists('glpi_plugin_tralla_boards_users', 'can_approve');
+        }
+
+        return $exists;
     }
 
     /**

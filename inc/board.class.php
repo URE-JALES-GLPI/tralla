@@ -396,6 +396,48 @@ class PluginTrallaBoard extends CommonDBTM
         return $stats;
     }
 
+    /**
+     * Hash leve do estado do quadro para detecção de mudanças (polling).
+     */
+    public static function getVersion(int $boards_id): string
+    {
+        global $DB;
+
+        if ($boards_id <= 0) {
+            return '';
+        }
+
+        $boardId = (int) $boards_id;
+        $queries = [
+            "SELECT COUNT(*) AS c, COALESCE(SUM(CRC32(CONCAT_WS('|', id, name, category, color, is_archived, rank, date_mod))), 0) AS s
+                FROM `glpi_plugin_tralla_lists`
+                WHERE `plugin_tralla_boards_id` = {$boardId}",
+            "SELECT COUNT(*) AS c, COALESCE(SUM(CRC32(CONCAT_WS('|', id, plugin_tralla_lists_id, name, description, status, stage, parent_cards_id, approval_cards_id, approval_kind, source, is_locked, is_archived, is_deleted, rank, users_id, technician_id, users_id_approver, machines_total, date_taken, date_finalized, date_approved, date_withdrawn, rejection_reason, date_mod))), 0) AS s
+                FROM `glpi_plugin_tralla_cards`
+                WHERE `plugin_tralla_boards_id` = {$boardId}",
+            "SELECT COUNT(*) AS c, COALESCE(SUM(CRC32(CONCAT_WS('|', m.id, m.plugin_tralla_cards_id, m.plugin_tralla_machine_models_id, m.label, m.serial, m.report, m.status, m.service_done, m.needs_inventory, m.inventory_items_id, m.rank, m.report_saved_at, m.date_mod))), 0) AS s
+                FROM `glpi_plugin_tralla_machines` AS m
+                INNER JOIN `glpi_plugin_tralla_cards` AS c ON c.id = m.plugin_tralla_cards_id
+                WHERE c.plugin_tralla_boards_id = {$boardId}",
+            "SELECT COUNT(*) AS c, COALESCE(SUM(CRC32(CONCAT_WS('|', users_id, role, can_approve))), 0) AS s
+                FROM `glpi_plugin_tralla_boards_users`
+                WHERE `plugin_tralla_boards_id` = {$boardId}",
+        ];
+
+        $parts = [];
+        foreach ($queries as $query) {
+            try {
+                $result = $DB->doQuery($query);
+                $row = $result->fetch_assoc();
+                $parts[] = (string) ($row['c'] ?? '0') . ':' . (string) ($row['s'] ?? '0');
+            } catch (Throwable $e) {
+                $parts[] = '0:0';
+            }
+        }
+
+        return md5(implode('|', $parts));
+    }
+
     public static function countCards(int $boards_id): int
     {
         return countElementsInTable('glpi_plugin_tralla_cards', [

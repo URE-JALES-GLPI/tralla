@@ -1085,19 +1085,19 @@ body[data-theme="dark"] .tralla-card-id-chip,
     display: inline-flex;
     flex: 0 0 auto;
     font-family: inherit;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
-    gap: 4px;
+    gap: 6px;
     line-height: 1;
     margin-left: auto;
-    min-height: 24px;
-    padding: 4px 8px;
+    min-height: 30px;
+    padding: 6px 12px;
     transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
     white-space: nowrap;
 }
 
 .tralla-card-take .ti {
-    font-size: 13px;
+    font-size: 15px;
 }
 
 .tralla-card-take:hover {
@@ -1719,6 +1719,72 @@ body[data-theme="dark"] .tralla-add-card:disabled:hover,
     font-size: 12px;
     font-weight: 600;
     padding: 4px 10px;
+}
+
+.tralla-approvers {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.tralla-approver-badge {
+    background: var(--tr-primary-soft);
+    border-radius: 999px;
+    color: var(--tr-primary);
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    margin-left: 6px;
+    padding: 2px 7px;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
+.tralla-approver-grid {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+.tralla-approver-option {
+    align-items: center;
+    background: var(--tr-surface-2);
+    border: 1px solid var(--tr-border);
+    border-radius: var(--tr-radius-sm);
+    cursor: pointer;
+    display: flex;
+    gap: 8px;
+    min-width: 0;
+    padding: 9px 11px;
+}
+
+.tralla-approver-option:hover {
+    border-color: var(--tr-border-strong);
+}
+
+.tralla-approver-option input[type="checkbox"] {
+    accent-color: var(--tr-primary);
+    flex: 0 0 auto;
+    height: 16px;
+    margin: 0;
+    width: 16px;
+}
+
+.tralla-approver-option:has(input:disabled) {
+    cursor: default;
+    opacity: 0.75;
+}
+
+.tralla-approver-name {
+    font-size: 13px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.tralla-approver-option .tralla-member-login {
+    margin-left: auto;
+    text-align: right;
 }
 
 /* --------------------------------------------------- board create modal */

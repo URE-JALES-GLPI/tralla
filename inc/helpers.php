@@ -594,3 +594,43 @@ if (!function_exists('tralla_queue_email')) {
         }
     }
 }
+
+if (!function_exists('tralla_board_state')) {
+    /**
+     * Estado do quadro para o Kanban.
+     *
+     * A lista da categoria "Manutenção Aprovação" e os cards dela só são
+     * expostos para quem tem permissão de aprovação neste quadro.
+     *
+     * @return array{lists: array<int, array<string, mixed>>, cards: array<int, array<string, mixed>>}
+     */
+    function tralla_board_state(int $boards_id, bool $canApprove): array
+    {
+        $lists = PluginTrallaList::getListsForBoard($boards_id);
+        $cards = PluginTrallaCard::getCardsForBoard($boards_id);
+
+        if ($canApprove) {
+            return ['lists' => $lists, 'cards' => $cards];
+        }
+
+        $hidden = [];
+        foreach ($lists as $list) {
+            if ((string) ($list['category'] ?? '') === 'maintenance_approval') {
+                $hidden[(int) $list['id']] = true;
+            }
+        }
+
+        if ($hidden === []) {
+            return ['lists' => $lists, 'cards' => $cards];
+        }
+
+        $lists = array_values(array_filter($lists, static function (array $list) use ($hidden): bool {
+            return !isset($hidden[(int) $list['id']]);
+        }));
+        $cards = array_values(array_filter($cards, static function (array $card) use ($hidden): bool {
+            return !isset($hidden[(int) ($card['plugin_tralla_lists_id'] ?? 0)]);
+        }));
+
+        return ['lists' => $lists, 'cards' => $cards];
+    }
+}

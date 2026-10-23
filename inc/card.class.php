@@ -306,7 +306,7 @@ class PluginTrallaCard extends CommonDBTM
             return false;
         }
 
-        return PluginTrallaBoardUser::getRole($boardId, $userId) !== '';
+        return PluginTrallaBoardUser::isApprover($boardId, $userId);
     }
 
     public static function create(array $data, int $userId = 0): array

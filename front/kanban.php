@@ -30,8 +30,9 @@ $canCreateCard = PluginTrallaBoard::canOperateBoard($boards_id) && Session::have
 $canMoveCard = PluginTrallaBoard::canOperateBoard($boards_id) && Session::haveRight('plugin_tralla', UPDATE) && !$isMaintenance;
 $canApprove = PluginTrallaCard::userIsApprover($userId, $boards_id);
 
-$lists = PluginTrallaList::getListsForBoard($boards_id);
-$cards = PluginTrallaCard::getCardsForBoard($boards_id);
+$boardState = tralla_board_state($boards_id, $canApprove);
+$lists = $boardState['lists'];
+$cards = $boardState['cards'];
 $deletedCards = $canViewDeleted ? PluginTrallaCard::getDeletedForBoard($boards_id) : [];
 $models = PluginTrallaMachineModel::getModels();
 
@@ -62,6 +63,7 @@ $bootstrap = [
     'cards' => $cards,
     'deleted_cards' => $deletedCards,
     'activity_cursor' => PluginTrallaHistory::getLatestIdForBoard($boards_id),
+    'version'         => PluginTrallaBoard::getVersion($boards_id),
     'entities' => tralla_all_entity_options(),
     'models' => array_map(static function (array $model): array {
         return [

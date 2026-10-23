@@ -92,6 +92,7 @@ Board geometry:
 - **Structure**: `section.tralla-list` > header + `.tralla-cards` + composer/button.
 - **Variants**: normal, maintenance category (colored dot), drop target.
 - **States**: default, hover (actions reveal), focus-within (actions stay visible), drag-over wash, empty. The "Adicionar card" button is disabled in the in-progress, approval, withdrawal, and done maintenance lists because those cards are created only in the pending list.
+- **Visibility**: the `maintenance_approval` list and its cards are only serialized for members with approval permission on that board. Everyone else receives the board without that column.
 - **Motion**: box-shadow 140ms; no layout animation.
 - **Scroll**: `.tralla-cards` is the vertical scroll owner; list is a flex column, empty lists keep a compact 72px minimum, and the composer stays outside the scroll area.
 
@@ -117,11 +118,11 @@ Board geometry:
 - **Accessibility**: dialog role, focus trap, Escape closes, errors announced by toast.
 
 ### Board settings tabs
-- **Structure**: `front/board.form.php` uses `nav.tralla-tabs` with **Geral** and **Membros**. **Geral** keeps the current name, theme, color, description, archive, and delete controls. **Membros** lists user name/login, role, inclusion date, and actions.
-- **Variants**: Admin sees the member list read-only, with role badges instead of selects and no add/remove controls. SuperAdmin sees the add form, inline role select, **Salvar**, and **Remover**.
-- **States**: default, active tab (`is-active` + `aria-current="page"`), focused tab, last-SuperAdmin controls disabled.
-- **Rules**: only SuperAdmin manages members. The last SuperAdmin cannot be removed or demoted; the server rejects it and the UI explains “O último SuperAdmin do quadro não pode ser rebaixado ou removido.”. Each member action uses its own form; never nest the member forms inside the **Geral** form.
-- **Accessibility**: tabs are links with visible focus; add/update/remove controls have accessible labels and confirmation on removal; role changes are announced through the redirect message.
+- **Structure**: `front/board.form.php` uses `nav.tralla-tabs` with **Geral** and **Membros**. **Geral** keeps the current name, theme, color, description, archive, and delete controls. **Membros** lists user name/login, role, inclusion date, and actions, followed by an **Aprovadores do quadro** section with one checkbox per member.
+- **Variants**: Admin sees the member list read-only, with role badges instead of selects and no add/remove controls. SuperAdmin sees the add form, inline role select, **Salvar**, **Remover**, and the approver checkboxes with **Salvar aprovadores**.
+- **States**: default, active tab (`is-active` + `aria-current="page"`), focused tab, last-SuperAdmin controls disabled, checked approver option.
+- **Rules**: only SuperAdmin manages members and approvers. Approvers must be members; the server ignores unknown users. The creator starts as SuperAdmin and approver. The last SuperAdmin cannot be removed or demoted; the server rejects it and the UI explains “O último SuperAdmin do quadro não pode ser rebaixado ou removido.”. Each member action uses its own form; never nest the member forms inside the **Geral** form. The approver list uses one form with `approver_ids[]`.
+- **Accessibility**: tabs are links with visible focus; add/update/remove controls have accessible labels and confirmation on removal; role changes are announced through the redirect message; approver checkboxes are wrapped by their visible labels.
 
 ### Deleted modal
 - **Structure**: wide modal (`showModal(..., true)`) titled **Cards excluídos** with the board name. Table columns: código, nome, motivo, solicitado em, excluído em, solicitante, aprovador, lista anterior, and **Restaurar**.
@@ -153,7 +154,7 @@ Board geometry:
 - **Structure**: compact `.tralla-card-take` button in the card footer with `data-card-take`, a hand icon, and **Pegar**.
 - **Variants**: visible only when `card.permissions.take` is true; absent otherwise.
 - **States**: default, hover, focus-visible, busy, disabled.
-- **Rules**: the click uses `stopPropagation` and does not open the card modal. The action calls `take_card`, applies the new state, and shows “Card atribuído a você.”. The button disappears when the card leaves `maintenance_pending`.
+- **Rules**: the button uses a 30px minimum height, 12px label, and 15px icon so it reads as a tappable action inside the card footer. The click uses `stopPropagation` and does not open the card modal. The action calls `take_card`, applies the new state, and shows “Card atribuído a você.”. The button disappears when the card leaves `maintenance_pending`.
 - **Accessibility**: the button has a `title`, remains reachable by keyboard, and its keydown must not trigger the card-open handler.
 
 ### Modal
@@ -179,6 +180,12 @@ These hooks are the contract between server-rendered markup and `public/js/trall
 | `#tralla-history-form` | History filter form | Submits `card_id`, `date_from`, and `date_to` filters. |
 
 History filters use `name="card_id"`, `name="date_from"`, and `name="date_to"`; keep those names aligned with the AJAX payload.
+
+### Real-time board sync
+- **Structure**: the Kanban polls `board_ping` every 3s. The response carries `version` (hash of lists/cards/machines/history aggregates) and `cursor` (latest history id).
+- **Rules**: a full `board_poll` runs only when `version` or `cursor` changes; it returns the filtered state, the new activity rows, and the current `version`. The client seeds `lastVersion` from the bootstrap and refreshes it on every full poll.
+- **Pause**: polling pauses while the tab is hidden, a modal is open, a drag or inline composer is active, or a machine save is pending. It resumes on `visibilitychange` and after the board becomes idle.
+- **Accessibility**: other users' changes are announced through the existing polite toast region; focus is never stolen.
 
 ## 6. Motion & Interaction
 

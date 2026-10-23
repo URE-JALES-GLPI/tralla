@@ -133,6 +133,30 @@ if (isset($_POST['member_add']) || isset($_POST['member_update']) || isset($_POS
     Html::redirect($pluginUrl . '/front/board.form.php?id=' . $id . '&tab=members');
 }
 
+if (isset($_POST['approvers_save'])) {
+    Session::checkRight('plugin_tralla', UPDATE);
+    tralla_check_csrf($_POST);
+
+    if (!$canGovern) {
+        Session::addMessageAfterRedirect('Sem permissão para definir aprovadores.', false, ERROR);
+        Html::redirect($pluginUrl . '/front/board.form.php?id=' . $id . '&tab=members');
+    }
+
+    $approverIds = $_POST['approver_ids'] ?? [];
+    if (!is_array($approverIds)) {
+        $approverIds = [];
+    }
+
+    try {
+        PluginTrallaBoardUser::setApprovers($id, $approverIds);
+        Session::addMessageAfterRedirect('Aprovadores atualizados.', true);
+    } catch (RuntimeException $e) {
+        Session::addMessageAfterRedirect($e->getMessage(), false, ERROR);
+    }
+
+    Html::redirect($pluginUrl . '/front/board.form.php?id=' . $id . '&tab=members');
+}
+
 $tab = (($_GET['tab'] ?? 'general') === 'members') ? 'members' : 'general';
 
 Html::header('Editar quadro — [URE] Tralla', $_SERVER['PHP_SELF'], 'tools', 'PluginTrallaBoard');
@@ -285,7 +309,7 @@ Html::header('Editar quadro — [URE] Tralla', $_SERVER['PHP_SELF'], 'tools', 'P
                             <?= Html::hidden('id', ['value' => (int) $id]) ?>
                             <?= Html::hidden('users_id', ['value' => $memberUsersId]) ?>
                             <div class="tralla-member-info">
-                                <span class="tralla-member-name"><?= tralla_h($displayName) ?></span>
+                                <span class="tralla-member-name"><?= tralla_h($displayName) ?><?php if ((int) ($member['can_approve'] ?? 0) === 1): ?><span class="tralla-approver-badge" title="Aprovador deste quadro">Aprovador</span><?php endif; ?></span>
                                 <?php if ($login !== ''): ?>
                                     <span class="tralla-member-login"><?= tralla_h($login) ?></span>
                                 <?php endif; ?>
@@ -326,6 +350,63 @@ Html::header('Editar quadro — [URE] Tralla', $_SERVER['PHP_SELF'], 'tools', 'P
                         </form>
                     <?php endforeach; ?>
                 </div>
+            <?php endif; ?>
+        </section>
+
+        <?php
+        $approverIds = [];
+        foreach ($members as $member) {
+            if ((int) ($member['can_approve'] ?? 0) === 1) {
+                $approverIds[(int) $member['users_id']] = true;
+            }
+        }
+        ?>
+        <section class="tralla-card tralla-approvers">
+            <header class="tralla-members-head">
+                <div>
+                    <h2><i class="ti ti-shield-check"></i> Aprovadores do quadro</h2>
+                    <p>Somente os aprovadores selecionados veem a lista "Manutenção Aprovação" e podem aprovar ou recusar manutenções e exclusões deste quadro.</p>
+                </div>
+            </header>
+
+            <?php if ($members === []): ?>
+                <p class="tralla-empty-mini">Adicione membros ao quadro antes de definir aprovadores.</p>
+            <?php else: ?>
+                <form method="post" action="<?= tralla_h($pluginUrl) ?>/front/board.form.php?id=<?= (int) $id ?>&amp;tab=members" class="tralla-approvers-form">
+                    <?= Html::hidden('_glpi_csrf_token', ['value' => tralla_csrf_token()]) ?>
+                    <?= Html::hidden('id', ['value' => (int) $id]) ?>
+                    <div class="tralla-approver-grid">
+                        <?php foreach ($members as $member): ?>
+                            <?php
+                            $approverUsersId = (int) $member['users_id'];
+                            $approverName = trim((string) $member['realname'] . ' ' . (string) $member['firstname']);
+                            if ($approverName === '') {
+                                $approverName = trim((string) $member['name']);
+                            }
+                            if ((int) $member['is_deleted'] === 1 || $approverName === '') {
+                                $approverName = 'Usuário removido';
+                            }
+                            $approverLogin = trim((string) $member['name']);
+                            ?>
+                            <label class="tralla-approver-option">
+                                <input type="checkbox" name="approver_ids[]" value="<?= $approverUsersId ?>"
+                                       <?= isset($approverIds[$approverUsersId]) ? 'checked' : '' ?>
+                                       <?= $canGovern ? '' : 'disabled' ?>>
+                                <span class="tralla-approver-name"><?= tralla_h($approverName) ?></span>
+                                <?php if ($approverLogin !== ''): ?>
+                                    <span class="tralla-member-login"><?= tralla_h($approverLogin) ?></span>
+                                <?php endif; ?>
+                            </label>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php if ($canGovern): ?>
+                        <footer class="tralla-form-actions">
+                            <button type="submit" name="approvers_save" value="1" class="tralla-btn tralla-btn-primary">
+                                <i class="ti ti-device-floppy"></i> Salvar aprovadores
+                            </button>
+                        </footer>
+                    <?php endif; ?>
+                </form>
             <?php endif; ?>
         </section>
     <?php endif; ?>
