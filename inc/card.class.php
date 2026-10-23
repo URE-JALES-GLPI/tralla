@@ -881,6 +881,8 @@ class PluginTrallaCard extends CommonDBTM
 
         $DB->beginTransaction();
         try {
+            self::lockCardRow($parentId);
+
             $approval = self::getCard($approvalId);
             $parent = self::getCard($parentId);
             if ($approval === null
@@ -1046,8 +1048,13 @@ class PluginTrallaCard extends CommonDBTM
             throw new RuntimeException('Informe o motivo da exclusão.');
         }
 
+        $approvalId = 0;
+        $isMaintenance = false;
+
         $DB->beginTransaction();
         try {
+            self::lockCardRow($id);
+
             $fresh = self::getCard($id);
             if ($fresh === null) {
                 throw new RuntimeException('Card não encontrado.');
@@ -1124,41 +1131,44 @@ class PluginTrallaCard extends CommonDBTM
                 );
 
                 $DB->commit();
+                $isMaintenance = true;
+            } else {
+                $now = tralla_now();
+                $DB->update('glpi_plugin_tralla_cards', [
+                    'deletion_previous_lists_id'  => (int) $fresh['plugin_tralla_lists_id'],
+                    'deletion_previous_status'    => (string) $fresh['status'],
+                    'deletion_previous_is_locked' => (int) $fresh['is_locked'],
+                    'deletion_reason'             => $normalizedReason,
+                    'deletion_requested_at'       => $now,
+                    'deletion_requested_by'       => $userId,
+                    'deletion_decided_at'         => $now,
+                    'deletion_decided_by'         => $userId,
+                    'is_deleted'                  => 1,
+                    'status'                      => 'deleted',
+                    'is_locked'                   => 1,
+                    'approval_cards_id'           => 0,
+                    'date_mod'                    => $now,
+                ], ['id' => $id]);
 
-                return [
-                    'card'     => self::getCardDetail($id, $userId),
-                    'approval' => self::getCardDetail($approvalId, $userId),
-                ];
+                PluginTrallaHistory::log(
+                    $id,
+                    $userId,
+                    'card_deletion_requested',
+                    'Exclusão direta solicitada. Motivo: ' . $normalizedReason
+                );
+
+                $DB->commit();
             }
-
-            $now = tralla_now();
-            $DB->update('glpi_plugin_tralla_cards', [
-                'deletion_previous_lists_id'  => (int) $fresh['plugin_tralla_lists_id'],
-                'deletion_previous_status'    => (string) $fresh['status'],
-                'deletion_previous_is_locked' => (int) $fresh['is_locked'],
-                'deletion_reason'             => $normalizedReason,
-                'deletion_requested_at'       => $now,
-                'deletion_requested_by'       => $userId,
-                'deletion_decided_at'         => $now,
-                'deletion_decided_by'         => $userId,
-                'is_deleted'                  => 1,
-                'status'                      => 'deleted',
-                'is_locked'                   => 1,
-                'approval_cards_id'           => 0,
-                'date_mod'                    => $now,
-            ], ['id' => $id]);
-
-            PluginTrallaHistory::log(
-                $id,
-                $userId,
-                'card_deletion_requested',
-                'Exclusão direta solicitada. Motivo: ' . $normalizedReason
-            );
-
-            $DB->commit();
         } catch (Throwable $e) {
             $DB->rollBack();
             throw $e;
+        }
+
+        if ($isMaintenance) {
+            return [
+                'card'     => self::getCardDetail($id, $userId),
+                'approval' => self::getCardDetail($approvalId, $userId),
+            ];
         }
 
         return [
@@ -1283,6 +1293,23 @@ class PluginTrallaCard extends CommonDBTM
         }
 
         return $deleted;
+    }
+
+    /**
+     * Serializa decisões concorrentes sobre o mesmo card.
+     *
+     * O `SELECT ... FOR UPDATE` não possui equivalente no query builder do GLPI,
+     * por isso o SQL bruto é necessário. Deve ser executado dentro da transação
+     * que faz a leitura e a escrita, para que o bloqueio valha até o commit.
+     */
+    private static function lockCardRow(int $cardId): void
+    {
+        global $DB;
+
+        $DB->doQuery(sprintf(
+            'SELECT `id` FROM `glpi_plugin_tralla_cards` WHERE `id` = %d FOR UPDATE',
+            $cardId
+        ));
     }
 
     public static function deleteCard(int $id): void
