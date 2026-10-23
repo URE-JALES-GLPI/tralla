@@ -358,8 +358,7 @@ class PluginTrallaCard extends CommonDBTM
             && $stage === 1
             && $status === 'in_progress'
             && !$locked
-            && ($isTechnician || $isBoardAdmin);
-
+            && $isTechnician;
         $canFinalize = $isMember
             && $boardType === 'maintenance'
             && $stage === 1

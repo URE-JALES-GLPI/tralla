@@ -2273,7 +2273,13 @@
                 local.is_filled = String(local.report || '').trim() !== ''
                     && !!local.service_done && (local.status === 'done' || local.status === 'not_repairable' || local.status === 'pending');
             }
+            var pill = machineEl.querySelector('.tralla-pill');
+            if (pill) {
+                pill.className = 'tralla-pill ' + (local && local.is_filled ? 'done' : 'pending');
+                pill.textContent = (local && local.is_filled) ? 'Preenchida' : 'Pendente';
+            }
             var progress = data.progress || machineProgress(machines);
+            updateProgressDom(progress);
             updateProgressDom(progress);
         }
     }
