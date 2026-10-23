@@ -724,6 +724,7 @@ class PluginTrallaCard extends CommonDBTM
             'stage'                   => 2,
             'parent_cards_id'         => $id,
             'approval_cards_id'       => 0,
+            'approval_kind'           => 'maintenance',
             'status'                  => 'waiting_approval',
             'is_locked'               => 0,
             'is_archived'             => 0,
@@ -763,6 +764,9 @@ class PluginTrallaCard extends CommonDBTM
         $approval = self::getCard($approvalId);
         if ($approval === null || (int) $approval['stage'] !== 2) {
             throw new RuntimeException('Card de aprovação não encontrado.');
+        }
+        if ((string) ($approval['approval_kind'] ?? 'maintenance') === 'deletion') {
+            return self::decideDeletion($approvalId, $approve, $reason, $userId, $isAdmin);
         }
         if (!tralla_can_transition($approval, $approve ? 'approve' : 'reject', 'maintenance')) {
             throw new RuntimeException('Este card não está aguardando aprovação.');
@@ -838,6 +842,136 @@ class PluginTrallaCard extends CommonDBTM
 
             PluginTrallaHistory::log($parentId, $userId, 'approval_rejected', 'Manutenção reprovada; card voltou para Em Andamento.' . ($reason !== '' ? ' Motivo: ' . $reason : ''));
             PluginTrallaHistory::log($approvalId, $userId, 'approval_rejected', 'Aprovação recusada.');
+        }
+
+        return self::getCardDetail($parentId, $userId);
+    }
+
+    public static function decideDeletion(int $approvalId, bool $approve, string $reason, int $userId, bool $isAdmin): array
+    {
+        global $DB;
+
+        if ($userId <= 0) {
+            $userId = (int) Session::getLoginUserID();
+        }
+
+        $approval = self::getCard($approvalId);
+        if ($approval === null
+            || (int) $approval['stage'] !== 2
+            || (string) ($approval['approval_kind'] ?? '') !== 'deletion'
+            || (string) $approval['status'] !== 'waiting_approval'
+            || !empty($approval['is_archived'])) {
+            throw new RuntimeException('Card de aprovação não encontrado.');
+        }
+
+        $parentId = (int) $approval['parent_cards_id'];
+        $parent = $parentId > 0 ? self::getCard($parentId) : null;
+        if ($parent === null) {
+            throw new RuntimeException('Card de origem não encontrado.');
+        }
+        self::assertBoardAccess($parent);
+        if ((string) $parent['status'] !== 'deletion_pending') {
+            throw new RuntimeException('O card de origem não está aguardando exclusão.');
+        }
+
+        $boardId = (int) $parent['plugin_tralla_boards_id'];
+        if (!self::userIsApprover($userId, $boardId)) {
+            throw new RuntimeException('Sem permissão para aprovar ou reprovar.');
+        }
+
+        $DB->beginTransaction();
+        try {
+            $approval = self::getCard($approvalId);
+            $parent = self::getCard($parentId);
+            if ($approval === null
+                || (int) $approval['stage'] !== 2
+                || (string) ($approval['approval_kind'] ?? '') !== 'deletion'
+                || (string) $approval['status'] !== 'waiting_approval'
+                || !empty($approval['is_archived'])
+                || (int) $approval['parent_cards_id'] !== $parentId) {
+                throw new RuntimeException('Card de aprovação não encontrado.');
+            }
+            if ($parent === null) {
+                throw new RuntimeException('Card de origem não encontrado.');
+            }
+            self::assertBoardAccess($parent);
+            if ((string) $parent['status'] !== 'deletion_pending') {
+                throw new RuntimeException('O card de origem não está aguardando exclusão.');
+            }
+
+            $now = tralla_now();
+            $reason = trim(strip_tags($reason));
+
+            if ($approve) {
+                $DB->update('glpi_plugin_tralla_cards', [
+                    'status'              => 'deleted',
+                    'is_deleted'          => 1,
+                    'is_locked'           => 1,
+                    'deletion_decided_at' => $now,
+                    'deletion_decided_by' => $userId,
+                    'date_mod'            => $now,
+                ], ['id' => $parentId]);
+
+                $DB->update('glpi_plugin_tralla_cards', [
+                    'status'            => 'approved',
+                    'is_archived'       => 1,
+                    'users_id_approver' => $userId,
+                    'rejection_reason'  => null,
+                    'date_mod'          => $now,
+                ], ['id' => $approvalId]);
+
+                PluginTrallaHistory::log($parentId, $userId, 'card_deletion_approved', 'Exclusão aprovada; card movido para Excluídos.');
+                PluginTrallaHistory::log($approvalId, $userId, 'card_deletion_approved', 'Aprovação da exclusão concluída.');
+            } else {
+                $lists = PluginTrallaList::getListsForBoard($boardId);
+                $listId = tralla_restore_list_id($parent, $lists, 'maintenance');
+                if ($listId <= 0) {
+                    throw new RuntimeException('O quadro não possui uma lista ativa para restaurar o card.');
+                }
+
+                $DB->update('glpi_plugin_tralla_cards', [
+                    'plugin_tralla_lists_id'      => $listId,
+                    'status'                      => tralla_restore_status($parent, 'maintenance'),
+                    'is_locked'                   => tralla_restore_is_locked($parent),
+                    'approval_cards_id'           => 0,
+                    'deletion_reason'             => null,
+                    'deletion_requested_at'       => null,
+                    'deletion_requested_by'       => 0,
+                    'deletion_decided_at'         => null,
+                    'deletion_decided_by'         => 0,
+                    'deletion_previous_lists_id'  => 0,
+                    'deletion_previous_status'    => '',
+                    'deletion_previous_is_locked' => 0,
+                    'rank'                        => self::nextRankForList($listId),
+                    'date_mod'                    => $now,
+                ], ['id' => $parentId]);
+
+                $DB->update('glpi_plugin_tralla_cards', [
+                    'status'            => 'rejected',
+                    'is_archived'       => 1,
+                    'users_id_approver' => $userId,
+                    'rejection_reason'  => $reason !== '' ? $reason : null,
+                    'date_mod'          => $now,
+                ], ['id' => $approvalId]);
+
+                PluginTrallaHistory::log(
+                    $parentId,
+                    $userId,
+                    'card_deletion_rejected',
+                    'Exclusão reprovada; card restaurado.' . ($reason !== '' ? ' Motivo: ' . $reason : '')
+                );
+                PluginTrallaHistory::log(
+                    $approvalId,
+                    $userId,
+                    'card_deletion_rejected',
+                    'Pedido de exclusão recusado.' . ($reason !== '' ? ' Motivo: ' . $reason : '')
+                );
+            }
+
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
         }
 
         return self::getCardDetail($parentId, $userId);
@@ -927,7 +1061,71 @@ class PluginTrallaCard extends CommonDBTM
             }
 
             if ($freshBoardType !== 'normal') {
-                throw new RuntimeException('A exclusão de cards de manutenção será habilitada na Task 6.');
+                $approvalList = PluginTrallaBoard::findListByCategory(
+                    (int) $fresh['plugin_tralla_boards_id'],
+                    'maintenance_approval'
+                );
+                if ($approvalList === null) {
+                    throw new RuntimeException('O quadro não possui a lista "Manutenção Aprovação".');
+                }
+
+                $now = tralla_now();
+                $DB->insert('glpi_plugin_tralla_cards', [
+                    'plugin_tralla_boards_id' => (int) $fresh['plugin_tralla_boards_id'],
+                    'plugin_tralla_lists_id'  => (int) $approvalList['id'],
+                    'name'                    => $fresh['name'],
+                    'description'             => $fresh['description'],
+                    'rank'                    => self::nextRankForList((int) $approvalList['id']),
+                    'users_id'                => $userId,
+                    'technician_id'           => (int) $fresh['technician_id'],
+                    'stage'                   => 2,
+                    'parent_cards_id'         => $id,
+                    'approval_cards_id'       => 0,
+                    'approval_kind'           => 'deletion',
+                    'status'                  => 'waiting_approval',
+                    'is_locked'               => 0,
+                    'is_archived'             => 0,
+                    'source'                  => (string) $fresh['source'],
+                    'machines_total'          => (int) $fresh['machines_total'],
+                    'date_creation'           => $now,
+                    'date_mod'                => $now,
+                ]);
+                $approvalId = (int) $DB->insertId();
+
+                $DB->update('glpi_plugin_tralla_cards', [
+                    'status'                      => 'deletion_pending',
+                    'is_locked'                   => 1,
+                    'approval_cards_id'           => $approvalId,
+                    'deletion_reason'             => $normalizedReason,
+                    'deletion_requested_at'       => $now,
+                    'deletion_requested_by'       => $userId,
+                    'deletion_decided_at'         => null,
+                    'deletion_decided_by'         => 0,
+                    'deletion_previous_lists_id'  => (int) $fresh['plugin_tralla_lists_id'],
+                    'deletion_previous_status'    => (string) $fresh['status'],
+                    'deletion_previous_is_locked' => (int) $fresh['is_locked'],
+                    'date_mod'                    => $now,
+                ], ['id' => $id]);
+
+                PluginTrallaHistory::log(
+                    $id,
+                    $userId,
+                    'card_deletion_requested',
+                    'Exclusão de manutenção solicitada. Motivo: ' . $normalizedReason
+                );
+                PluginTrallaHistory::log(
+                    $approvalId,
+                    $userId,
+                    'card_deletion_requested',
+                    'Aguardando aprovação da exclusão. Motivo: ' . $normalizedReason
+                );
+
+                $DB->commit();
+
+                return [
+                    'card'     => self::getCardDetail($id, $userId),
+                    'approval' => self::getCardDetail($approvalId, $userId),
+                ];
             }
 
             $now = tralla_now();
