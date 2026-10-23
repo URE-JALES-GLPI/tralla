@@ -32,6 +32,7 @@ $canApprove = PluginTrallaCard::userIsApprover($userId, $boards_id);
 
 $lists = PluginTrallaList::getListsForBoard($boards_id);
 $cards = PluginTrallaCard::getCardsForBoard($boards_id);
+$deletedCards = $canViewDeleted ? PluginTrallaCard::getDeletedForBoard($boards_id) : [];
 $models = PluginTrallaMachineModel::getModels();
 
 $bootstrap = [
@@ -59,6 +60,7 @@ $bootstrap = [
         ];
     }, $lists),
     'cards' => $cards,
+    'deleted_cards' => $deletedCards,
     'entities' => tralla_all_entity_options(),
     'models' => array_map(static function (array $model): array {
         return [

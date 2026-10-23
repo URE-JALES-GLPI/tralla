@@ -61,6 +61,8 @@ check('admin cannot govern', !tralla_can_manage_members('admin', true));
 check('view requires entity', !tralla_role_can_view(true, false, false, true));
 check('view requires read', !tralla_role_can_view(true, false, true, false));
 check('admin can restore', tralla_can_restore('admin', true));
+check('member cannot restore', !tralla_can_restore('member', true));
+check('superadmin can restore', tralla_can_restore('superadmin', true));
 
 check('restore lock dropped on status fallback',
     tralla_restore_is_locked(['deletion_previous_status' => '', 'deletion_previous_is_locked' => 1]) === 0);

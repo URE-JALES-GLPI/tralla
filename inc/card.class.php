@@ -84,9 +84,13 @@ class PluginTrallaCard extends CommonDBTM
             'WHERE' => [
                 'plugin_tralla_boards_id' => $boards_id,
                 'is_archived'             => 0,
+                'is_deleted'              => 0,
             ],
             'ORDER' => 'rank ASC, id ASC',
         ]) as $row) {
+            if ((string) ($row['status'] ?? '') === 'deletion_pending') {
+                continue;
+            }
             $cards[] = $row;
         }
 
@@ -218,6 +222,9 @@ class PluginTrallaCard extends CommonDBTM
 
     public static function permissionsFor(array $card, string $boardType, int $userId, bool $isAdmin): array
     {
+        $boardId = (int) ($card['plugin_tralla_boards_id'] ?? 0);
+        $role = $isAdmin ? 'superadmin' : PluginTrallaBoard::roleFor($boardId, $userId);
+        $isMember = $role !== '';
         $status = (string) ($card['status'] ?? '');
         $stage = (int) ($card['stage'] ?? 1);
         $locked = !empty($card['is_locked']);
@@ -225,56 +232,62 @@ class PluginTrallaCard extends CommonDBTM
             && (int) $card['technician_id'] === $userId;
         $canUpdate = Session::haveRight(self::$rightname, UPDATE);
 
-        $canEditMachines = $boardType === 'maintenance'
+        $canEditMachines = $isMember
+            && $boardType === 'maintenance'
             && $stage === 1
             && $status === 'in_progress'
             && !$locked
             && ($isTechnician || $isAdmin);
 
-        $canEditCard = $boardType === 'normal'
-            ? $canUpdate
-            : ($stage === 1 && $status === 'in_progress' && !$locked && ($isTechnician || $isAdmin));
+        $canEditCard = $isMember
+            && ($boardType === 'normal'
+                ? $canUpdate
+                : ($stage === 1 && $status === 'in_progress' && !$locked && ($isTechnician || $isAdmin)));
 
-        $canTake = $boardType === 'maintenance'
+        $canTake = $isMember
+            && $boardType === 'maintenance'
             && $stage === 1
             && $status === 'pending'
             && !$locked
             && $canUpdate;
 
-        $canApprove = $boardType === 'maintenance'
+        $canApprove = $isMember
+            && $boardType === 'maintenance'
             && $stage === 2
             && $status === 'waiting_approval'
-            && self::userIsApprover($userId);
+            && self::userIsApprover($userId, $boardId);
 
-        $canConfirm = $boardType === 'maintenance'
+        $canConfirm = $isMember
+            && $boardType === 'maintenance'
             && $stage === 1
             && $status === 'withdrawal'
             && !$locked
-            && ($isTechnician || $isAdmin || self::userIsApprover($userId));
+            && ($isTechnician || $isAdmin || self::userIsApprover($userId, $boardId));
 
-        $canDelete = $stage !== 2
-            && ($isAdmin
-                || (Session::haveRight(self::$rightname, DELETE)
-                    && ($boardType === 'normal'
-                        || ($stage === 1 && $status === 'pending' && (int) $card['technician_id'] === 0))));
+        $canRequestDeletion = tralla_can_request_deletion(
+            $card,
+            $isMember,
+            Session::haveRight(self::$rightname, DELETE),
+            $isAdmin
+        );
 
         return [
-            'view'           => true,
-            'edit_card'      => $canEditCard,
-            'edit_machines'  => $canEditMachines,
-            'add_machine'    => $canEditMachines,
-            'delete_machine' => $canEditMachines,
-            'take'           => $canTake,
-            'finalize'       => $canEditMachines && tralla_all_machines_filled($card['machines'] ?? []),
-            'approve'        => $canApprove,
-            'reject'         => $canApprove,
-            'withdraw'       => $canConfirm,
-            'delete'         => $canDelete,
-            'move'           => $boardType === 'normal' && $canUpdate,
+            'view'             => true,
+            'edit_card'        => $canEditCard,
+            'edit_machines'    => $canEditMachines,
+            'add_machine'      => $canEditMachines,
+            'delete_machine'   => $canEditMachines,
+            'take'             => $canTake,
+            'finalize'         => $canEditMachines && tralla_all_machines_filled($card['machines'] ?? []),
+            'approve'          => $canApprove,
+            'reject'           => $canApprove,
+            'withdraw'         => $canConfirm,
+            'request_deletion' => $canRequestDeletion,
+            'move'             => $isMember && $boardType === 'normal' && $canUpdate,
         ];
     }
 
-    public static function userIsApprover(int $userId = 0): bool
+    public static function userIsApprover(int $userId = 0, int $boardId = 0): bool
     {
         if ($userId <= 0) {
             $userId = (int) Session::getLoginUserID();
@@ -285,15 +298,15 @@ class PluginTrallaCard extends CommonDBTM
             return false;
         }
 
-        $groupId = PluginTrallaConfig::approvalGroupId();
-        if ($groupId > 0) {
-            return countElementsInTable('glpi_groups_users', [
-                'users_id'  => $userId,
-                'groups_id' => $groupId,
-            ]) > 0;
+        if (Session::haveRight(self::$rightname, PURGE)) {
+            return true;
         }
 
-        return true;
+        if ($boardId <= 0) {
+            return false;
+        }
+
+        return PluginTrallaBoardUser::getRole($boardId, $userId) !== '';
     }
 
     public static function create(array $data, int $userId = 0): array
@@ -754,7 +767,7 @@ class PluginTrallaCard extends CommonDBTM
         if (!tralla_can_transition($approval, $approve ? 'approve' : 'reject', 'maintenance')) {
             throw new RuntimeException('Este card não está aguardando aprovação.');
         }
-        if (!self::userIsApprover($userId)) {
+        if (!self::userIsApprover($userId, (int) $approval['plugin_tralla_boards_id'])) {
             throw new RuntimeException('Sem permissão para aprovar ou reprovar.');
         }
 
@@ -871,6 +884,204 @@ class PluginTrallaCard extends CommonDBTM
         PluginTrallaHistory::log($id, $userId, 'withdrawal_confirmed', 'Retirada confirmada; manutenção concluída.');
 
         return self::getCardDetail($id, $userId);
+    }
+
+    public static function requestDeletion(int $id, string $reason, int $userId = 0, bool $isAdmin = false): array
+    {
+        global $DB;
+
+        if ($userId <= 0) {
+            $userId = (int) Session::getLoginUserID();
+        }
+
+        $card = self::getCard($id);
+        if ($card === null) {
+            throw new RuntimeException('Card não encontrado.');
+        }
+        self::assertBoardAccess($card);
+
+        $boards_id = (int) $card['plugin_tralla_boards_id'];
+        $boardType = self::getBoardType($boards_id);
+        $permissions = self::permissionsFor($card, $boardType, $userId, $isAdmin);
+        if (empty($permissions['request_deletion'])) {
+            throw new RuntimeException('Sem permissão para excluir este card.');
+        }
+
+        $normalizedReason = tralla_normalize_deletion_reason($reason);
+        if (!tralla_is_valid_deletion_reason($normalizedReason)) {
+            throw new RuntimeException('Informe o motivo da exclusão.');
+        }
+
+        $DB->beginTransaction();
+        try {
+            $fresh = self::getCard($id);
+            if ($fresh === null) {
+                throw new RuntimeException('Card não encontrado.');
+            }
+            self::assertBoardAccess($fresh);
+
+            $freshBoardType = self::getBoardType((int) $fresh['plugin_tralla_boards_id']);
+            $freshPermissions = self::permissionsFor($fresh, $freshBoardType, $userId, $isAdmin);
+            if (empty($freshPermissions['request_deletion'])) {
+                throw new RuntimeException('Sem permissão para excluir este card.');
+            }
+
+            if ($freshBoardType !== 'normal') {
+                throw new RuntimeException('A exclusão de cards de manutenção será habilitada na Task 6.');
+            }
+
+            $now = tralla_now();
+            $DB->update('glpi_plugin_tralla_cards', [
+                'deletion_previous_lists_id'  => (int) $fresh['plugin_tralla_lists_id'],
+                'deletion_previous_status'    => (string) $fresh['status'],
+                'deletion_previous_is_locked' => (int) $fresh['is_locked'],
+                'deletion_reason'             => $normalizedReason,
+                'deletion_requested_at'       => $now,
+                'deletion_requested_by'       => $userId,
+                'deletion_decided_at'         => $now,
+                'deletion_decided_by'         => $userId,
+                'is_deleted'                  => 1,
+                'status'                      => 'deleted',
+                'is_locked'                   => 1,
+                'approval_cards_id'           => 0,
+                'date_mod'                    => $now,
+            ], ['id' => $id]);
+
+            PluginTrallaHistory::log(
+                $id,
+                $userId,
+                'card_deletion_requested',
+                'Exclusão direta solicitada. Motivo: ' . $normalizedReason
+            );
+
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
+        }
+
+        return [
+            'card'     => self::getCardDetail($id, $userId),
+            'approval' => null,
+        ];
+    }
+
+    public static function restoreDeleted(int $id, int $userId = 0, bool $isAdmin = false): array
+    {
+        global $DB;
+
+        if ($userId <= 0) {
+            $userId = (int) Session::getLoginUserID();
+        }
+
+        $card = self::getCard($id);
+        if ($card === null) {
+            throw new RuntimeException('Card não encontrado.');
+        }
+        self::assertBoardAccess($card);
+        if (empty($card['is_deleted'])) {
+            throw new RuntimeException('Este card não está excluído.');
+        }
+
+        $boards_id = (int) $card['plugin_tralla_boards_id'];
+        $boardType = self::getBoardType($boards_id);
+        if (!$isAdmin
+            && (!PluginTrallaBoard::canAdminBoard($boards_id, $userId)
+                || !Session::haveRight(self::$rightname, UPDATE))) {
+            throw new RuntimeException('Sem permissão para restaurar este card.');
+        }
+
+        $lists = PluginTrallaList::getListsForBoard($boards_id);
+
+        $DB->beginTransaction();
+        try {
+            $fresh = self::getCard($id);
+            if ($fresh === null) {
+                throw new RuntimeException('Card não encontrado.');
+            }
+            if (empty($fresh['is_deleted'])) {
+                throw new RuntimeException('Este card não está excluído.');
+            }
+
+            $listId = tralla_restore_list_id($fresh, $lists, $boardType);
+            if ($listId <= 0) {
+                throw new RuntimeException('O quadro não possui uma lista ativa para restaurar o card.');
+            }
+
+            $status = tralla_restore_status($fresh, $boardType);
+            $locked = tralla_restore_is_locked($fresh);
+            $list = PluginTrallaList::getList($listId);
+            $listName = (string) ($list['name'] ?? '');
+            $now = tralla_now();
+
+            $DB->update('glpi_plugin_tralla_cards', [
+                'plugin_tralla_lists_id'      => $listId,
+                'status'                      => $status,
+                'is_locked'                   => $locked,
+                'is_deleted'                  => 0,
+                'approval_cards_id'           => 0,
+                'deletion_reason'             => null,
+                'deletion_requested_at'       => null,
+                'deletion_requested_by'       => 0,
+                'deletion_decided_at'         => null,
+                'deletion_decided_by'         => 0,
+                'deletion_previous_lists_id'  => 0,
+                'deletion_previous_status'    => '',
+                'deletion_previous_is_locked' => 0,
+                'date_mod'                    => $now,
+                'rank'                        => self::nextRankForList($listId),
+            ], ['id' => $id]);
+
+            PluginTrallaHistory::log(
+                $id,
+                $userId,
+                'card_deletion_restored',
+                'Card restaurado para a lista "' . $listName . '".'
+            );
+
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
+        }
+
+        return self::getCardDetail($id, $userId);
+    }
+
+    public static function getDeletedForBoard(int $boards_id): array
+    {
+        global $DB;
+
+        if (!PluginTrallaBoard::canAdminBoard($boards_id)) {
+            throw new RuntimeException('Você não tem acesso aos cards excluídos deste quadro.');
+        }
+
+        $boardType = self::getBoardType($boards_id);
+        $deleted = [];
+        foreach ($DB->request([
+            'FROM'  => 'glpi_plugin_tralla_cards',
+            'WHERE' => [
+                'plugin_tralla_boards_id' => $boards_id,
+                'is_deleted'              => 1,
+            ],
+            'ORDER' => 'deletion_decided_at DESC, id DESC',
+        ]) as $row) {
+            $previousList = PluginTrallaList::getList((int) ($row['deletion_previous_lists_id'] ?? 0));
+
+            $deleted[] = [
+                'id'                     => (int) $row['id'],
+                'code'                   => tralla_display_code($row, $boardType),
+                'name'                   => (string) $row['name'],
+                'deletion_reason'        => (string) ($row['deletion_reason'] ?? ''),
+                'requester_name'         => tralla_user_name((int) ($row['deletion_requested_by'] ?? 0)),
+                'decider_name'           => tralla_user_name((int) ($row['deletion_decided_by'] ?? 0)),
+                'previous_list_name'     => (string) ($previousList['name'] ?? ''),
+                'deleted_at_formatted'   => tralla_date($row['deletion_decided_at'] ?? ''),
+                'requested_at_formatted' => tralla_date($row['deletion_requested_at'] ?? ''),
+            ];
+        }
+
+        return $deleted;
     }
 
     public static function deleteCard(int $id): void
