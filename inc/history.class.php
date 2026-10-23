@@ -167,6 +167,7 @@ class PluginTrallaHistory extends CommonDBTM
                     'u.name AS user_login',
                     'u.realname AS user_realname',
                     'u.firstname AS user_firstname',
+                    'u.is_deleted AS user_deleted',
                 ],
                 'FROM'  => 'glpi_plugin_tralla_history AS h',
                 'WHERE' => $where,
@@ -176,14 +177,14 @@ class PluginTrallaHistory extends CommonDBTM
             ]);
 
             foreach ($iterator as $row) {
-                $userName = tralla_user_name((int) $row['users_id']);
-                if ($userName === '') {
+                $userName = '';
+                if ((int) ($row['user_deleted'] ?? 0) !== 1) {
                     $userName = trim(
                         (string) ($row['user_realname'] ?? '') . ' ' . (string) ($row['user_firstname'] ?? '')
                     );
-                }
-                if ($userName === '') {
-                    $userName = (string) ($row['user_login'] ?? '');
+                    if ($userName === '') {
+                        $userName = (string) ($row['user_login'] ?? '');
+                    }
                 }
 
                 $cardRow = [
