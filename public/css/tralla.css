@@ -2199,10 +2199,11 @@ body[data-theme="dark"] .tralla-add-card:disabled:hover,
     align-items: center;
     color: var(--tr-muted);
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     font-size: 12px;
     gap: 8px;
     margin-top: 6px;
+    overflow: hidden;
 }
 
 .tralla-detail-sub .tralla-avatar {
@@ -3027,7 +3028,11 @@ body.tralla-modal-open {
     align-items: center;
     display: inline-flex;
     gap: 4px;
+    max-width: 220px;
     min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .tralla-btn.is-busy {
@@ -3629,9 +3634,9 @@ body.tralla-modal-open {
 .tralla-edit-machine {
     background: var(--tr-surface-2);
     border: 1px solid var(--tr-border);
-    border-radius: var(--tr-radius-sm);
-    margin-bottom: 12px;
-    padding: 12px;
+    border-radius: var(--tr-radius);
+    margin-bottom: 16px;
+    padding: 16px;
     position: relative;
 }
 
@@ -3697,4 +3702,34 @@ body.tralla-modal-open {
     .tralla-add-machine-grid {
         grid-template-columns: 1fr;
     }
+}
+.tralla-card.approval-final {
+    border-left: 4px solid var(--tr-primary);
+}
+
+.tralla-card.approval-deletion {
+    border-left: 4px solid var(--tr-approval-deletion);
+}
+
+.tralla-card.approval-edit {
+    border-left: 4px solid var(--tr-success);
+}
+.tralla-edit-machine .tralla-field {
+    margin-top: 10px;
+}
+
+.tralla-edit-machine .tralla-field:first-child {
+    margin-top: 0;
+}
+
+.tralla-edit-machine .tralla-machine-flags {
+    margin-top: 12px;
+}
+
+.tralla-edit-new-machine {
+    padding: 16px;
+}
+
+.tralla-modal-body .tralla-detail-section {
+    margin-bottom: 16px;
 }

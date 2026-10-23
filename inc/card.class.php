@@ -353,7 +353,7 @@ class PluginTrallaCard extends CommonDBTM
         $canUpdate = Session::haveRight(self::$rightname, UPDATE);
         $isBoardAdmin = $isAdmin || tralla_role_at_least($role, 'admin');
 
-        $canEditMachines = false;
+        $canEditMachines = $isMember\n            && $boardType === 'maintenance'\n            && $stage === 1\n            && $status === 'in_progress'\n            && !$locked\n            && ($isTechnician || $isBoardAdmin);
 
         $canFinalize = $isMember
             && $boardType === 'maintenance'

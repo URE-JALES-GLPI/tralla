@@ -974,6 +974,7 @@
         var statusLabel = isMaintenance ? (card.status_label || labels.statuses[card.status] || '') : '';
         var statusClass = statusClasses[card.status] || '';
         var labelClass = approvalKindClass(card) || statusClass;
+        var cardApprovalClass = Number(card.stage) === 2 ? approvalKindClass(card) : '';
         var label = statusLabel
             ? '<span class="tralla-card-label tralla-card-label-' + esc(labelClass) + '">' + esc(statusLabel) + '</span>'
             : '';
@@ -1028,7 +1029,7 @@
             + (label || '<span class="tralla-card-top-spacer" aria-hidden="true"></span>')
             + '</div>';
 
-        return '<article class="tralla-card' + (card.is_locked ? ' is-locked' : '') + departingClass
+        return '<article class="tralla-card' + (card.is_locked ? ' is-locked' : '') + (cardApprovalClass ? ' ' + cardApprovalClass : '') + departingClass
             + '" data-card-id="' + cardId + '"'
             + (canDrag ? ' draggable="true"' : '')
             + ' tabindex="0" role="button" aria-label="Abrir card ' + attr(card.name) + '">'
@@ -1550,7 +1551,7 @@
         }
     }
 
-    var TRALLA_CHALLENGE_WORDS = ['MASSON','PAIVA','FERRARI','SAWATA','NETO','MASSON','PAIVA','FERRARI','SAWATA','NETO','MASSON','PAIVA','FERRARI','SAWATA','NETO','MASSON','PAIVA','FERRARI','SAWATA','NETO','ALFA','BRAVO','CHARLIE','DELTA','ECHO','FOXTROT','GOLF','HOTEL','INDIA','JULIET','KILO','LIMA','MIKE','NOVEMBER','OSCAR','PAPA','QUEBEC','ROMEO','SIERRA','TANGO','UNIFORM','VICTOR','WHISKEY','XRAY','YANKEE','ZULU','AMARELO','AZUL','VERDE','VERMELHO','PRETO','BRANCO','CINZA','ROSA','ROXO','LARANJA','MARROM','PRATA','DOURADO','BRONZE','COBRE','FERRO','ACO','MADEIRA','PEDRA','VIDRO','PLASTICO','BORRACHA','TECIDO','PAPEL','COURO','LINHO','SEDA','LA','ALGODAO','NYLON','POLIESTER','VINIL','ACRILICO','CERAMICA','PORCELANA','FAIANCA','LOICA','BARRO','ARGILA','AREIA','GRAVA','SEIXO','PEDREGULHO','CAL','CIMENTO','CONCRETO','ASFALTO','BETUME','TAR','PITCH','RESINA','GOMA','LATEX','SILICONE','TEFLON','KEVLAR','NOMEX','CORDURA','GORETEX','NEOPRENE','LICRA','SPANDEX','ELASTANO','VISCOSE','RAYON','BAMBU','JUTA','SISAL','HEMP','LINHO','RAMI','ABACA','MANILA','COCO','PALHA','PALMITO','BANANEIRA','JUNCO','VIME','BAMBOO','CANA','BAGACO','MELACO','ACUCAR','SAL','PIMENTA','CANELA','CRAVO','NOZ','MOSCA','CARDAMOMO','CURCUMA','CURRY','PAPRIKA','COLORAU','URUCUM','ANNATTO','ACAFRAO','AÇAFRAO','TURMERIC','GINGER','GENGIBRE','ALHO','CEBOLA','ALHO-PORRO','SALSINHA','COENTRO','MANJERICAO','OREGANO','TOMILHO','ALECRIM','LOURO','SAGE','SALVIA','MINT','HORTELA','MELISSA','CAMOMILA','ERVA','CIDE','CIDREIRA','CAPIM','LIMAO','LIMA','LARANJA','TANGERINA','MEXERICA','BERGAMOTA','POMELO','TORANJA','GRAPEFRUIT','CITRUS','ACEROLA','CEREJA','MORANGO','FRAMBOESA','AMORA','MIRTILO','BLUEBERRY','BLACKBERRY','RASPBERRY','GOJI','ACAI','CUPUACU','CACAU','CHOCOLATE','CACAO','THEOBROMA','GUARANA','MATE','CHIMARRAO','TERERE','CHA','TEA','CAFE','COFFEE','CACAU','CACAO','NIBS','POWDER','CACAU','CACAO','CACAU','CACAO','CACAU','CACAO','CACAU','CACAO','CACAU','CACAO','CACAU','CACAO','CACAU','CACAO','CACAU','CACAO','CACAU','CACAO','CACAU','CACAO'];
+    var TRALLA_CHALLENGE_WORDS = ['MASSON','PAIVA','FERRARI','SAWATA','NETO','MASSON','PAIVA','FERRARI','SAWATA','NETO','MASSON','PAIVA','FERRARI','SAWATA','NETO','MASSON','PAIVA','FERRARI','SAWATA','NETO','ALFA','BRAVO','CHARLIE','DELTA','ECHO','FOXTROT','GOLF','HOTEL','INDIA','JULIET','KILO','LIMA','MIKE','NOVEMBER','OSCAR','PAPA','QUEBEC','ROMEO','SIERRA','TANGO','UNIFORM','VICTOR','WHISKEY','XRAY','YANKEE','ZULU','AMARELO','AZUL','VERDE','VERMELHO','PRETO','BRANCO','CINZA','ROSA','ROXO','LARANJA','MARROM','PRATA','DOURADO','BRONZE','COBRE','FERRO','ACO','MADEIRA','PEDRA','VIDRO','PLASTICO','BORRACHA','TECIDO','PAPEL','COURO','LINHO','SEDA','LA','ALGODAO','NYLON','POLIESTER','VINIL','ACRILICO','CERAMICA','PORCELANA','FAIANCA','LOICA','BARRO','ARGILA','AREIA','GRAVA','SEIXO','PEDREGULHO','CAL','CIMENTO','CONCRETO','ASFALTO','BETUME','TAR','PITCH','RESINA'];
 
     function pickChallengeWord() {
         var idx = Math.floor(Math.random() * TRALLA_CHALLENGE_WORDS.length);
