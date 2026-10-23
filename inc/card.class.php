@@ -1087,6 +1087,9 @@ class PluginTrallaCard extends CommonDBTM
                     'is_archived'             => 0,
                     'source'                  => (string) $fresh['source'],
                     'machines_total'          => (int) $fresh['machines_total'],
+                    'deletion_reason'         => $normalizedReason,
+                    'deletion_requested_at'   => $now,
+                    'deletion_requested_by'   => $userId,
                     'date_creation'           => $now,
                     'date_mod'                => $now,
                 ]);
