@@ -1467,7 +1467,9 @@
             return '';
         }
         return '<a class="tralla-assignature-link" href="' + attr(card.assignature_url) + '" target="_blank" rel="noopener noreferrer">'
-            + '<i class="ti ti-external-link"></i><span>Retirada registrada no assignat-ure. Abrir comprovante.</span></a>';
+            + '<i class="ti ti-external-link"></i><span>'
+            + (card.assignature_sent ? 'Abrir comprovante no Assignat-ure' : 'Assinar retirada no Assignat-ure')
+            + '</span></a>';
     }
 
     function renderCardModal(card) {

@@ -3,6 +3,9 @@
  * [URE] Tralla — quadros Kanban e fluxo de manutenção para GLPI 12.
  */
 
+use Glpi\Http\Firewall;
+use Glpi\Http\SessionManager;
+
 require_once __DIR__ . '/inc/compat.php';
 require_once __DIR__ . '/inc/helpers.php';
 
@@ -16,6 +19,14 @@ define('PLUGIN_TRALLA_MAX_GLPI', '12.0.99');
 function plugin_init_tralla(): void
 {
     global $PLUGIN_HOOKS;
+
+    if (class_exists(Firewall::class)) {
+        Firewall::addPluginStrategyForLegacyScripts(
+            'tralla',
+            '#^/front/assignature(?:_callback)?\.php$#',
+            Firewall::STRATEGY_NO_CHECK
+        );
+    }
 
     if (!tralla_is_glpi12_plus()) {
         $PLUGIN_HOOKS['csrf_compliant']['tralla'] = true;
@@ -46,6 +57,15 @@ function plugin_init_tralla(): void
     $PLUGIN_HOOKS['add_javascript']['tralla'] = [
         $versioned('public/js/tralla.js'),
     ];
+}
+
+/** Endpoints entre plugins usam apenas o token, sem sessão GLPI. */
+function plugin_tralla_boot(): void
+{
+    if (class_exists(SessionManager::class)) {
+        SessionManager::registerPluginStatelessPath('tralla', '#^/front/assignature\.php$#');
+        SessionManager::registerPluginStatelessPath('tralla', '#^/front/assignature_callback\.php$#');
+    }
 }
 
 /**

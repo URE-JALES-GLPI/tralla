@@ -28,6 +28,7 @@ header('Cache-Control: no-store');
 $listMode = strtolower(trim((string) ($_GET['list'] ?? '')));
 if ($listMode === 'withdrawal') {
     $limit = max(1, min(500, (int) ($_GET['limit'] ?? 200)));
+    $offset = max(0, (int) ($_GET['offset'] ?? 0));
     $cards = [];
 
     foreach ($DB->request([
@@ -36,8 +37,11 @@ if ($listMode === 'withdrawal') {
             'status'      => 'withdrawal',
             'stage'       => 1,
             'is_archived' => 0,
+            'is_deleted'  => 0,
+            'family_seq'  => 1,
         ],
         'ORDER' => 'date_approved ASC, id ASC',
+        'START' => $offset,
         'LIMIT' => $limit,
     ]) as $row) {
         $board = $DB->request([
@@ -53,6 +57,7 @@ if ($listMode === 'withdrawal') {
         $machines = PluginTrallaMachine::getMachinesForCard((int) $row['id']);
         $cards[] = [
             'id'              => (int) $row['id'],
+            'family_id'       => (int) ($row['family_cards_id'] ?: $row['id']),
             'code'            => tralla_display_code($row, 'maintenance'),
             'name'            => (string) $row['name'],
             'status'          => (string) $row['status'],
@@ -114,13 +119,27 @@ if (!is_array($board) || (string) $board['type'] !== 'maintenance') {
 
 $list = PluginTrallaList::getList((int) $card['plugin_tralla_lists_id']);
 $machines = PluginTrallaMachine::getMachinesForCard($cardId);
+$modelIds = array_values(array_unique(array_filter(array_map(
+    static fn(array $machine): int => (int) $machine['plugin_tralla_machine_models_id'],
+    $machines
+))));
+$modelNames = [];
+if ($modelIds !== []) {
+    foreach ($DB->request([
+        'SELECT' => ['id', 'name'],
+        'FROM' => 'glpi_plugin_tralla_machine_models',
+        'WHERE' => ['id' => $modelIds],
+    ]) as $model) {
+        $modelNames[(int) $model['id']] = (string) $model['name'];
+    }
+}
 
 $machinePayload = [];
 foreach ($machines as $machine) {
     $machinePayload[] = [
         'id'              => (int) $machine['id'],
         'model_id'        => (int) $machine['plugin_tralla_machine_models_id'],
-        'model_name'      => (string) $machine['model_name'],
+        'model_name'      => (string) ($modelNames[(int) $machine['plugin_tralla_machine_models_id']] ?? $machine['model_name']),
         'label'           => (string) $machine['label'],
         'serial'          => (string) $machine['serial'],
         'report'          => (string) $machine['report'],
@@ -137,6 +156,7 @@ tralla_json([
     'ok'   => true,
     'data' => [
         'id'              => (int) $card['id'],
+        'family_id'       => (int) ($card['family_cards_id'] ?: $card['id']),
         'code'            => tralla_display_code($card, 'maintenance'),
         'parent_id'       => (int) $card['parent_cards_id'],
         'stage'           => (int) $card['stage'],
