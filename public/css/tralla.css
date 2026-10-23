@@ -443,7 +443,7 @@ body[data-theme="dark"] .tralla-toast,
     color: var(--tr-warning);
 }
 
-.tralla-pill.progress {
+.tralla-pill.is-in-progress {
     background: var(--tr-primary-soft);
     color: var(--tr-primary);
 }
@@ -929,7 +929,7 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
     color: #172b4d;
 }
 
-.tralla-card-label-progress {
+.tralla-card-label-is-in-progress {
     background: #0079bf;
 }
 

@@ -384,7 +384,7 @@
 
     var statusClasses = {
         pending: 'pending',
-        in_progress: 'progress',
+        in_progress: 'is-in-progress',
         waiting_approval: 'approval',
         withdrawal: 'withdrawal',
         done: 'done',

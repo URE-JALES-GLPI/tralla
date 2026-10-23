@@ -101,7 +101,7 @@ class PluginTrallaMachine extends CommonDBTM
             'label'                           => tralla_normalize_label($data['label'] ?? ''),
             'serial'                          => tralla_normalize_label($data['serial'] ?? ''),
             'report'                          => '',
-            'status'                          => (string) ($data['status'] ?? 'pending'),
+            'status'                          => (string) ($data['status'] ?? ''),
             'service_done'                    => !empty($data['service_done']) ? 1 : 0,
             'needs_inventory'                 => !empty($data['needs_inventory']) ? 1 : 0,
             'inventory_items_id'              => (int) ($data['inventory_items_id'] ?? 0),

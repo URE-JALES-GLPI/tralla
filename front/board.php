@@ -78,7 +78,7 @@ $pluginUrl = $root . '/plugins/tralla';
                         <span><i class="ti ti-cards"></i> <?= (int) $stats['cards'] ?> cards</span>
                         <?php if ($isMaintenance): ?>
                             <span class="tralla-pill pending"><i class="ti ti-clock"></i> <?= (int) $stats['pending'] ?> pendentes</span>
-                            <span class="tralla-pill progress"><i class="ti ti-progress"></i> <?= (int) $stats['in_progress'] ?> em andamento</span>
+                            <span class="tralla-pill is-in-progress"><i class="ti ti-progress"></i> <?= (int) $stats['in_progress'] ?> em andamento</span>
                             <span class="tralla-pill withdrawal"><i class="ti ti-package"></i> <?= (int) $stats['withdrawal'] ?> retiradas</span>
                         <?php endif; ?>
                     </div>
