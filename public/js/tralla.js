@@ -1252,19 +1252,19 @@
     }
 
     function renderHistory(card) {
-        if (!history.length) {
-            return '<section class="tralla-detail-section"><h3><i class="ti ti-history"></i> HistÃ³rico</h3>'
-                + '<p class="tralla-empty-mini">Sem histÃ³rico registrado.</p></section>';
+        if (!Array.isArray(card.history) || !card.history.length) {
+        return '<section class="tralla-detail-section"><h3><i class="ti ti-history"></i> Histórico</h3>'
+            + '<p class="tralla-empty-mini">Sem histórico registrado.</p></section>';
         }
 
-        return '<section class="tralla-detail-section"><h3><i class="ti ti-history"></i> HistÃ³rico</h3>'
+        return '<section class="tralla-detail-section"><h3><i class="ti ti-history"></i> Histórico</h3>'
             + '<div class="tralla-history">'
-            + history.map(function (entry) {
+            + card.history.map(function (entry) {
                 return '<div class="tralla-history-item">'
                     + '<div class="tralla-history-dot"><span class="tralla-avatar">' + esc(initials(entry.user_name || 'Sistema')) + '</span></div>'
                     + '<div class="tralla-history-body">'
                     + '<strong>' + esc(entry.action_label || entry.action) + '</strong>'
-                    + '<small>' + esc(entry.user_name || 'Sistema') + ' Â· ' + esc(entry.date_formatted || formatDate(entry.date_creation)) + '</small>'
+                    + '<small>' + esc(entry.user_name || 'Sistema') + ' – ' + esc(entry.date_formatted || formatDate(entry.date_creation)) + '</small>'
                     + (entry.details ? '<p>' + esc(entry.details) + '</p>' : '')
                     + '</div></div>';
             }).join('')
