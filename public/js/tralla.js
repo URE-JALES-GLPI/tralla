@@ -1550,6 +1550,32 @@
         }
     }
 
+    var TRALLA_CHALLENGE_WORDS = ['MASSON','PAIVA','FERRARI','SAWATA','NETO','MASSON','PAIVA','FERRARI','SAWATA','NETO','MASSON','PAIVA','FERRARI','SAWATA','NETO','MASSON','PAIVA','FERRARI','SAWATA','NETO','ALFA','BRAVO','CHARLIE','DELTA','ECHO','FOXTROT','GOLF','HOTEL','INDIA','JULIET','KILO','LIMA','MIKE','NOVEMBER','OSCAR','PAPA','QUEBEC','ROMEO','SIERRA','TANGO','UNIFORM','VICTOR','WHISKEY','XRAY','YANKEE','ZULU','AMARELO','AZUL','VERDE','VERMELHO','PRETO','BRANCO','CINZA','ROSA','ROXO','LARANJA','MARROM','PRATA','DOURADO','BRONZE','COBRE','FERRO','ACO','MADEIRA','PEDRA','VIDRO','PLASTICO','BORRACHA','TECIDO','PAPEL','COURO','LINHO','SEDA','LA','ALGODAO','NYLON','POLIESTER','VINIL','ACRILICO','CERAMICA','PORCELANA','FAIANCA','LOICA','BARRO','ARGILA','AREIA','GRAVA','SEIXO','PEDREGULHO','CAL','CIMENTO','CONCRETO','ASFALTO','BETUME','TAR','PITCH','RESINA','GOMA','LATEX','SILICONE','TEFLON','KEVLAR','NOMEX','CORDURA','GORETEX','NEOPRENE','LICRA','SPANDEX','ELASTANO','VISCOSE','RAYON','BAMBU','JUTA','SISAL','HEMP','LINHO','RAMI','ABACA','MANILA','COCO','PALHA','PALMITO','BANANEIRA','JUNCO','VIME','BAMBOO','CANA','BAGACO','MELACO','ACUCAR','SAL','PIMENTA','CANELA','CRAVO','NOZ','MOSCA','CARDAMOMO','CURCUMA','CURRY','PAPRIKA','COLORAU','URUCUM','ANNATTO','ACAFRAO','AÇAFRAO','TURMERIC','GINGER','GENGIBRE','ALHO','CEBOLA','ALHO-PORRO','SALSINHA','COENTRO','MANJERICAO','OREGANO','TOMILHO','ALECRIM','LOURO','SAGE','SALVIA','MINT','HORTELA','MELISSA','CAMOMILA','ERVA','CIDE','CIDREIRA','CAPIM','LIMAO','LIMA','LARANJA','TANGERINA','MEXERICA','BERGAMOTA','POMELO','TORANJA','GRAPEFRUIT','CITRUS','ACEROLA','CEREJA','MORANGO','FRAMBOESA','AMORA','MIRTILO','BLUEBERRY','BLACKBERRY','RASPBERRY','GOJI','ACAI','CUPUACU','CACAU','CHOCOLATE','CACAO','THEOBROMA','GUARANA','MATE','CHIMARRAO','TERERE','CHA','TEA','CAFE','COFFEE','CACAU','CACAO','NIBS','POWDER','CACAU','CACAO','CACAU','CACAO','CACAU','CACAO','CACAU','CACAO','CACAU','CACAO','CACAU','CACAO','CACAU','CACAO','CACAU','CACAO','CACAU','CACAO','CACAU','CACAO'];
+
+    function pickChallengeWord() {
+        var idx = Math.floor(Math.random() * TRALLA_CHALLENGE_WORDS.length);
+        return TRALLA_CHALLENGE_WORDS[idx];
+    }
+
+    async function wordChallenge() {
+        var word = pickChallengeWord();
+        var answer = await promptDialog({
+            title: 'Verificação',
+            message: 'Digite corretamente a palavra exibida para confirmar: ' + word,
+            label: 'Palavra',
+            required: true,
+            requiredMessage: 'Digite a palavra exibida.',
+            placeholder: word,
+            icon: 'ti-shield-check',
+            tone: 'primary',
+            confirmLabel: 'Confirmar'
+        });
+        if (answer === null) {
+            return false;
+        }
+        return String(answer).trim().toUpperCase() === word.toUpperCase();
+    }
+
     async function handleCardAction(action, button) {
         if (!activeCard) {
             return;
@@ -1664,6 +1690,11 @@
             }
 
             if (action === 'finalize') {
+                var finalizeChallenge = await wordChallenge();
+                if (!finalizeChallenge) {
+                    toast('Verificação incorreta. Ação cancelada.', 'error');
+                    return;
+                }
                 var finalizeConfirmed = await confirmDialog({
                     title: 'Finalizar manutenção',
                     message: 'Finalizar a manutenção e enviar para aprovação?',
@@ -1709,6 +1740,11 @@
             var data;
 
             if (action === 'take') {
+                var takeChallenge = await wordChallenge();
+                if (!takeChallenge) {
+                    toast('Verificação incorreta. Ação cancelada.', 'error');
+                    return;
+                }
                 data = await api('take_card', { id: cardId });
                 applyState(data);
                 toast('Card atribuído a você.', 'success');
