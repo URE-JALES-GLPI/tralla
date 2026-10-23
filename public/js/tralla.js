@@ -337,7 +337,7 @@
     var modalRoot = document.getElementById('tralla-modal-root');
     var toastRoot = document.getElementById('tralla-toast-root');
     var isMaintenance = !!state.board.is_maintenance;
-    var can = state.rights || {};
+    var can = state.can || state.rights || {};
     var labels = state.labels || {};
     var activeCard = null;
     var dragCardId = null;
@@ -549,7 +549,7 @@
                 + '<i class="ti ti-layout-kanban"></i>'
                 + '<h2>Este quadro ainda não tem listas</h2>'
                 + '<p>Crie a primeira lista para começar a organizar os cards.</p>'
-                + (can.create
+                + (can.manage_lists
                     ? '<button type="button" class="tralla-btn tralla-btn-primary" data-add-list>'
                         + '<i class="ti ti-plus"></i> Criar lista</button>'
                     : '')
@@ -557,7 +557,7 @@
             return;
         }
 
-        var addListColumn = can.create
+        var addListColumn = can.manage_lists
             ? '<button type="button" class="tralla-add-list-column" data-add-list>'
                 + '<i class="ti ti-plus" aria-hidden="true"></i>'
                 + '<span>Adicionar outra lista</span>'
@@ -579,21 +579,21 @@
         var color = safeColor(list.color, palette[list.category] || palette['']);
         var actions = '';
 
-        if (can.update) {
+        if (can.manage_lists) {
             actions += '<button type="button" class="tralla-icon-btn" data-edit-list="' + listId + '" title="Editar lista">'
                 + '<i class="ti ti-pencil"></i></button>';
         }
-        if (can['delete'] && !list.category) {
+        if (can.manage_lists && !list.category) {
             actions += '<button type="button" class="tralla-icon-btn" data-delete-list="' + listId + '" title="Excluir lista">'
                 + '<i class="ti ti-trash"></i></button>';
         }
 
-        var composerOpen = !isMaintenance && can.create && Number(inlineComposerListId) === listId;
+        var composerOpen = !isMaintenance && can.create_card && Number(inlineComposerListId) === listId;
         var addCardBlocked = !!addCardBlockedCategories[list.category];
         var addCardAttrs = addCardBlocked
             ? ' disabled aria-disabled="true" title="Novos cards de manutenção são criados em Manutenção Pendente."'
             : '';
-        var addCard = can.create && !composerOpen
+        var addCard = can.create_card && !composerOpen
             ? '<button type="button" class="tralla-add-card" data-add-card="' + listId + '"' + addCardAttrs + '>'
                 + '<i class="ti ti-plus"></i> Adicionar card</button>'
             : '';
@@ -619,7 +619,7 @@
 
     function renderCard(card) {
         var cardId = Number(card.id);
-        var canDrag = !isMaintenance && !!can.update;
+        var canDrag = !isMaintenance && !!can.move_card;
         var machineCount = Number(card.machine_count || 0);
         var progress = card.progress || { total: machineCount, filled: 0, percent: 0 };
         var showProgress = isMaintenance && (machineCount > 0 || Number(progress.total) > 0);
@@ -658,6 +658,11 @@
         }
         badges += machineBadge + lock;
 
+        var takeButton = card.permissions && card.permissions.take
+            ? '<button type="button" class="tralla-card-take" data-card-take="' + cardId + '" title="Pegar para mim">'
+                + '<i class="ti ti-hand-stop" aria-hidden="true"></i> Pegar</button>'
+            : '';
+
         return '<article class="tralla-card' + (card.is_locked ? ' is-locked' : '')
             + '" data-card-id="' + cardId + '"'
             + (canDrag ? ' draggable="true"' : '')
@@ -666,10 +671,11 @@
             + label
             + '<h4 class="tralla-card-title"><span class="tralla-card-code">'
             + esc(card.code || ('#' + cardId)) + '</span> ' + esc(card.name) + '</h4>'
-            + ((badges || tech)
+            + ((badges || tech || takeButton)
                 ? '<div class="tralla-card-footer">'
                     + '<div class="tralla-card-badges">' + badges + '</div>'
                     + tech
+                    + takeButton
                     + '</div>'
                 : '')
             + '</article>';
@@ -1096,6 +1102,18 @@
         }
     }
 
+    async function handleTake(cardId, button) {
+        try {
+            setBusy(button, true);
+            var data = await api('take_card', { id: cardId });
+            applyState(data);
+            toast('Card atribuído a você.', 'success');
+        } catch (error) {
+            toast(error.message, 'error');
+            setBusy(button, false);
+        }
+    }
+
     async function handleCardAction(action, button) {
         if (!activeCard) {
             return;
@@ -1335,7 +1353,7 @@
                 + (String(model.id) === String(selected) ? ' selected' : '') + '>'
                 + esc(model.name) + '</option>';
         });
-        if (can.create) {
+        if (can.create_card) {
             options += '<option value="__new">+ Cadastrar novo modelo...</option>';
         }
         return options;
@@ -1579,7 +1597,7 @@
     }
 
     function openInlineCardComposer(listId) {
-        if (isMaintenance || !can.create) {
+        if (isMaintenance || !can.create_card) {
             return;
         }
         inlineComposerListId = Number(listId);
@@ -2012,6 +2030,14 @@
             return;
         }
 
+        var takeButton = event.target.closest('[data-card-take]');
+        if (takeButton) {
+            event.preventDefault();
+            event.stopPropagation();
+            handleTake(Number(takeButton.dataset.cardTake), takeButton);
+            return;
+        }
+
         var cardElement = event.target.closest('.tralla-card');
         if (cardElement) {
             openCard(Number(cardElement.dataset.cardId));
@@ -2071,7 +2097,7 @@
 
     listsEl.addEventListener('dragstart', function (event) {
         var cardElement = event.target.closest('.tralla-card');
-        if (!cardElement || isMaintenance || !can.update) {
+        if (!cardElement || isMaintenance || !can.move_card) {
             event.preventDefault();
             return;
         }

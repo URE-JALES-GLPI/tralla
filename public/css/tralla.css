@@ -953,6 +953,58 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
     margin-left: auto;
 }
 
+.tralla-card-take {
+    align-items: center;
+    background: var(--tr-surface-2);
+    border: 1px solid var(--tr-border);
+    border-radius: var(--tr-radius-sm);
+    color: var(--tr-muted);
+    cursor: pointer;
+    display: inline-flex;
+    flex: 0 0 auto;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    gap: 4px;
+    line-height: 1;
+    margin-left: auto;
+    min-height: 24px;
+    padding: 4px 8px;
+    transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+    white-space: nowrap;
+}
+
+.tralla-card-take .ti {
+    font-size: 13px;
+}
+
+.tralla-card-take:hover {
+    background: var(--tr-surface);
+    border-color: var(--tr-border-strong);
+    color: var(--tr-text);
+}
+
+.tralla-card-avatar + .tralla-card-take {
+    margin-left: 0;
+}
+
+.tralla-card-take:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--tr-primary) 35%, transparent);
+    outline-offset: 2px;
+}
+
+.tralla-card-take[disabled],
+.tralla-card-take:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+    transform: none;
+}
+
+.tralla-card-take.is-busy {
+    cursor: progress;
+    opacity: 0.7;
+}
+
 .tralla-avatar {
     align-items: center;
     background: #0079bf;

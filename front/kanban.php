@@ -134,6 +134,14 @@ Html::header($board->fields['name'] . ' — [URE] Tralla', $_SERVER['PHP_SELF'],
             </div>
         </div>
         <div class="tralla-head-actions">
+            <button type="button" class="tralla-btn tralla-kanban-action" data-board-history>
+                <i class="ti ti-history" aria-hidden="true"></i> Histórico
+            </button>
+            <?php if ($canViewDeleted): ?>
+                <button type="button" class="tralla-btn tralla-kanban-action" data-board-deleted>
+                    <i class="ti ti-trash" aria-hidden="true"></i> Excluídos
+                </button>
+            <?php endif; ?>
             <?php if ($canManageLists): ?>
                 <button type="button" class="tralla-btn tralla-kanban-action" data-tralla-add-list>
                     <i class="ti ti-plus" aria-hidden="true"></i> Lista
