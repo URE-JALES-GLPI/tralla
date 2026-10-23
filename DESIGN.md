@@ -116,6 +116,46 @@ Board geometry:
 - **Rules**: source is not shown in creation; machine model + integer quantity are required; no description/label/serial fields. The entity list opens only after a click or typing, never on modal focus.
 - **Accessibility**: dialog role, focus trap, Escape closes, errors announced by toast.
 
+### Board settings tabs
+- **Structure**: `front/board.form.php` uses `nav.tralla-tabs` with **Geral** and **Membros**. **Geral** keeps the current name, theme, color, description, archive, and delete controls. **Membros** lists user name/login, role, inclusion date, and actions.
+- **Variants**: Admin sees the member list read-only, with role badges instead of selects and no add/remove controls. SuperAdmin sees the add form, inline role select, **Salvar**, and **Remover**.
+- **States**: default, active tab (`is-active` + `aria-current="page"`), focused tab, last-SuperAdmin controls disabled.
+- **Rules**: only SuperAdmin manages members. The last SuperAdmin cannot be removed or demoted; the server rejects it and the UI explains “O último SuperAdmin do quadro não pode ser rebaixado ou removido.”. Each member action uses its own form; never nest the member forms inside the **Geral** form.
+- **Accessibility**: tabs are links with visible focus; add/update/remove controls have accessible labels and confirmation on removal; role changes are announced through the redirect message.
+
+### Deleted modal
+- **Structure**: wide modal (`showModal(..., true)`) titled **Cards excluídos** with the board name. Table columns: código, nome, motivo, solicitado em, excluído em, solicitante, aprovador, lista anterior, and **Restaurar**.
+- **Variants**: populated table and empty state “Nenhum card excluído neste quadro.”.
+- **States**: default, hover row, busy restore button, confirmation dialog, refreshed list after restore, error toast.
+- **Rules**: restore asks for confirmation before the API call; a successful restore removes the row and refreshes the board. Use the existing danger/surface tokens; no new colors.
+- **Accessibility**: modal has a close button, table scrolls horizontally on narrow screens, and **Restaurar** is a named button per row.
+
+### History modal
+- **Structure**: wide modal titled **Histórico do quadro** with filters for card ID, initial date, and final date; **Filtrar** and **Limpar**; table columns data/hora, card, ação, usuário, detalhes; footer pagination.
+- **Variants**: populated table and empty state “Nenhum evento encontrado.”.
+- **States**: default, filtered, cleared, previous/next disabled at bounds, busy while loading.
+- **Rules**: card filter accepts `123`, `#123`, `123/1`, and `123/2`; dates are inclusive; 50 events per page. Deleted cards and deletion events remain visible.
+- **Accessibility**: labels are associated with each filter, the page position is announced in text (“Página X de Y”), and pagination buttons expose disabled state.
+
+### Deletion prompt
+- **Structure**: `promptDialog` with a multiline textarea, required validation, `maxlength=2000`, danger tone, and **Solicitar exclusão**.
+- **Variants**: normal board copy “O card será movido para Excluídos. Informe o motivo.”; maintenance board copy “A exclusão será enviada para aprovação. Informe o motivo.”.
+- **States**: empty (confirm keeps the dialog open and shows “Informe o motivo da exclusão.”), typing, valid, submitting, cancelled.
+- **Rules**: the reason is trimmed, stripped of tags, and limited to 2000 characters on the server. Empty reasons are rejected even if the client is bypassed.
+- **Accessibility**: textarea has a visible label, receives focus, and the validation error is announced in the dialog.
+
+### Deletion approval banner
+- **Structure**: `.tralla-approval-banner.is-deletion` with a trash icon, **Exclusão aguardando aprovação**, optional parent card code/name, the reason in `.tralla-deletion-reason`, **Ver origem**, and destructive action labels.
+- **Variants**: normal maintenance approval banner keeps the purple approval tone; deletion uses the danger-soft variant.
+- **Rules**: the `/2` card shows **Aprovar exclusão** and **Recusar exclusão**; approving moves the `/1` to **Excluídos**, rejecting restores it. Do not introduce new colors.
+
+### Minimized Take
+- **Structure**: compact `.tralla-card-take` button in the card footer with `data-card-take`, a hand icon, and **Pegar**.
+- **Variants**: visible only when `card.permissions.take` is true; absent otherwise.
+- **States**: default, hover, focus-visible, busy, disabled.
+- **Rules**: the click uses `stopPropagation` and does not open the card modal. The action calls `take_card`, applies the new state, and shows “Card atribuído a você.”. The button disappears when the card leaves `maintenance_pending`.
+- **Accessibility**: the button has a `title`, remains reachable by keyboard, and its keydown must not trigger the card-open handler.
+
 ### Modal
 - **Dismissal**: clicking the backdrop closes the modal only when the pointer press starts on the backdrop. Dragging a text selection from inside the dialog to the backdrop must not close it.
 - **Implementation**: `showModal()` binds this rule automatically. Any custom modal must use the same `bindBackdropDismiss()` helper on its backdrop.
@@ -124,6 +164,21 @@ Board geometry:
 - **Variants**: primary, ghost, danger, icon.
 - **States**: default, hover, active translateY(1px), focus-visible 3px accent ring, disabled opacity 55%, busy cursor-progress.
 - **Motion**: 120ms background/box-shadow; no width/height animation.
+
+### v3 interaction hooks
+These hooks are the contract between server-rendered markup and `public/js/tralla.js`.
+
+| Hook | Element | Behavior |
+|---|---|---|
+| `data-board-history` | Header button | Opens the board history modal. |
+| `data-board-deleted` | Header button | Opens the deleted-cards modal; rendered only for Admin/SuperAdmin. |
+| `data-card-take` | Card footer button | Takes the card without opening its modal. |
+| `data-restore-card` | Deleted table row button | Confirms and restores the selected card. |
+| `data-history-page` | History pagination button | Moves to `prev`, `next`, or a numeric page. |
+| `data-history-clear` | History filter button | Clears card/date filters and resets page 1. |
+| `#tralla-history-form` | History filter form | Submits `card_id`, `date_from`, and `date_to` filters. |
+
+History filters use `name="card_id"`, `name="date_from"`, and `name="date_to"`; keep those names aligned with the AJAX payload.
 
 ## 6. Motion & Interaction
 

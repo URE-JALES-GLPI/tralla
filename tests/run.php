@@ -54,15 +54,18 @@ check('restore previous status', tralla_restore_status(['deletion_previous_statu
 check('member sees board', tralla_role_can_view(true, false, true, true));
 check('purge without entity cannot see', !tralla_role_can_view(false, true, false, true));
 check('no member no purge cannot see', !tralla_role_can_view(false, false, true, true));
+check('member cannot manage board', !tralla_can_manage_members('member', true));
 check('admin cannot manage members', !tralla_can_manage_members('admin', true));
 check('superadmin manages members', tralla_can_manage_members('superadmin', true));
 check('superadmin can govern', tralla_can_manage_members('superadmin', true));
 check('admin cannot govern', !tralla_can_manage_members('admin', true));
 check('view requires entity', !tralla_role_can_view(true, false, false, true));
 check('view requires read', !tralla_role_can_view(true, false, true, false));
-check('admin can restore', tralla_can_restore('admin', true));
+check('admin can restore with update', tralla_can_restore('admin', true));
+check('admin cannot restore without update', !tralla_can_restore('admin', false));
 check('member cannot restore', !tralla_can_restore('member', true));
 check('superadmin can restore', tralla_can_restore('superadmin', true));
+check('superadmin cannot be removed by pure rule', tralla_role_rank('superadmin') === 3);
 
 check('restore lock dropped on status fallback',
     tralla_restore_is_locked(['deletion_previous_status' => '', 'deletion_previous_is_locked' => 1]) === 0);
