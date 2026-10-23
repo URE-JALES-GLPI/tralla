@@ -135,7 +135,7 @@ Html::header('Configurações — [URE] Tralla', $_SERVER['PHP_SELF'], 'tools', 
 <div class="tralla-page tralla-config-page">
     <header class="tralla-page-head">
         <div class="tralla-brand">
-            <img class="tralla-brand-logo" src="<?= tralla_h($pluginUrl) ?>/logo.png?v=<?= (int) @filemtime(GLPI_ROOT . '/plugins/tralla/logo.png') ?>" alt="">
+            <img class="tralla-brand-logo" src="<?= tralla_h($pluginUrl) ?>/logo.png?v=<?= (int) @filemtime(GLPI_ROOT . '/plugins/tralla/public/logo.png') ?>" alt="">
             <div>
                 <h1>Configurações</h1>
                 <p>Integração com o assignat-ure, aprovações e notificações.</p>

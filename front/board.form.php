@@ -164,7 +164,7 @@ Html::header('Editar quadro — [URE] Tralla', $_SERVER['PHP_SELF'], 'tools', 'P
 <div class="tralla-page tralla-form-page">
     <header class="tralla-page-head">
         <div class="tralla-brand">
-            <img class="tralla-brand-logo" src="<?= tralla_h($pluginUrl) ?>/logo.png?v=<?= (int) @filemtime(GLPI_ROOT . '/plugins/tralla/logo.png') ?>" alt="">
+            <img class="tralla-brand-logo" src="<?= tralla_h($pluginUrl) ?>/logo.png?v=<?= (int) @filemtime(GLPI_ROOT . '/plugins/tralla/public/logo.png') ?>" alt="">
             <div>
                 <h1>Editar quadro</h1>
                 <p><?= tralla_h($board->fields['name']) ?></p>
