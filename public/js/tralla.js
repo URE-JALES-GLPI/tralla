@@ -1133,7 +1133,7 @@
     }
 
     function detailHeader(card) {
-        var sub = statusPill(card);
+        var sub = '';
         if (card.source_label && card.source !== 'manual') {
             sub += '<span>' + esc(card.source_label) + '</span>';
         }
@@ -1145,7 +1145,7 @@
         return '<div class="tralla-modal-head">'
             + '<div>'
             + '<div class="tralla-detail-code">' + esc(card.code || ('#' + card.id))
-            + ' · ' + esc(card.list_name || '') + '</div>'
+            + ' · ' + esc(card.list_name || '') + ' ' + statusPill(card) + '</div>'
             + '<h2 class="tralla-detail-title">' + esc(card.name) + '</h2>'
             + (sub ? '<div class="tralla-detail-sub">' + sub + '</div>' : '')
             + '</div>'
