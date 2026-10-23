@@ -1637,7 +1637,7 @@
             inputEl.addEventListener('compositionend', uppercaseInput);
             inputEl.addEventListener('keydown', function (e) {
                 if (e.key === 'Enter') { e.preventDefault(); submit(); }
-                if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+                if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
             });
             window.setTimeout(function () { if (inputEl) inputEl.focus(); }, 30);
         });
@@ -1729,6 +1729,9 @@
                 if (rejectReason === null) {
                     return;
                 }
+                if (!await wordChallenge()) {
+                    return;
+                }
                 setBusy(button, true);
                 var rejected = await api('reject_card', { id: cardId, reason: rejectReason });
                 applyState(rejected);
@@ -1805,6 +1808,9 @@
                 }
                 var approveConfirmed = await confirmDialog(approveConfig);
                 if (!approveConfirmed) {
+                    return;
+                }
+                if (!await wordChallenge()) {
                     return;
                 }
             }
@@ -2060,6 +2066,10 @@
         var submit = form.querySelector('button[type="submit"]');
         setBusy(submit, true);
         try {
+            if (!await wordChallenge()) {
+                setBusy(submit, false);
+                return;
+            }
             var data = await api('edit_request', {
                 id: activeCard.id,
                 name: name,
