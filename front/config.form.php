@@ -151,12 +151,12 @@ Html::header('Configurações — [URE] Tralla', $_SERVER['PHP_SELF'], 'tools', 
         <section class="tralla-card tralla-config-card">
             <header>
                 <h2><i class="ti ti-link"></i> assignat-ure</h2>
-                <p>Endpoint usado pelo aplicativo externo para consultar cards de manutenção.</p>
+                <p>Vincule o Tralla ao Assignat-ure para coletar a assinatura e concluir a retirada automaticamente.</p>
             </header>
             <div class="tralla-field">
                 <label for="tralla-assignature-url">URL do assignat-ure</label>
                 <input id="tralla-assignature-url" type="url" name="assignature_url" maxlength="255"
-                       placeholder="https://assignat.exemplo.com/api/tralla"
+                       placeholder="https://SEU-GLPI/plugins/assignature/front/request.php"
                        value="<?= tralla_h($config['assignature_url']) ?>">
                 <small>O Tralla envia <code>?card={id}</code> para esta URL.</small>
             </div>
