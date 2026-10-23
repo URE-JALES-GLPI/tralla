@@ -41,6 +41,25 @@ try {
             }
             tralla_json(['ok' => true, 'data' => tralla_ajax_state($boards_id)]);
 
+        case 'board_poll':
+            $boards_id = tralla_post_int('boards_id');
+            if (!PluginTrallaBoard::canViewBoard($boards_id)) {
+                throw new RuntimeException('Quadro sem acesso.');
+            }
+            $activity = PluginTrallaHistory::getActivityForBoard(
+                $boards_id,
+                tralla_post_int('after_id', 0),
+                20
+            );
+            tralla_json([
+                'ok'   => true,
+                'data' => [
+                    'state'    => tralla_ajax_state($boards_id),
+                    'activity' => $activity['rows'],
+                    'cursor'   => $activity['last_id'],
+                ],
+            ]);
+
         case 'list_add':
             tralla_ajax_require(CREATE);
             $boards_id = tralla_post_int('boards_id');

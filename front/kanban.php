@@ -61,6 +61,7 @@ $bootstrap = [
     }, $lists),
     'cards' => $cards,
     'deleted_cards' => $deletedCards,
+    'activity_cursor' => PluginTrallaHistory::getLatestIdForBoard($boards_id),
     'entities' => tralla_all_entity_options(),
     'models' => array_map(static function (array $model): array {
         return [
@@ -132,6 +133,15 @@ Html::header($board->fields['name'] . ' — [URE] Tralla', $_SERVER['PHP_SELF'],
                     <p><?= tralla_h($board->fields['comment']) ?></p>
                 <?php endif; ?>
             </div>
+        </div>
+        <div class="tralla-kanban-search" role="search">
+            <i class="ti ti-search" aria-hidden="true"></i>
+            <label class="tralla-visually-hidden" for="tralla-board-search">Pesquisar cards</label>
+            <input id="tralla-board-search" type="search" placeholder="Pesquisar entidade, técnico ou ID..." autocomplete="off" spellcheck="false">
+            <span class="tralla-search-count" data-search-count hidden></span>
+            <button type="button" class="tralla-icon-btn tralla-search-clear" data-search-clear hidden aria-label="Limpar pesquisa" title="Limpar pesquisa">
+                <i class="ti ti-x" aria-hidden="true"></i>
+            </button>
         </div>
         <div class="tralla-head-actions">
             <button type="button" class="tralla-btn tralla-kanban-action" data-board-history>

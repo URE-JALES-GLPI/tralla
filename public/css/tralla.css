@@ -623,6 +623,87 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
     width: 32px;
 }
 
+.tralla-kanban-search {
+    align-items: center;
+    align-self: center;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 8px;
+    display: flex;
+    flex: 1 1 260px;
+    gap: 6px;
+    height: 34px;
+    max-width: 420px;
+    min-width: 190px;
+    padding: 0 7px;
+    transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.tralla-kanban-search:focus-within {
+    background: rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.42);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12);
+}
+
+.tralla-kanban-search > .ti-search {
+    color: rgba(255, 255, 255, 0.72);
+    flex: 0 0 auto;
+    font-size: 15px;
+}
+
+.tralla-kanban-search input[type="search"] {
+    background: transparent;
+    border: 0;
+    color: #fff;
+    flex: 1 1 auto;
+    font-family: var(--tr-font);
+    font-size: 13px;
+    height: 30px;
+    min-width: 0;
+    outline: 0;
+    padding: 0;
+}
+
+.tralla-kanban-search input[type="search"]::placeholder {
+    color: rgba(255, 255, 255, 0.65);
+}
+
+.tralla-kanban-search input[type="search"]::-webkit-search-cancel-button {
+    display: none;
+}
+
+.tralla-search-count {
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+    color: rgba(255, 255, 255, 0.86);
+    flex: 0 0 auto;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    padding: 4px 7px;
+    white-space: nowrap;
+}
+
+.tralla-search-clear {
+    background: transparent;
+    color: rgba(255, 255, 255, 0.8);
+    flex: 0 0 auto;
+    height: 24px;
+    margin: 0;
+    padding: 0;
+    width: 24px;
+}
+
+.tralla-search-clear:hover {
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
+}
+
+.tralla-search-count[hidden],
+.tralla-search-clear[hidden] {
+    display: none;
+}
+
 .tralla-board-scroll {
     align-items: flex-start;
     display: flex;
@@ -863,11 +944,52 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
     background: #eb5a46;
 }
 
-.tralla-card-code {
-    color: var(--tr-muted);
+.tralla-card-top {
+    align-items: center;
+    display: flex;
+    gap: 6px;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    min-height: 20px;
+    padding-right: 34px;
+}
+
+.tralla-card-id-chip {
+    align-items: center;
+    background: var(--tr-primary-soft);
+    border: 1px solid rgba(0, 121, 191, 0.24);
+    border-radius: 5px;
+    color: var(--tr-primary-strong);
+    display: inline-flex;
+    flex: 0 0 auto;
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    line-height: 1.2;
+    padding: 3px 6px;
+    white-space: nowrap;
+}
+
+.tralla-card-top .tralla-card-label {
+    align-self: center;
+    flex: 0 1 auto;
+    margin-bottom: 0;
+    min-width: 0;
+}
+
+html[data-theme="dark"] .tralla-card-id-chip,
+body[data-theme="dark"] .tralla-card-id-chip,
+.tralla-page[data-theme="dark"] .tralla-card-id-chip {
+    border-color: rgba(107, 184, 234, 0.32);
+}
+
+.tralla-card-top-spacer {
+    flex: 1 1 auto;
+}
+
+.tralla-card-title {
+    margin: 0;
 }
 
 .tralla-card-source {
@@ -2741,13 +2863,16 @@ body.tralla-dialog-open {
 /* --------------------------------------------------------------- toast */
 
 #tralla-toast-root {
+    align-items: center;
     bottom: 22px;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    left: 22px;
+    left: 50%;
     pointer-events: none;
     position: fixed;
+    transform: translateX(-50%);
+    width: min(420px, calc(100vw - 32px));
     z-index: 1200;
 }
 
@@ -2762,7 +2887,7 @@ body.tralla-dialog-open {
     font-family: var(--tr-font);
     font-size: 13px;
     gap: 8px;
-    max-width: 360px;
+    max-width: 100%;
     padding: 10px 13px;
     pointer-events: auto;
 }
@@ -2774,6 +2899,12 @@ body.tralla-dialog-open {
 
 .tralla-toast.is-success {
     background: #006644;
+    color: #fff;
+}
+
+.tralla-toast.is-activity {
+    background: #0b5c8a;
+    border-left: 3px solid rgba(255, 255, 255, 0.6);
     color: #fff;
 }
 
@@ -3023,12 +3154,25 @@ body.tralla-modal-open {
         width: 100%;
     }
 
+    .tralla-kanban-search {
+        align-self: stretch;
+        flex-basis: auto;
+        max-width: none;
+        min-width: 0;
+        width: 100%;
+    }
+
     .tralla-board-heading {
         max-width: 100%;
     }
 
     .tralla-head-actions {
         flex-wrap: wrap;
+    }
+
+    #tralla-toast-root {
+        bottom: 14px;
+        width: calc(100vw - 24px);
     }
 
     .tralla-kanban-title h1 {

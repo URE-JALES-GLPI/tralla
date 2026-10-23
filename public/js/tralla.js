@@ -336,6 +336,9 @@
     var listsEl = document.getElementById('tralla-lists');
     var modalRoot = document.getElementById('tralla-modal-root');
     var toastRoot = document.getElementById('tralla-toast-root');
+    var searchInput = document.getElementById('tralla-board-search');
+    var searchClear = document.querySelector('[data-search-clear]');
+    var searchCount = document.querySelector('[data-search-count]');
     var isMaintenance = !!state.board.is_maintenance;
     var can = state.can || state.rights || {};
     var labels = state.labels || {};
@@ -348,6 +351,16 @@
     var historyFilters = { card_id: '', date_from: '', date_to: '' };
     var historyPage = 1;
     var historyPages = 1;
+    var searchQuery = '';
+    var lastStateJson = JSON.stringify({
+        lists: state.lists || [],
+        cards: state.cards || []
+    });
+    var lastActivityId = Number(state.activity_cursor || 0);
+    var pollInterval = 8000;
+    var pollTimer = null;
+    var pollInFlight = false;
+    var pendingPoll = false;
 
     var palette = {
         '': '#97a0af',
@@ -432,13 +445,20 @@
         }) || null;
     }
 
-    function toast(message, type) {
+    function toast(message, type, duration) {
         if (!toastRoot) {
             return;
         }
         var element = document.createElement('div');
-        element.className = 'tralla-toast' + (type === 'error' ? ' is-error' : (type === 'success' ? ' is-success' : ''));
-        var icon = type === 'error' ? 'ti-alert-triangle' : (type === 'success' ? 'ti-circle-check' : 'ti-info-circle');
+        var toastType = type === 'error'
+            ? ' is-error'
+            : (type === 'success' ? ' is-success' : (type === 'activity' ? ' is-activity' : ''));
+        element.className = 'tralla-toast' + toastType;
+        var icon = type === 'error'
+            ? 'ti-alert-triangle'
+            : (type === 'success'
+                ? 'ti-circle-check'
+                : (type === 'activity' ? 'ti-activity' : 'ti-info-circle'));
         element.innerHTML = '<i class="ti ' + icon + '"></i><span>' + esc(message) + '</span>';
         toastRoot.appendChild(element);
         window.setTimeout(function () {
@@ -447,7 +467,7 @@
             window.setTimeout(function () {
                 element.remove();
             }, 220);
-        }, 3800);
+        }, duration || 3800);
     }
 
     async function api(action, payload) {
@@ -502,14 +522,116 @@
         }
         state.lists = next.lists;
         state.cards = next.cards;
+        lastStateJson = JSON.stringify({
+            lists: state.lists,
+            cards: state.cards
+        });
         renderBoard();
     }
 
     async function refreshState() {
         var data = await api('state', { boards_id: state.board.id });
-        state.lists = data.lists || [];
-        state.cards = data.cards || [];
-        renderBoard();
+        applyState(data);
+    }
+
+    function boardIsBusy() {
+        if (document.hidden) {
+            return true;
+        }
+        if (modalRoot && modalRoot.innerHTML) {
+            return true;
+        }
+        if (document.querySelector('.tralla-dialog-layer')) {
+            return true;
+        }
+        if (dragCardId !== null || inlineComposerListId !== null) {
+            return true;
+        }
+        if (Object.keys(saveTimers).length > 0) {
+            return true;
+        }
+
+        return false;
+    }
+
+    function schedulePoll(delay) {
+        if (pollTimer) {
+            window.clearTimeout(pollTimer);
+        }
+        pollTimer = window.setTimeout(pollBoard, delay || pollInterval);
+    }
+
+    function activityText(event) {
+        var who = String(event.user_name || 'Sistema');
+        var action = String(event.action_label || event.action || 'Alteração');
+        var code = String(event.card_code || ('#' + event.card_id));
+        var detail = String(event.details || '').trim();
+        if (detail.length > 90) {
+            detail = detail.slice(0, 87) + '...';
+        }
+
+        return who + ': ' + action + ' · ' + code + (detail ? ' — ' + detail : '');
+    }
+
+    async function pollBoard() {
+        if (pollInFlight) {
+            pendingPoll = true;
+            return;
+        }
+        if (document.hidden) {
+            schedulePoll(pollInterval);
+            return;
+        }
+        if (boardIsBusy()) {
+            pendingPoll = true;
+            schedulePoll(pollInterval);
+            return;
+        }
+
+        pollInFlight = true;
+        try {
+            var data = await api('board_poll', {
+                boards_id: state.board.id,
+                after_id: lastActivityId
+            });
+
+            if (data && data.state) {
+                var nextJson = JSON.stringify({
+                    lists: data.state.lists || [],
+                    cards: data.state.cards || []
+                });
+                if (nextJson !== lastStateJson) {
+                    applyState(data.state);
+                }
+            }
+
+            if (data && data.cursor !== undefined) {
+                lastActivityId = Number(data.cursor) || lastActivityId;
+            }
+
+            var ownId = Number(state.user && state.user.id || 0);
+            var events = data && Array.isArray(data.activity) ? data.activity : [];
+            var otherEvents = events.filter(function (event) {
+                return Number(event.users_id) !== ownId;
+            });
+
+            otherEvents.slice(0, 3).forEach(function (event) {
+                toast(activityText(event), 'activity', 5200);
+            });
+            if (otherEvents.length > 3) {
+                toast('Mais ' + (otherEvents.length - 3) + ' alterações no quadro.', 'activity', 5200);
+            }
+        } catch (error) {
+            /* silencioso: o quadro tenta novamente no próximo ciclo */
+        } finally {
+            pollInFlight = false;
+            if (pendingPoll) {
+                pendingPoll = false;
+                schedulePoll(1200);
+            } else {
+                schedulePoll(pollInterval);
+            }
+        }
     }
 
     function statusPill(card) {
@@ -539,13 +661,96 @@
             + '</span>';
     }
 
+    function cardMatchesSearch(card, query) {
+        var terms = normalizeSearchText(query).split(/\s+/).filter(function (term) {
+            return term !== '';
+        });
+        if (!terms.length) {
+            return true;
+        }
+
+        var cardId = String(card.id || '');
+        var code = String(card.code || ('#' + cardId));
+        var haystack = normalizeSearchText([
+            card.name,
+            card.technician_name,
+            code,
+            cardId,
+            '#' + cardId,
+            cardId + '/1',
+            cardId + '/2'
+        ].join(' '));
+
+        return terms.every(function (term) {
+            return haystack.indexOf(term) !== -1;
+        });
+    }
+
+    function updateSearchUi() {
+        if (!searchInput) {
+            return;
+        }
+
+        var hasQuery = searchQuery !== '';
+        if (searchClear) {
+            searchClear.hidden = !hasQuery;
+        }
+        if (!searchCount) {
+            return;
+        }
+        if (!hasQuery) {
+            searchCount.hidden = true;
+            searchCount.textContent = '';
+            return;
+        }
+
+        var total = (Array.isArray(state.cards) ? state.cards : []).filter(function (card) {
+            return cardMatchesSearch(card, searchQuery);
+        }).length;
+        searchCount.hidden = false;
+        searchCount.textContent = total + (total === 1 ? ' card' : ' cards');
+    }
+
+    function bindSearch() {
+        if (!searchInput) {
+            return;
+        }
+
+        searchInput.addEventListener('input', function () {
+            searchQuery = searchInput.value.trim();
+            renderBoard();
+        });
+
+        searchInput.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                searchInput.value = '';
+                searchQuery = '';
+                renderBoard();
+            }
+        });
+
+        if (searchClear) {
+            searchClear.addEventListener('click', function () {
+                searchInput.value = '';
+                searchQuery = '';
+                renderBoard();
+                searchInput.focus();
+            });
+        }
+    }
+
     function renderBoard() {
         if (!listsEl) {
             return;
         }
 
+        updateSearchUi();
         var scrollLeft = listsEl.scrollLeft;
         var lists = Array.isArray(state.lists) ? state.lists : [];
+        var visibleCards = (Array.isArray(state.cards) ? state.cards : []).filter(function (card) {
+            return cardMatchesSearch(card, searchQuery);
+        });
 
         if (!lists.length) {
             listsEl.innerHTML = '<div class="tralla-empty">'
@@ -567,13 +772,15 @@
                 + '</button>'
             : '';
 
-        listsEl.innerHTML = lists.map(renderList).join('') + addListColumn;
+        listsEl.innerHTML = lists.map(function (list) {
+            return renderList(list, visibleCards);
+        }).join('') + addListColumn;
         listsEl.scrollLeft = scrollLeft;
     }
 
-    function renderList(list) {
+    function renderList(list, cards) {
         var listId = Number(list.id);
-        var listCards = state.cards.filter(function (card) {
+        var listCards = (Array.isArray(cards) ? cards : state.cards).filter(function (card) {
             return Number(card.plugin_tralla_lists_id) === listId;
         }).sort(function (left, right) {
             return Number(left.rank) - Number(right.rank) || Number(left.id) - Number(right.id);
@@ -622,7 +829,7 @@
 
     function renderCard(card) {
         var cardId = Number(card.id);
-        var canDrag = !isMaintenance && !!can.move_card;
+        var canDrag = !isMaintenance && !!can.move_card && searchQuery === '';
         var machineCount = Number(card.machine_count || 0);
         var progress = card.progress || { total: machineCount, filled: 0, percent: 0 };
         var showProgress = isMaintenance && (machineCount > 0 || Number(progress.total) > 0);
@@ -666,14 +873,20 @@
                 + '<i class="ti ti-hand-stop" aria-hidden="true"></i> Pegar</button>'
             : '';
 
+        var cardCode = String(card.code || ('#' + cardId));
+        var cardTop = '<div class="tralla-card-top">'
+            + '<span class="tralla-card-id-chip" title="ID do card: ' + attr(cardCode) + '">'
+            + esc(cardCode) + '</span>'
+            + (label || '<span class="tralla-card-top-spacer" aria-hidden="true"></span>')
+            + '</div>';
+
         return '<article class="tralla-card' + (card.is_locked ? ' is-locked' : '')
             + '" data-card-id="' + cardId + '"'
             + (canDrag ? ' draggable="true"' : '')
             + ' tabindex="0" role="button" aria-label="Abrir card ' + attr(card.name) + '">'
             + '<span class="tralla-card-edit" aria-hidden="true"><i class="ti ti-pencil"></i></span>'
-            + label
-            + '<h4 class="tralla-card-title"><span class="tralla-card-code">'
-            + esc(card.code || ('#' + cardId)) + '</span> ' + esc(card.name) + '</h4>'
+            + cardTop
+            + '<h4 class="tralla-card-title">' + esc(card.name) + '</h4>'
             + ((badges || tech || takeButton)
                 ? '<div class="tralla-card-footer">'
                     + '<div class="tralla-card-badges">' + badges + '</div>'
@@ -2609,5 +2822,13 @@
         }
     });
 
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) {
+            schedulePoll(600);
+        }
+    });
+
+    bindSearch();
+    schedulePoll(pollInterval);
     renderBoard();
 })();

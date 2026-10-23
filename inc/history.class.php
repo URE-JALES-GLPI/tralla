@@ -216,6 +216,149 @@ class PluginTrallaHistory extends CommonDBTM
         ];
     }
 
+    /**
+     * Maior ID de histórico do quadro, usado como cursor inicial do polling.
+     */
+    public static function getLatestIdForBoard(int $boardId): int
+    {
+        global $DB;
+
+        if ($boardId <= 0 || !$DB->tableExists('glpi_plugin_tralla_history')) {
+            return 0;
+        }
+
+        $row = $DB->request([
+            'SELECT' => ['h.id AS max_id'],
+            'FROM'   => 'glpi_plugin_tralla_history AS h',
+            'INNER JOIN' => [
+                'glpi_plugin_tralla_cards AS c' => [
+                    'ON' => [
+                        'h' => 'plugin_tralla_cards_id',
+                        'c' => 'id',
+                    ],
+                ],
+            ],
+            'WHERE'  => ['c.plugin_tralla_boards_id' => $boardId],
+            'ORDER'  => 'h.id DESC',
+            'LIMIT'  => 1,
+        ])->current();
+
+        return (int) ($row['max_id'] ?? 0);
+    }
+
+    /**
+     * Eventos novos do quadro para o log de notificações em tempo quase real.
+     *
+     * @return array{rows: array<int, array<string, mixed>>, last_id: int}
+     */
+    public static function getActivityForBoard(int $boardId, int $afterId = 0, int $limit = 20): array
+    {
+        global $DB;
+
+        if ($boardId <= 0 || !PluginTrallaBoard::canViewBoard($boardId)) {
+            throw new RuntimeException('Você não tem acesso a este quadro.');
+        }
+
+        $afterId = max(0, $afterId);
+        if (!$DB->tableExists('glpi_plugin_tralla_history')) {
+            return ['rows' => [], 'last_id' => $afterId];
+        }
+
+        $limit = max(1, min(50, $limit));
+        $boardRow = $DB->request([
+            'SELECT' => ['type'],
+            'FROM'   => 'glpi_plugin_tralla_boards',
+            'WHERE'  => ['id' => $boardId],
+            'LIMIT'  => 1,
+        ])->current();
+        $boardType = is_array($boardRow) ? (string) ($boardRow['type'] ?? '') : '';
+
+        $rows = [];
+        $lastId = max(0, $afterId);
+        $iterator = $DB->request([
+            'SELECT' => [
+                'h.id AS history_id',
+                'h.plugin_tralla_cards_id AS card_id',
+                'c.name AS card_name',
+                'c.stage AS stage',
+                'c.parent_cards_id AS parent_cards_id',
+                'h.action AS action',
+                'h.details AS details',
+                'h.date_creation AS date_creation',
+                'h.users_id AS users_id',
+                'u.name AS user_login',
+                'u.realname AS user_realname',
+                'u.firstname AS user_firstname',
+                'u.is_deleted AS user_deleted',
+            ],
+            'FROM'  => 'glpi_plugin_tralla_history AS h',
+            'INNER JOIN' => [
+                'glpi_plugin_tralla_cards AS c' => [
+                    'ON' => [
+                        'h' => 'plugin_tralla_cards_id',
+                        'c' => 'id',
+                    ],
+                ],
+            ],
+            'LEFT JOIN' => [
+                'glpi_users AS u' => [
+                    'ON' => [
+                        'u' => 'id',
+                        'h' => 'users_id',
+                    ],
+                ],
+            ],
+            'WHERE' => [
+                'c.plugin_tralla_boards_id' => $boardId,
+                'h.id'                      => ['>', $afterId],
+            ],
+            'ORDER' => 'h.id ASC',
+            'LIMIT' => $limit,
+        ]);
+
+        foreach ($iterator as $row) {
+            $lastId = max($lastId, (int) $row['history_id']);
+
+            $userName = '';
+            if ((int) ($row['users_id'] ?? 0) > 0 && (int) ($row['user_deleted'] ?? 0) !== 1) {
+                $userName = trim(
+                    (string) ($row['user_realname'] ?? '') . ' ' . (string) ($row['user_firstname'] ?? '')
+                );
+                if ($userName === '') {
+                    $userName = (string) ($row['user_login'] ?? '');
+                }
+            }
+            if ($userName === '') {
+                $userName = (int) ($row['users_id'] ?? 0) > 0 ? 'Usuário removido' : 'Sistema';
+            }
+
+            $cardRow = [
+                'id'              => (int) $row['card_id'],
+                'stage'           => (int) $row['stage'],
+                'parent_cards_id' => (int) $row['parent_cards_id'],
+            ];
+
+            $rows[] = [
+                'id'             => (int) $row['history_id'],
+                'card_id'        => (int) $row['card_id'],
+                'card_code'      => tralla_display_code($cardRow, $boardType),
+                'card_name'      => (string) $row['card_name'],
+                'action'         => (string) $row['action'],
+                'action_label'   => self::getActionLabel((string) $row['action']),
+                'details'        => (string) $row['details'],
+                'date_creation'  => (string) $row['date_creation'],
+                'date_formatted' => tralla_date($row['date_creation']),
+                'user_name'      => $userName,
+                'users_id'       => (int) $row['users_id'],
+            ];
+        }
+
+        return [
+            'rows'    => $rows,
+            'last_id' => $lastId,
+        ];
+    }
+
     public static function getActionLabel(string $action): string
     {
         $labels = [
