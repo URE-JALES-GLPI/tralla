@@ -3732,3 +3732,16 @@ body.tralla-modal-open {
 .tralla-modal-body .tralla-detail-section {
     margin-bottom: 16px;
 }
+.tralla-challenge-word {
+    background: var(--tr-primary-soft);
+    border: 2px dashed var(--tr-primary);
+    border-radius: var(--tr-radius);
+    color: var(--tr-primary);
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: 4px;
+    margin: 12px 0;
+    padding: 16px;
+    text-align: center;
+    text-transform: uppercase;
+}

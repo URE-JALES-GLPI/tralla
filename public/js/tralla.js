@@ -1567,24 +1567,68 @@
         return TRALLA_CHALLENGE_WORDS[idx];
     }
 
-    async function wordChallenge() {
+    function wordChallenge() {
         var word = pickChallengeWord();
-        var answer = await promptDialog({
-            title: 'Verificação',
-            message: 'Digite corretamente a palavra exibida para confirmar: ' + word,
-            label: 'Palavra',
-            required: true,
-            requiredMessage: 'Digite a palavra exibida.',
-            placeholder: word,
-            icon: 'ti-shield-check',
-            tone: 'primary',
-            confirmLabel: 'Confirmar'
+        return new Promise(function (resolve) {
+            if (activePluginDialog) {
+                activePluginDialog.cancel();
+            }
+            var uid = 'tralla-challenge-' + Date.now();
+            var layer = document.createElement('div');
+            layer.className = 'tralla-dialog-layer';
+            layer.innerHTML = '<div class="tralla-dialog-backdrop" data-dialog-backdrop></div>'
+                + '<div class="tralla-modal tralla-dialog tralla-dialog-primary" role="alertdialog" aria-modal="true">'
+                + '<div class="tralla-dialog-head">'
+                + '<span class="tralla-dialog-icon" aria-hidden="true"><i class="ti ti-shield-check"></i></span>'
+                + '<div class="tralla-dialog-copy">'
+                + '<h2 class="tralla-dialog-title" id="' + uid + '-title">Verificacao</h2>'
+                + '<p class="tralla-dialog-message">Digite a palavra exibida abaixo para confirmar:</p>'
+                + '</div></div>'
+                + '<div class="tralla-challenge-word">' + word + '</div>'
+                + '<div class="tralla-dialog-field"><label for="' + uid + '-input">Palavra</label>'
+                + '<input id="' + uid + '-input" type="text" autocomplete="off" placeholder="Digite aqui"></div>'
+                + '<p class="tralla-dialog-error" hidden></p>'
+                + '<div class="tralla-dialog-actions">'
+                + '<button type="button" class="tralla-btn tralla-btn-ghost" data-dialog-cancel>Cancelar</button>'
+                + '<button type="button" class="tralla-btn tralla-btn-primary" data-dialog-confirm>Confirmar</button>'
+                + '</div></div>';
+            document.body.appendChild(layer);
+            document.body.classList.add('tralla-dialog-open');
+            var inputEl = layer.querySelector('input');
+            var errorEl = layer.querySelector('.tralla-dialog-error');
+            var finished = false;
+            function finish(ok) {
+                if (finished) return;
+                finished = true;
+                document.body.classList.remove('tralla-dialog-open');
+                layer.remove();
+                resolve(ok);
+            }
+            function submit() {
+                var value = inputEl ? inputEl.value.trim() : '';
+                if (!value) {
+                    if (errorEl) { errorEl.hidden = false; errorEl.textContent = 'Digite a palavra exibida.'; }
+                    if (inputEl) inputEl.focus();
+                    return;
+                }
+                if (value.toUpperCase() !== word.toUpperCase()) {
+                    if (errorEl) { errorEl.hidden = false; errorEl.textContent = 'Palavra incorreta. Tente novamente.'; }
+                    if (inputEl) { inputEl.value = ''; inputEl.focus(); }
+                    return;
+                }
+                finish(true);
+            }
+            layer.querySelector('[data-dialog-confirm]').addEventListener('click', submit);
+            layer.querySelector('[data-dialog-backdrop]').addEventListener('click', function () { finish(false); });
+            layer.querySelector('[data-dialog-cancel]').addEventListener('click', function () { finish(false); });
+            inputEl.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') { e.preventDefault(); submit(); }
+                if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+            });
+            window.setTimeout(function () { if (inputEl) inputEl.focus(); }, 30);
         });
-        if (answer === null) {
-            return false;
-        }
-        return String(answer).trim().toUpperCase() === word.toUpperCase();
     }
+
 
     async function handleCardAction(action, button) {
         if (!activeCard) {
