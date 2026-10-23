@@ -189,26 +189,47 @@ try {
             );
             tralla_json(['ok' => true, 'data' => ['card' => $detail, 'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id'])]]);
 
-        case 'card_delete':
-            if (!Session::haveRight('plugin_tralla', DELETE) && !Session::haveRight('plugin_tralla', PURGE)) {
-                throw new RuntimeException('Sem permissão para esta ação.');
-            }
+        case 'card_request_deletion':
             $cardId = tralla_post_int('id');
-            $card = PluginTrallaCard::getCard($cardId);
-            if ($card === null) {
-                throw new RuntimeException('Card não encontrado.');
+            $result = PluginTrallaCard::requestDeletion(
+                $cardId,
+                tralla_post_string('reason'),
+                $userId,
+                $isAdmin
+            );
+            tralla_json(['ok' => true, 'data' => [
+                'state' => tralla_ajax_state((int) ($result['card']['plugin_tralla_boards_id'] ?? 0)),
+                'card' => $result['card'],
+                'approval' => $result['approval'],
+            ]]);
+
+        case 'deleted_cards':
+            $boards_id = tralla_post_int('boards_id');
+            if (!PluginTrallaBoard::canAdminBoard($boards_id)) {
+                throw new RuntimeException('Você não tem acesso aos cards excluídos deste quadro.');
             }
-            $boardType = PluginTrallaCard::getBoardType((int) $card['plugin_tralla_boards_id']);
-            $permissions = PluginTrallaCard::permissionsFor($card, $boardType, $userId, $isAdmin);
-            if (empty($permissions['delete'])) {
-                throw new RuntimeException('Sem permissão para excluir este card.');
+            tralla_json(['ok' => true, 'data' => ['cards' => PluginTrallaCard::getDeletedForBoard($boards_id)]]);
+
+        case 'restore_card':
+            $cardId = tralla_post_int('id');
+            $card = PluginTrallaCard::restoreDeleted($cardId, $userId, $isAdmin);
+            tralla_json(['ok' => true, 'data' => [
+                'state' => tralla_ajax_state((int) ($card['plugin_tralla_boards_id'] ?? 0)),
+                'card' => $card,
+            ]]);
+
+        case 'board_history':
+            $boards_id = tralla_post_int('boards_id');
+            if (!PluginTrallaBoard::canViewBoard($boards_id) || PluginTrallaBoard::roleFor($boards_id) === '') {
+                throw new RuntimeException('Quadro sem acesso.');
             }
-            if ((int) $card['stage'] === 2) {
-                throw new RuntimeException('Cards de aprovação são arquivados automaticamente.');
-            }
-            $boards_id = (int) $card['plugin_tralla_boards_id'];
-            PluginTrallaCard::deleteCard($cardId);
-            tralla_json(['ok' => true, 'data' => ['state' => tralla_ajax_state($boards_id)]]);
+            $filters = [
+                'card_id'   => tralla_post_string('card_id'),
+                'date_from' => tralla_post_string('date_from'),
+                'date_to'   => tralla_post_string('date_to'),
+                'page'      => tralla_post_int('page', 1),
+            ];
+            tralla_json(['ok' => true, 'data' => PluginTrallaHistory::getForBoard($boards_id, $filters)]);
 
         case 'take_card':
             tralla_ajax_require(UPDATE);

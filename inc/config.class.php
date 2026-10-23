@@ -105,11 +105,6 @@ class PluginTrallaConfig
         return trim(self::get('assignature_token'));
     }
 
-    public static function approvalGroupId(): int
-    {
-        return max(0, self::getInt('approval_group', 0));
-    }
-
     public static function notificationsEnabled(): bool
     {
         return self::getBool('notification_enabled', true);

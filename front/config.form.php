@@ -27,7 +27,6 @@ if (isset($_POST['save'])) {
     }
 
     PluginTrallaConfig::set('assignature_url', $url);
-    PluginTrallaConfig::set('approval_group', (string) max(0, tralla_post_int('approval_group')));
     PluginTrallaConfig::set('notification_enabled', !empty($_POST['notification_enabled']) ? '1' : '0');
     PluginTrallaConfig::set('notification_emails', implode(', ', array_unique($emails)));
     PluginTrallaConfig::set('pending_hours', (string) max(1, tralla_post_int('pending_hours', 1)));
@@ -175,22 +174,6 @@ Html::header('Configurações — [URE] Tralla', $_SERVER['PHP_SELF'], 'tools', 
                     </button>
                 </div>
                 <small>Copie este token para a configuração do assignat-ure. Ele não é exibido em nenhuma outra tela.</small>
-            </div>
-        </section>
-
-        <section class="tralla-card tralla-config-card">
-            <header>
-                <h2><i class="ti ti-checkup-list"></i> Aprovações</h2>
-                <p>Quem pode aprovar ou reprovar cards no estágio <strong>/2</strong>.</p>
-            </header>
-            <div class="tralla-field">
-                <label for="tralla-approval-group">Grupo aprovador <span class="tralla-muted">(opcional)</span></label>
-                <?php Group::dropdown([
-                    'name'   => 'approval_group',
-                    'value'  => (int) $config['approval_group'],
-                    'entity' => (int) ($_SESSION['glpiactive_entity'] ?? 0),
-                ]); ?>
-                <small>Além do direito <code>plugin_tralla_approve</code>, o usuário precisa pertencer a este grupo quando definido.</small>
             </div>
         </section>
 
