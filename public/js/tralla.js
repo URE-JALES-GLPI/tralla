@@ -345,6 +345,9 @@
     var shouldRefreshBoard = false;
     var saveTimers = {};
     var inlineComposerListId = null;
+    var historyFilters = { card_id: '', date_from: '', date_to: '' };
+    var historyPage = 1;
+    var historyPages = 1;
 
     var palette = {
         '': '#97a0af',
@@ -831,10 +834,11 @@
         }
 
         if (permissions.approve) {
+            var isDeletionApproval = card.approval_kind === 'deletion';
             buttons += '<button type="button" class="tralla-btn tralla-btn-primary" data-card-action="approve">'
-                + '<i class="ti ti-shield-check"></i> Aprovar</button>';
+                + '<i class="ti ti-shield-check"></i> ' + (isDeletionApproval ? 'Aprovar exclusão' : 'Aprovar') + '</button>';
             buttons += '<button type="button" class="tralla-btn tralla-btn-danger" data-card-action="reject">'
-                + '<i class="ti ti-shield-x"></i> Reprovar</button>';
+                + '<i class="ti ti-shield-x"></i> ' + (isDeletionApproval ? 'Recusar exclusão' : 'Reprovar') + '</button>';
         }
 
         if (permissions.withdraw) {
@@ -842,7 +846,7 @@
                 + '<i class="ti ti-package-export"></i> Confirmar retirada</button>';
         }
 
-        if (permissions['delete']) {
+        if (permissions.request_deletion) {
             buttons += '<button type="button" class="tralla-btn tralla-btn-danger" data-card-action="delete">'
                 + '<i class="ti ti-trash"></i> Excluir card</button>';
         }
@@ -988,17 +992,37 @@
         if (Number(card.stage) !== 2) {
             return '';
         }
-        var parent = card.parent
-            ? 'Card de origem: ' + card.parent.code + ' — ' + card.parent.name
-            : 'Aguardando a decisão de um aprovador.';
+
+        var isDeletion = card.approval_kind === 'deletion';
         var openParent = card.parent
             ? '<button type="button" class="tralla-btn tralla-btn-ghost" data-open-card="' + Number(card.parent.id) + '">'
                 + '<i class="ti ti-arrow-up-right"></i> Ver origem</button>'
             : '';
 
+        if (isDeletion) {
+            var reason = card.deletion_reason
+                || (card.parent && card.parent.deletion_reason)
+                || 'Motivo não informado.';
+            var parent = card.parent
+                ? '<small>Card de origem: ' + esc(card.parent.code) + ' — ' + esc(card.parent.name) + '</small>'
+                : '';
+
+            return '<div class="tralla-approval-banner is-deletion">'
+                + '<i class="ti ti-trash"></i>'
+                + '<div style="flex:1"><strong>Exclusão aguardando aprovação</strong>'
+                + parent
+                + '<small class="tralla-deletion-reason">Motivo: ' + esc(reason) + '</small></div>'
+                + openParent
+                + '</div>';
+        }
+
+        var parentText = card.parent
+            ? 'Card de origem: ' + card.parent.code + ' — ' + card.parent.name
+            : 'Aguardando a decisão de um aprovador.';
+
         return '<div class="tralla-approval-banner">'
             + '<i class="ti ti-shield-check"></i>'
-            + '<div style="flex:1"><strong>Aguardando aprovação</strong><small>' + esc(parent) + '</small></div>'
+            + '<div style="flex:1"><strong>Aguardando aprovação</strong><small>' + esc(parentText) + '</small></div>'
             + openParent
             + '</div>';
     }
@@ -1120,45 +1144,70 @@
         }
 
         var cardId = activeCard.id;
+        var isDeletionApproval = activeCard.approval_kind === 'deletion';
 
         try {
             if (action === 'delete') {
-                var deleteConfirmed = await confirmDialog({
+                var reason = await promptDialog({
                     title: 'Excluir card',
-                    message: 'Excluir este card definitivamente? Esta ação não pode ser desfeita.',
+                    message: isMaintenance
+                        ? 'A exclusão será enviada para aprovação. Informe o motivo.'
+                        : 'O card será movido para Excluídos. Informe o motivo.',
+                    label: 'Motivo da exclusão',
+                    multiline: true,
+                    required: true,
+                    requiredMessage: 'Informe o motivo da exclusão.',
+                    maxlength: 2000,
+                    placeholder: 'Descreva o motivo...',
                     icon: 'ti-trash',
                     tone: 'danger',
-                    confirmLabel: 'Excluir card'
-                });
-                if (!deleteConfirmed) {
-                    return;
-                }
-                setBusy(button, true);
-                var deleted = await api('card_delete', { id: cardId });
-                applyState(deleted);
-                closeModal();
-                toast('Card excluído.', 'success');
-                return;
-            }
-
-            if (action === 'reject') {
-                var reason = await promptDialog({
-                    title: 'Reprovar manutenção',
-                    message: 'O card voltará para Em Andamento com este registro no histórico.',
-                    label: 'Motivo (opcional)',
-                    multiline: true,
-                    placeholder: 'Descreva o motivo da reprovação...',
-                    icon: 'ti-shield-x',
-                    tone: 'danger',
-                    confirmLabel: 'Reprovar'
+                    confirmLabel: 'Solicitar exclusão'
                 });
                 if (reason === null) {
                     return;
                 }
                 setBusy(button, true);
-                var rejected = await api('reject_card', { id: cardId, reason: reason });
+                var deleted = await api('card_request_deletion', { id: cardId, reason: reason });
+                applyState(deleted);
+                closeModal();
+                toast(isMaintenance ? 'Exclusão enviada para aprovação.' : 'Card movido para Excluídos.', 'success');
+                return;
+            }
+
+            if (action === 'reject') {
+                var rejectConfig = isDeletionApproval
+                    ? {
+                        title: 'Recusar exclusão',
+                        message: 'O card será restaurado ao quadro.',
+                        label: 'Motivo (opcional)',
+                        confirmLabel: 'Recusar exclusão'
+                    }
+                    : {
+                        title: 'Reprovar manutenção',
+                        message: 'O card voltará para Em Andamento com este registro no histórico.',
+                        label: 'Motivo (opcional)',
+                        confirmLabel: 'Reprovar'
+                    };
+                var rejectReason = await promptDialog(Object.assign({
+                    multiline: true,
+                    placeholder: isDeletionApproval
+                        ? 'Descreva o motivo da recusa...'
+                        : 'Descreva o motivo da reprovação...',
+                    icon: 'ti-shield-x',
+                    tone: 'danger'
+                }, rejectConfig));
+                if (rejectReason === null) {
+                    return;
+                }
+                setBusy(button, true);
+                var rejected = await api('reject_card', { id: cardId, reason: rejectReason });
                 applyState(rejected);
-                toast('Manutenção reprovada. O card voltou para Em Andamento.', 'success');
+                toast(
+                    isDeletionApproval
+                        ? 'Exclusão recusada. Card restaurado.'
+                        : 'Manutenção reprovada. O card voltou para Em Andamento.',
+                    'success'
+                );
                 await openCard(rejected.card.id);
                 return;
             }
@@ -1188,12 +1237,19 @@
             }
 
             if (action === 'approve') {
-                var approveConfirmed = await confirmDialog({
-                    title: 'Aprovar manutenção',
-                    message: 'Aprovar esta manutenção e liberar a retirada?',
-                    icon: 'ti-shield-check',
-                    confirmLabel: 'Aprovar'
-                });
+                var approveConfirmed = await confirmDialog(isDeletionApproval
+                    ? {
+                        title: 'Aprovar exclusão',
+                        message: 'Aprovar a exclusão deste card? Ele será movido para Excluídos.',
+                        icon: 'ti-shield-check',
+                        confirmLabel: 'Aprovar exclusão'
+                    }
+                    : {
+                        title: 'Aprovar manutenção',
+                        message: 'Aprovar esta manutenção e liberar a retirada?',
+                        icon: 'ti-shield-check',
+                        confirmLabel: 'Aprovar'
+                    });
                 if (!approveConfirmed) {
                     return;
                 }
@@ -1215,8 +1271,13 @@
             } else if (action === 'approve') {
                 data = await api('approve_card', { id: cardId });
                 applyState(data);
-                toast('Manutenção aprovada. Card liberado para retirada.', 'success');
-                await openCard(data.card.id);
+                if (isDeletionApproval) {
+                    toast('Exclusão aprovada. Card movido para Excluídos.', 'success');
+                    closeModal();
+                } else {
+                    toast('Manutenção aprovada. Card liberado para retirada.', 'success');
+                    await openCard(data.card.id);
+                }
             } else if (action === 'withdraw') {
                 data = await api('confirm_withdrawal', { id: cardId });
                 applyState(data);
@@ -1226,6 +1287,143 @@
         } catch (error) {
             toast(error.message, 'error');
             setBusy(button, false);
+        }
+    }
+
+    function renderDeletedCardsModal(data) {
+        var cards = Array.isArray(data.cards) ? data.cards : [];
+        var body;
+
+        if (!cards.length) {
+            body = '<p class="tralla-empty-mini tralla-table-empty">Nenhum card excluído neste quadro.</p>';
+        } else {
+            body = '<div class="tralla-table-scroll">'
+                + '<table class="tralla-data-table tralla-deleted-table">'
+                + '<thead><tr>'
+                + '<th>Código</th><th>Nome</th><th>Motivo</th>'
+                + '<th>Solicitado em</th><th>Excluído em</th>'
+                + '<th>Solicitante</th><th>Aprovador</th><th>Lista anterior</th><th></th>'
+                + '</tr></thead><tbody>'
+                + cards.map(function (card) {
+                    var cardId = Number(card.id);
+                    return '<tr>'
+                        + '<td><span class="tralla-cell-title">' + esc(card.code || ('#' + cardId)) + '</span></td>'
+                        + '<td>' + esc(card.name || '—') + '</td>'
+                        + '<td><span class="tralla-cell-details">' + esc(card.deletion_reason || '—') + '</span></td>'
+                        + '<td>' + esc(card.requested_at_formatted || '—') + '</td>'
+                        + '<td>' + esc(card.deleted_at_formatted || '—') + '</td>'
+                        + '<td>' + esc(card.requester_name || '—') + '</td>'
+                        + '<td>' + esc(card.decider_name || '—') + '</td>'
+                        + '<td>' + esc(card.previous_list_name || '—') + '</td>'
+                        + '<td class="tralla-table-actions">'
+                        + '<button type="button" class="tralla-btn tralla-btn-ghost" data-restore-card="' + cardId + '">'
+                        + '<i class="ti ti-arrow-back-up"></i> Restaurar</button></td>'
+                        + '</tr>';
+                }).join('')
+                + '</tbody></table></div>';
+        }
+
+        return '<div class="tralla-modal-head"><div>'
+            + '<h2><i class="ti ti-trash"></i> Cards excluídos</h2>'
+            + '<p>' + esc(state.board.name) + '</p>'
+            + '</div>' + modalCloseButton() + '</div>'
+            + '<div class="tralla-modal-body">' + body + '</div>';
+    }
+
+    async function openDeletedModal() {
+        try {
+            var data = await api('deleted_cards', { boards_id: state.board.id });
+            showModal(renderDeletedCardsModal(data), true);
+        } catch (error) {
+            toast(error.message, 'error');
+        }
+    }
+
+    async function restoreDeletedCard(cardId, button) {
+        setBusy(button, true);
+        try {
+            var data = await api('restore_card', { id: cardId });
+            applyState(data);
+            toast('Card restaurado.', 'success');
+            await openDeletedModal();
+        } catch (error) {
+            toast(error.message, 'error');
+            setBusy(button, false);
+        }
+    }
+
+    function renderHistoryModal(data) {
+        var rows = Array.isArray(data.rows) ? data.rows : [];
+        var page = Math.max(1, Number(data.page) || 1);
+        var pages = Math.max(1, Number(data.pages) || 0);
+        var table;
+
+        if (!rows.length) {
+            table = '<p class="tralla-empty-mini tralla-table-empty">Nenhum evento encontrado.</p>';
+        } else {
+            table = '<div class="tralla-table-scroll">'
+                + '<table class="tralla-data-table tralla-history-table">'
+                + '<thead><tr>'
+                + '<th>Data/hora</th><th>Card</th><th>Ação</th><th>Usuário</th><th>Detalhes</th>'
+                + '</tr></thead><tbody>'
+                + rows.map(function (row) {
+                    return '<tr>'
+                        + '<td>' + esc(row.date_formatted || '—') + '</td>'
+                        + '<td><span class="tralla-cell-title">' + esc(row.card_code || ('#' + row.card_id)) + '</span>'
+                        + (row.card_name ? '<span class="tralla-cell-sub">' + esc(row.card_name) + '</span>' : '')
+                        + '</td>'
+                        + '<td>' + esc(row.action_label || row.action || '—') + '</td>'
+                        + '<td>' + esc(row.user_name || '—') + '</td>'
+                        + '<td><span class="tralla-cell-details">' + esc(row.details || '—') + '</span></td>'
+                        + '</tr>';
+                }).join('')
+                + '</tbody></table></div>';
+        }
+
+        var filters = '<form id="tralla-history-form" class="tralla-history-filters" novalidate>'
+            + '<div class="tralla-field"><label for="tralla-history-card">Card</label>'
+            + '<input id="tralla-history-card" type="text" name="card_id" value="' + attr(historyFilters.card_id) + '"'
+            + ' placeholder="ID, #ID ou ID/etapa"></div>'
+            + '<div class="tralla-field"><label for="tralla-history-date-from">Data inicial</label>'
+            + '<input id="tralla-history-date-from" type="date" name="date_from" value="' + attr(historyFilters.date_from) + '"></div>'
+            + '<div class="tralla-field"><label for="tralla-history-date-to">Data final</label>'
+            + '<input id="tralla-history-date-to" type="date" name="date_to" value="' + attr(historyFilters.date_to) + '"></div>'
+            + '<div class="tralla-history-filter-actions">'
+            + '<button type="submit" class="tralla-btn tralla-btn-primary"><i class="ti ti-filter"></i> Filtrar</button>'
+            + '<button type="button" class="tralla-btn tralla-btn-ghost" data-history-clear>Limpar</button>'
+            + '</div></form>';
+
+        var pagination = '<div class="tralla-history-pagination">'
+            + '<span class="tralla-history-page-label">Página ' + page + ' de ' + pages + '</span>'
+            + '<div class="tralla-history-pagination-actions">'
+            + '<button type="button" class="tralla-btn tralla-btn-ghost" data-history-page="prev"'
+            + (page <= 1 ? ' disabled' : '') + '>'
+            + '<i class="ti ti-chevron-left"></i> Anterior</button>'
+            + '<button type="button" class="tralla-btn tralla-btn-ghost" data-history-page="next"'
+            + (page >= pages ? ' disabled' : '') + '>'
+            + 'Próxima <i class="ti ti-chevron-right"></i></button>'
+            + '</div></div>';
+
+        return '<div class="tralla-modal-head"><div>'
+            + '<h2><i class="ti ti-history"></i> Histórico do quadro</h2>'
+            + '<p>' + esc(state.board.name) + '</p>'
+            + '</div>' + modalCloseButton() + '</div>'
+            + '<div class="tralla-modal-body">' + filters + table + pagination + '</div>';
+    }
+
+    async function openHistoryModal() {
+        try {
+            var data = await api('board_history', {
+                boards_id: state.board.id,
+                card_id: historyFilters.card_id,
+                date_from: historyFilters.date_from,
+                date_to: historyFilters.date_to,
+                page: historyPage
+            });
+            historyPages = Math.max(1, Number(data.pages) || 0);
+            showModal(renderHistoryModal(data), true);
+        } catch (error) {
+            toast(error.message, 'error');
         }
     }
 
@@ -1987,6 +2185,20 @@
     /* ------------------------------------------------------------ events */
 
     root.addEventListener('click', function (event) {
+        var historyButton = event.target.closest('[data-board-history]');
+        if (historyButton) {
+            event.preventDefault();
+            openHistoryModal();
+            return;
+        }
+
+        var deletedButton = event.target.closest('[data-board-deleted]');
+        if (deletedButton) {
+            event.preventDefault();
+            openDeletedModal();
+            return;
+        }
+
         var addList = event.target.closest('[data-add-list], [data-tralla-add-list]');
         if (addList) {
             event.preventDefault();
@@ -2046,6 +2258,9 @@
 
     root.addEventListener('keydown', function (event) {
         if (event.key !== 'Enter' && event.key !== ' ') {
+            return;
+        }
+        if (event.target.closest('[data-card-take]')) {
             return;
         }
         var cardElement = event.target.closest('.tralla-card');
@@ -2202,6 +2417,38 @@
             return;
         }
 
+        var restoreButton = event.target.closest('[data-restore-card]');
+        if (restoreButton) {
+            restoreDeletedCard(Number(restoreButton.dataset.restoreCard), restoreButton);
+            return;
+        }
+
+        var historyPageButton = event.target.closest('[data-history-page]');
+        if (historyPageButton) {
+            var pageValue = historyPageButton.dataset.historyPage;
+            var targetPage;
+            if (pageValue === 'prev') {
+                targetPage = Math.max(1, historyPage - 1);
+            } else if (pageValue === 'next') {
+                targetPage = Math.min(historyPages, historyPage + 1);
+            } else {
+                targetPage = Number(pageValue);
+            }
+            if (!targetPage || targetPage < 1 || targetPage > historyPages || targetPage === historyPage) {
+                return;
+            }
+            historyPage = targetPage;
+            openHistoryModal();
+            return;
+        }
+
+        if (event.target.closest('[data-history-clear]')) {
+            historyFilters = { card_id: '', date_from: '', date_to: '' };
+            historyPage = 1;
+            openHistoryModal();
+            return;
+        }
+
         if (event.target.closest('[data-add-create-machine]')) {
             addCreateMachineRow();
             return;
@@ -2233,6 +2480,21 @@
                 })
                 : null;
             submitList(form, existing);
+            return;
+        }
+
+        if (form.id === 'tralla-history-form') {
+            event.preventDefault();
+            var cardInput = form.querySelector('[name="card_id"]');
+            var dateFromInput = form.querySelector('[name="date_from"]');
+            var dateToInput = form.querySelector('[name="date_to"]');
+            historyFilters = {
+                card_id: cardInput ? cardInput.value.trim() : '',
+                date_from: dateFromInput ? dateFromInput.value : '',
+                date_to: dateToInput ? dateToInput.value : ''
+            };
+            historyPage = 1;
+            openHistoryModal();
         }
     });
 

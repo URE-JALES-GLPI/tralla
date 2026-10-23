@@ -1364,6 +1364,7 @@ body[data-theme="dark"] .tralla-add-card:disabled:hover,
 .tralla-modal input[type="number"],
 .tralla-modal input[type="color"],
 .tralla-modal input[type="password"],
+.tralla-modal input[type="date"],
 .tralla-modal select,
 .tralla-modal textarea {
     background: var(--tr-surface);
@@ -2341,6 +2342,147 @@ body[data-theme="dark"] .tralla-add-card:disabled:hover,
     font-style: italic;
 }
 
+.tralla-approval-banner.is-deletion {
+    background: var(--tr-danger-soft);
+    border-color: color-mix(in srgb, var(--tr-danger) 30%, transparent);
+    color: var(--tr-danger);
+}
+
+.tralla-approval-banner.is-deletion .tralla-deletion-reason {
+    font-weight: 600;
+    margin-top: 4px;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.tralla-table-scroll {
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid var(--tr-border);
+    border-radius: var(--tr-radius-sm);
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.tralla-data-table {
+    border-collapse: collapse;
+    font-size: 12px;
+    width: 100%;
+}
+
+.tralla-deleted-table {
+    min-width: 980px;
+}
+
+.tralla-history-table {
+    min-width: 720px;
+}
+
+.tralla-data-table th {
+    background: var(--tr-surface-2);
+    border-bottom: 1px solid var(--tr-border);
+    color: var(--tr-muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 9px 10px;
+    text-align: left;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.tralla-data-table td {
+    border-bottom: 1px solid var(--tr-border);
+    color: var(--tr-text-soft);
+    padding: 10px;
+    vertical-align: top;
+}
+
+.tralla-data-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.tralla-data-table tbody tr:hover {
+    background: var(--tr-surface-2);
+}
+
+.tralla-cell-title {
+    color: var(--tr-text);
+    display: block;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.tralla-cell-sub {
+    color: var(--tr-muted);
+    display: block;
+    font-size: 11px;
+    margin-top: 2px;
+}
+
+.tralla-cell-details {
+    display: block;
+    max-width: 340px;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.tralla-table-actions {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.tralla-table-actions .tralla-btn {
+    font-size: 12px;
+    min-height: 30px;
+    padding: 5px 9px;
+}
+
+.tralla-table-empty {
+    padding: 24px 12px;
+    text-align: center;
+}
+
+.tralla-history-filters {
+    align-items: end;
+    display: grid;
+    gap: 10px;
+    grid-template-columns: minmax(160px, 1.4fr) repeat(2, minmax(130px, 1fr)) auto;
+    margin-bottom: 16px;
+}
+
+.tralla-history-filter-actions {
+    align-items: end;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.tralla-history-pagination {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: space-between;
+    margin-top: 14px;
+}
+
+.tralla-history-page-label {
+    color: var(--tr-muted);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.tralla-history-pagination-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.tralla-history-pagination .tralla-btn {
+    font-size: 12px;
+    min-height: 32px;
+    padding: 6px 10px;
+}
+
 /* ------------------------------------------------------------- config */
 
 .tralla-config-grid {
@@ -2818,6 +2960,14 @@ body.tralla-modal-open {
     .tralla-config-actions {
         grid-column: 1;
     }
+
+    .tralla-history-filters {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .tralla-history-filter-actions {
+        grid-column: 1 / -1;
+    }
 }
 
 @media (max-width: 680px) {
@@ -2991,6 +3141,23 @@ body.tralla-modal-open {
     .tralla-modal-actions {
         padding-left: 15px;
         padding-right: 15px;
+    }
+
+    .tralla-history-filters {
+        grid-template-columns: 1fr;
+    }
+
+    .tralla-history-filter-actions {
+        grid-column: auto;
+    }
+
+    .tralla-history-pagination {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .tralla-history-pagination-actions .tralla-btn {
+        flex: 1 1 0;
     }
 
     .tralla-board-create-head {
