@@ -1334,18 +1334,33 @@
         try {
             var data = await api('deleted_cards', { boards_id: state.board.id });
             showModal(renderDeletedCardsModal(data), true);
+            return true;
         } catch (error) {
             toast(error.message, 'error');
+            return false;
         }
     }
 
     async function restoreDeletedCard(cardId, button) {
+        var restoreConfirmed = await confirmDialog({
+            title: 'Restaurar card',
+            message: 'Restaurar este card ao quadro?',
+            icon: 'ti-arrow-back-up',
+            confirmLabel: 'Restaurar'
+        });
+        if (!restoreConfirmed) {
+            return;
+        }
+
         setBusy(button, true);
         try {
             var data = await api('restore_card', { id: cardId });
             applyState(data);
             toast('Card restaurado.', 'success');
-            await openDeletedModal();
+            var refreshed = await openDeletedModal();
+            if (!refreshed) {
+                closeModal();
+            }
         } catch (error) {
             toast(error.message, 'error');
             setBusy(button, false);
