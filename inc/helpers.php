@@ -123,7 +123,7 @@ if (!function_exists('tralla_machine_status_labels')) {
             'pending'          => 'Pendente',
             'in_progress'      => 'Em andamento',
             'done'             => 'Concluído',
-            'not_repairable'   => 'Não reparável',
+            'not_repairable'   => 'Inservível',
         ];
     }
 }
@@ -144,7 +144,7 @@ if (!function_exists('tralla_machine_status_choices')) {
             'pending'        => 'Pendente',
             'in_progress'    => 'Em andamento',
             'done'           => 'Concluído',
-            'not_repairable' => 'Não reparável',
+            'not_repairable' => 'Inservível',
         ];
     }
 }
@@ -276,8 +276,9 @@ if (!function_exists('tralla_machine_is_filled')) {
     {
         $report = trim((string) ($machine['report'] ?? ''));
         $status = (string) ($machine['status'] ?? '');
+        $serviceDone = !empty($machine['service_done']);
 
-        return $report !== '' && in_array($status, ['done', 'not_repairable'], true);
+        return $report !== '' && $serviceDone && in_array($status, ['done', 'not_repairable', 'pending'], true);
     }
 }
 

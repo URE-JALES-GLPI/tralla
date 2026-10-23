@@ -1241,8 +1241,17 @@
             + '</div>';
     }
 
+    function refreshSideActions() {
+        if (!activeCard) {
+            return;
+        }
+        var aside = document.querySelector('.tralla-detail-side');
+        if (aside) {
+            aside.innerHTML = renderSideMeta(activeCard) + renderSideActions(activeCard);
+        }
+    }
+
     function renderHistory(card) {
-        var history = Array.isArray(card.history) ? card.history : [];
         if (!history.length) {
             return '<section class="tralla-detail-section"><h3><i class="ti ti-history"></i> Histórico</h3>'
                 + '<p class="tralla-empty-mini">Sem histórico registrado.</p></section>';
@@ -1276,7 +1285,7 @@
         var filled = machines.filter(function (machine) {
             var report = String(machine.report || '').trim();
             return machine.is_filled
-                || (report !== '' && (machine.status === 'done' || machine.status === 'not_repairable'));
+                || (report !== '' && !!machine.service_done && (machine.status === 'done' || machine.status === 'not_repairable' || machine.status === 'pending'));
         }).length;
         return {
             total: total,
@@ -2218,7 +2227,7 @@
                     });
                 }
                 local.is_filled = String(local.report || '').trim() !== ''
-                    && (local.status === 'done' || local.status === 'not_repairable');
+                    && !!local.service_done && (local.status === 'done' || local.status === 'not_repairable' || local.status === 'pending');
             }
             var progress = data.progress || machineProgress(machines);
             updateProgressDom(progress);
@@ -2237,7 +2246,10 @@
         try {
             var data = await api('machine_update', collectMachineFields(machineEl));
             applyMachineResponse(machineEl, data);
-            setSaveState(machineEl, 'saved');
+            if (activeCard && activeCard.permissions) {
+                activeCard.permissions.finalize = !!data.all_filled && !!activeCard.permissions.edit_machines;
+            }
+            refreshSideActions();
             shouldRefreshBoard = true;
         } catch (error) {
             setSaveState(machineEl, 'error');

@@ -864,6 +864,21 @@ class PluginTrallaCard extends CommonDBTM
         if (!tralla_all_machines_filled($machines)) {
             throw new RuntimeException('Preencha o relatório e o status de todas as máquinas antes de finalizar.');
         }
+        
+        $pendingMachineIds = [];
+        foreach ($machines as $machine) {
+            if ((string) ($machine['status'] ?? '') === 'pending') {
+                $pendingMachineIds[] = (int) $machine['id'];
+            }
+        }
+        if ($pendingMachineIds !== [] && count($pendingMachineIds) < count($machines)) {
+            self::split($id, $pendingMachineIds, $userId, $isAdmin);
+            $machines = PluginTrallaMachine::getMachinesForCard($id);
+        }
+        if (count($machines) === 0) {
+            throw new RuntimeException('Nenhuma maquina concluida para finalizar.');
+        }
+
 
         $approvalList = PluginTrallaBoard::findListByCategory($boards_id, 'maintenance_approval');
         if ($approvalList === null) {
