@@ -451,10 +451,6 @@ class PluginTrallaCard extends CommonDBTM
             return false;
         }
 
-        if (Session::haveRight(self::$rightname, PURGE)) {
-            return true;
-        }
-
         if ($boardId <= 0) {
             return false;
         }

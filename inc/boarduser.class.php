@@ -106,7 +106,7 @@ class PluginTrallaBoardUser
         }
 
         if (!self::hasApproverColumn()) {
-            return self::getRole($boardId, $userId) !== '';
+            return false;
         }
 
         $row = $DB->request([
