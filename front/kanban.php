@@ -124,16 +124,7 @@ Html::header($board->fields['name'] . ' — [URE] Tralla', $_SERVER['PHP_SELF'],
                 <i class="ti ti-arrow-left" aria-hidden="true"></i>
             </a>
             <div class="tralla-board-heading">
-                <div class="tralla-board-title-row">
-                    <h1><?= tralla_h($board->fields['name']) ?></h1>
-                    <span class="tralla-board-type <?= $isMaintenance ? 'is-maintenance' : '' ?>">
-                        <i class="ti <?= $isMaintenance ? 'ti-tool' : 'ti-layout-kanban' ?>" aria-hidden="true"></i>
-                        <?= $isMaintenance ? 'Manutenção' : 'Normal' ?>
-                    </span>
-                </div>
-                <?php if (trim((string) $board->fields['comment']) !== ''): ?>
-                    <p><?= tralla_h($board->fields['comment']) ?></p>
-                <?php endif; ?>
+                <h1><?= tralla_h($board->fields['name']) ?></h1>
             </div>
         </div>
         <div class="tralla-kanban-search" role="search">

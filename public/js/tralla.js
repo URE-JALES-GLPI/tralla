@@ -442,6 +442,20 @@
         }).join('').toUpperCase() || '?';
     }
 
+    function avatar(name, pictureUrl) {
+        return '<span class="tralla-avatar">' + esc(initials(name))
+            + (pictureUrl
+                ? '<img class="tralla-avatar-photo" src="' + attr(pictureUrl) + '" alt="" loading="lazy">'
+                : '')
+            + '</span>';
+    }
+
+    document.addEventListener('error', function (event) {
+        if (event.target.classList && event.target.classList.contains('tralla-avatar-photo')) {
+            event.target.remove();
+        }
+    }, true);
+
     function getCard(id) {
         var numeric = Number(id);
         return state.cards.find(function (card) {
@@ -983,7 +997,7 @@
 
         if (card.technician_name) {
             tech = '<span class="tralla-card-avatar" title="Responsável: ' + attr(card.technician_name) + '">'
-                + '<span class="tralla-avatar">' + esc(initials(card.technician_name)) + '</span></span>';
+                + avatar(card.technician_name, card.technician_picture_url) + '</span>';
         }
 
         var source = '';
@@ -1139,8 +1153,8 @@
             sub += '<span>' + esc(card.source_label) + '</span>';
         }
         if (card.technician_name) {
-            sub += '<span class="tralla-card-tech"><span class="tralla-avatar">' + esc(initials(card.technician_name))
-                + '</span>' + esc(card.technician_name) + '</span>';
+            sub += '<span class="tralla-card-tech">' + avatar(card.technician_name, card.technician_picture_url)
+                + esc(card.technician_name) + '</span>';
         }
 
         return '<div class="tralla-modal-head">'

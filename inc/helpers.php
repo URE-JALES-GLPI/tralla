@@ -440,32 +440,53 @@ if (!function_exists('tralla_get_int')) {
     }
 }
 
-if (!function_exists('tralla_user_name')) {
-    function tralla_user_name(int $users_id): string
+if (!function_exists('tralla_user_profile')) {
+    function tralla_user_profile(int $users_id): array
     {
         static $cache = [];
 
-        $users_id = (int) $users_id;
         if ($users_id <= 0) {
-            return '';
+            return ['name' => '', 'picture_url' => ''];
         }
         if (array_key_exists($users_id, $cache)) {
             return $cache[$users_id];
         }
 
-        $name = '';
+        $profile = ['name' => '', 'picture_url' => ''];
         try {
             $user = new User();
             if ($user->getFromDB($users_id)) {
-                $name = (string) $user->getFriendlyName();
+                $profile['name'] = (string) $user->getFriendlyName();
+                $picture = trim((string) ($user->fields['picture'] ?? ''));
+                if ($picture !== '') {
+                    try {
+                        $profile['picture_url'] = User::getURLForPicture($picture);
+                    } catch (Throwable $e) {
+                        $profile['picture_url'] = '';
+                    }
+                }
             }
         } catch (Throwable $e) {
-            $name = '';
+            $profile = ['name' => '', 'picture_url' => ''];
         }
 
-        $cache[$users_id] = $name;
+        $cache[$users_id] = $profile;
 
-        return $name;
+        return $profile;
+    }
+}
+
+if (!function_exists('tralla_user_name')) {
+    function tralla_user_name(int $users_id): string
+    {
+        return tralla_user_profile($users_id)['name'];
+    }
+}
+
+if (!function_exists('tralla_user_picture_url')) {
+    function tralla_user_picture_url(int $users_id): string
+    {
+        return tralla_user_profile($users_id)['picture_url'];
     }
 }
 

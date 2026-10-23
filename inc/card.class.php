@@ -179,6 +179,7 @@ class PluginTrallaCard extends CommonDBTM
             }
             $card['source_label'] = tralla_source_label((string) $card['source']);
             $card['technician_name'] = tralla_user_name((int) $card['technician_id']);
+            $card['technician_picture_url'] = tralla_user_picture_url((int) $card['technician_id']);
             $card['creator_name'] = tralla_user_name((int) $card['users_id']);
             $card['category'] = (string) ($list['category'] ?? '');
             $card['list_name'] = (string) ($list['name'] ?? '');
@@ -254,6 +255,7 @@ class PluginTrallaCard extends CommonDBTM
         }
         $card['source_label'] = tralla_source_label((string) $card['source']);
         $card['technician_name'] = tralla_user_name((int) $card['technician_id']);
+        $card['technician_picture_url'] = tralla_user_picture_url((int) $card['technician_id']);
         $card['creator_name'] = tralla_user_name((int) $card['users_id']);
         $card['approver_name'] = tralla_user_name((int) $card['users_id_approver']);
         $card['machines'] = $machines;

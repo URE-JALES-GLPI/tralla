@@ -563,44 +563,20 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 .tralla-board-heading {
     flex: 1 1 auto;
     min-width: 0;
-}
-
-.tralla-board-title-row {
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
+    border-left: 2px solid rgba(255, 255, 255, 0.58);
+    padding-left: 12px;
 }
 
 .tralla-kanban-title h1 {
     color: #fff;
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: -0.015em;
-    line-height: 1.3;
+    font-size: 20px;
+    font-weight: 750;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
     margin: 0;
     min-width: 0;
     overflow-wrap: anywhere;
-}
-
-.tralla-kanban-title p {
-    color: rgba(255, 255, 255, 0.76);
-    font-size: 12px;
-    line-height: 1.35;
-    margin-top: 3px;
-    max-width: 720px;
-}
-
-.tralla-kanban-head .tralla-board-type {
-    background: rgba(0, 0, 0, 0.2);
-    border-color: rgba(255, 255, 255, 0.2);
-    font-size: 10px;
-    padding: 3px 8px;
-}
-
-.tralla-kanban-head .tralla-board-type.is-maintenance {
-    background: rgba(255, 193, 7, 0.22);
-    border-color: rgba(255, 224, 130, 0.42);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
 }
 
 .tralla-kanban-head .tralla-btn,
@@ -1144,8 +1120,19 @@ body[data-theme="dark"] .tralla-card-id-chip,
     font-weight: 700;
     height: 24px;
     justify-content: center;
+    overflow: hidden;
+    position: relative;
     text-transform: uppercase;
     width: 24px;
+}
+
+.tralla-avatar-photo {
+    border-radius: inherit;
+    height: 100%;
+    inset: 0;
+    object-fit: cover;
+    position: absolute;
+    width: 100%;
 }
 
 .tralla-progress {
