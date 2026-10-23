@@ -2199,11 +2199,10 @@ body[data-theme="dark"] .tralla-add-card:disabled:hover,
     align-items: center;
     color: var(--tr-muted);
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     font-size: 12px;
     gap: 8px;
     margin-top: 6px;
-    overflow: hidden;
 }
 
 .tralla-detail-sub .tralla-avatar {

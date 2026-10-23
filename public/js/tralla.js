@@ -1133,7 +1133,7 @@
     }
 
     function detailHeader(card) {
-        var sub = '';
+        var sub = statusPill(card);
         if (card.source_label && card.source !== 'manual') {
             sub += '<span>' + esc(card.source_label) + '</span>';
         }
@@ -1145,7 +1145,7 @@
         return '<div class="tralla-modal-head">'
             + '<div>'
             + '<div class="tralla-detail-code">' + esc(card.code || ('#' + card.id))
-            + ' Â· ' + esc(card.list_name || '') + ' ' + statusPill(card) + '</div>'
+            + ' Â· ' + esc(card.list_name || '') + '</div>'
             + '<h2 class="tralla-detail-title">' + esc(card.name) + '</h2>'
             + (sub ? '<div class="tralla-detail-sub">' + sub + '</div>' : '')
             + '</div>'
@@ -1253,18 +1253,18 @@
 
     function renderHistory(card) {
         if (!Array.isArray(card.history) || !card.history.length) {
-        return '<section class="tralla-detail-section"><h3><i class="ti ti-history"></i> Histórico</h3>'
-            + '<p class="tralla-empty-mini">Sem histórico registrado.</p></section>';
+        return '<section class="tralla-detail-section"><h3><i class="ti ti-history"></i> Histï¿½rico</h3>'
+            + '<p class="tralla-empty-mini">Sem histï¿½rico registrado.</p></section>';
         }
 
-        return '<section class="tralla-detail-section"><h3><i class="ti ti-history"></i> Histórico</h3>'
+        return '<section class="tralla-detail-section"><h3><i class="ti ti-history"></i> Histï¿½rico</h3>'
             + '<div class="tralla-history">'
             + card.history.map(function (entry) {
                 return '<div class="tralla-history-item">'
                     + '<div class="tralla-history-dot"><span class="tralla-avatar">' + esc(initials(entry.user_name || 'Sistema')) + '</span></div>'
                     + '<div class="tralla-history-body">'
                     + '<strong>' + esc(entry.action_label || entry.action) + '</strong>'
-                    + '<small>' + esc(entry.user_name || 'Sistema') + ' – ' + esc(entry.date_formatted || formatDate(entry.date_creation)) + '</small>'
+                    + '<small>' + esc(entry.user_name || 'Sistema') + ' ï¿½ ' + esc(entry.date_formatted || formatDate(entry.date_creation)) + '</small>'
                     + (entry.details ? '<p>' + esc(entry.details) + '</p>' : '')
                     + '</div></div>';
             }).join('')
