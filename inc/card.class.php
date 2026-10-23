@@ -329,7 +329,7 @@ class PluginTrallaCard extends CommonDBTM
         }
 
         $card['assignature_url'] = ((string) $card['status'] === 'withdrawal' || !empty($card['assignature_sent']))
-            ? PluginTrallaConfig::assignatureCardUrl(self::familyRoot($card))
+            ? PluginTrallaConfig::assignatureCardUrl($id)
             : '';
         $card['permissions'] = self::permissionsFor($card, $boardType, $userId, $isAdmin);
         if ((int) $card['stage'] === 1 && !empty($card['permissions']['split'])) {
@@ -1907,7 +1907,7 @@ class PluginTrallaCard extends CommonDBTM
         return self::getCardDetail($id, $userId);
     }
 
-    /** Conclui a família depois da assinatura recebida pelo endpoint com token. */
+    /** Conclui apenas o card que teve sua retirada assinada. */
     public static function completeSignedWithdrawal(int $id, string $signerName, string $signatureHash): void
     {
         global $DB;
@@ -1919,11 +1919,9 @@ class PluginTrallaCard extends CommonDBTM
         if ($card === null || (int) $card['stage'] !== 1 || self::getBoardType((int) $card['plugin_tralla_boards_id']) !== 'maintenance') {
             throw new RuntimeException('Card de manutenção não encontrado.');
         }
-        $root = self::familyRoot($card);
         $DB->beginTransaction();
         try {
             self::lockCardRow($id);
-            self::lockFamilyRows($root);
             $card = self::getCard($id);
             if ($card === null || !in_array((string) $card['status'], ['withdrawal', 'done'], true)
                 || !empty($card['is_archived']) || !empty($card['is_deleted'])) {
@@ -1933,25 +1931,8 @@ class PluginTrallaCard extends CommonDBTM
                 $DB->commit();
                 return;
             }
-            $members = [];
-            foreach ($DB->request([
-                'FROM' => 'glpi_plugin_tralla_cards',
-                'WHERE' => [
-                    'family_cards_id' => $root,
-                    'stage' => 1,
-                    'is_archived' => 0,
-                    'is_deleted' => 0,
-                ],
-            ]) as $row) {
-                $members[] = $row;
-            }
-            if ($members === []) {
-                throw new RuntimeException('Família de cards não encontrada.');
-            }
-            foreach ($members as $member) {
-                if (!in_array((string) $member['status'], ['withdrawal', 'done'], true)) {
-                    throw new RuntimeException('Todos os cards da família precisam estar aprovados.');
-                }
+            if ((string) $card['status'] !== 'withdrawal') {
+                throw new RuntimeException('Este card não está aguardando retirada.');
             }
             $list = PluginTrallaBoard::findListByCategory((int) $card['plugin_tralla_boards_id'], 'maintenance_done');
             if ($list === null) {
@@ -1959,24 +1940,20 @@ class PluginTrallaCard extends CommonDBTM
             }
             $now = tralla_now();
             $safeSigner = mb_substr(trim($signerName), 0, 100);
-            foreach ($members as $member) {
-                $changes = ['assignature_sent' => 1, 'date_mod' => $now];
-                if ((string) $member['status'] === 'withdrawal') {
-                    $changes += [
-                        'plugin_tralla_lists_id' => (int) $list['id'],
-                        'status' => 'done',
-                        'date_withdrawn' => $now,
-                        'rank' => self::nextRankForList((int) $list['id']),
-                    ];
-                }
-                $DB->update('glpi_plugin_tralla_cards', $changes, ['id' => (int) $member['id']]);
-                PluginTrallaHistory::log(
-                    (int) $member['id'],
-                    0,
-                    'withdrawal_confirmed',
-                    'Retirada assinada por ' . $safeSigner . ' no Assignat-ure. SHA-256: ' . $signatureHash
-                );
-            }
+            $DB->update('glpi_plugin_tralla_cards', [
+                'assignature_sent' => 1,
+                'plugin_tralla_lists_id' => (int) $list['id'],
+                'status' => 'done',
+                'date_withdrawn' => $now,
+                'date_mod' => $now,
+                'rank' => self::nextRankForList((int) $list['id']),
+            ], ['id' => $id]);
+            PluginTrallaHistory::log(
+                $id,
+                0,
+                'withdrawal_confirmed',
+                'Retirada assinada por ' . $safeSigner . ' no Assignat-ure. SHA-256: ' . $signatureHash
+            );
             $DB->commit();
         } catch (Throwable $e) {
             $DB->rollBack();

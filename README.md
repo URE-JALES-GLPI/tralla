@@ -130,7 +130,7 @@ Listagem de cards aguardando retirada:
 
 O token é comparado com `hash_equals`. Gere um novo token na configuração sempre que necessário.
 
-Para usar a assinatura dentro do Assignat-ure, instale o plugin em `plugins/assignature`, cadastre o Tralla como fonte com o endpoint acima e o token gerado, e configure no Tralla a URL `https://SEU-GLPI/plugins/assignature/front/request.php`. O Tralla abre o pedido da família do card nessa URL. Depois que a assinatura é salva, o Assignat-ure envia um `POST` autenticado para `/plugins/tralla/front/assignature_callback.php`; o Tralla conclui a retirada automaticamente. Se o retorno falhar, o Assignat-ure mantém o comprovante e tenta reenviar pela tarefa automática.
+Para usar a assinatura dentro do Assignat-ure, instale o plugin em `plugins/assignature`, cadastre o Tralla como fonte com o endpoint acima e o token gerado, e configure no Tralla a URL `https://SEU-GLPI/plugins/assignature/front/request.php` (use `http://` quando o GLPI estiver servido por HTTP). Cada card em retirada abre seu próprio pedido nessa URL. Depois que a assinatura é salva, o Assignat-ure envia um `POST` autenticado para `/plugins/tralla/front/assignature_callback.php`; o Tralla conclui apenas o card assinado. Se o retorno falhar, o Assignat-ure mantém o comprovante e tenta reenviar pela tarefa automática.
 
 ## Exclusão e restauração
 

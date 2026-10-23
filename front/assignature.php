@@ -38,7 +38,6 @@ if ($listMode === 'withdrawal') {
             'stage'       => 1,
             'is_archived' => 0,
             'is_deleted'  => 0,
-            'family_seq'  => 1,
         ],
         'ORDER' => 'date_approved ASC, id ASC',
         'START' => $offset,
