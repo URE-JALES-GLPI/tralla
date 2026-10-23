@@ -1396,6 +1396,156 @@ body[data-theme="dark"] .tralla-add-card:disabled:hover,
     margin-top: 4px;
 }
 
+.tralla-tabs {
+    border-bottom: 1px solid var(--tr-border);
+    display: flex;
+    gap: 4px;
+    margin: 0 0 16px;
+}
+
+.tralla-tab {
+    border-bottom: 2px solid transparent;
+    color: var(--tr-muted);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 9px 12px;
+    text-decoration: none;
+}
+
+.tralla-tab:hover {
+    color: var(--tr-text);
+    text-decoration: none;
+}
+
+.tralla-tab.is-active {
+    border-bottom-color: var(--tr-primary);
+    color: var(--tr-text);
+}
+
+.tralla-tab:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--tr-primary) 35%, transparent);
+    outline-offset: 2px;
+}
+
+.tralla-page.tralla-form-page .tralla-members {
+    max-width: 960px;
+}
+
+.tralla-members {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.tralla-members-head h2 {
+    align-items: center;
+    display: flex;
+    font-size: 16px;
+    gap: 7px;
+    margin: 0;
+}
+
+.tralla-members-head p {
+    color: var(--tr-muted);
+    font-size: 13px;
+    margin: 4px 0 0;
+}
+
+.tralla-member-add {
+    align-items: end;
+    background: var(--tr-surface-2);
+    border: 1px solid var(--tr-border);
+    border-radius: var(--tr-radius);
+    display: grid;
+    gap: 12px;
+    grid-template-columns: minmax(0, 2fr) 170px auto;
+    padding: 14px;
+}
+
+.tralla-member-add .tralla-field {
+    min-width: 0;
+}
+
+.tralla-members-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.tralla-members-columns,
+.tralla-member-row {
+    align-items: center;
+    display: grid;
+    gap: 12px;
+    grid-template-columns: minmax(0, 2fr) 170px 140px minmax(0, auto);
+}
+
+.tralla-members-columns {
+    border-bottom: 1px solid var(--tr-border);
+    color: var(--tr-muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    padding: 0 0 8px;
+    text-transform: uppercase;
+}
+
+.tralla-member-row {
+    border-bottom: 1px solid var(--tr-border);
+    margin: 0;
+    padding: 12px 0;
+}
+
+.tralla-member-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.tralla-member-name {
+    font-size: 14px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.tralla-member-login {
+    color: var(--tr-muted);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+.tralla-member-role {
+    min-width: 0;
+}
+
+.tralla-member-date {
+    color: var(--tr-muted);
+    font-size: 12px;
+}
+
+.tralla-member-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+.tralla-member-actions .tralla-btn {
+    font-size: 12px;
+    min-height: 32px;
+    padding: 6px 10px;
+}
+
+.tralla-role-badge {
+    background: var(--tr-surface-2);
+    border-radius: 999px;
+    color: var(--tr-text-soft);
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+}
+
 /* --------------------------------------------------- board create modal */
 
 .tralla-board-create-modal {
@@ -2733,6 +2883,32 @@ body.tralla-modal-open {
     .tralla-add-machine-grid,
     .tralla-create-machine-grid {
         grid-template-columns: 1fr;
+    }
+
+    .tralla-tabs {
+        overflow-x: auto;
+    }
+
+    .tralla-member-add {
+        align-items: stretch;
+        grid-template-columns: 1fr;
+    }
+
+    .tralla-members-columns {
+        display: none;
+    }
+
+    .tralla-member-row {
+        border: 1px solid var(--tr-border);
+        border-radius: var(--tr-radius-sm);
+        gap: 10px;
+        grid-template-columns: 1fr;
+        margin-top: 10px;
+        padding: 12px;
+    }
+
+    .tralla-member-actions {
+        justify-content: flex-start;
     }
 
     .tralla-add-machine-grid .tralla-field:first-child,
