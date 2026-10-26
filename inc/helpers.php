@@ -191,6 +191,11 @@ if (!function_exists('tralla_backgrounds')) {
             'forest'   => 'Floresta',
             'graphite' => 'Grafite',
             'candy'    => 'Doce',
+            'linux'       => 'Linux',
+            'windows'     => 'Windows',
+            'mac'         => 'Mac',
+            'tickets'     => 'Chamados',
+            'maintenance' => 'Manutenção',
         ];
     }
 }

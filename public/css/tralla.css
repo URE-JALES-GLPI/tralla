@@ -551,6 +551,36 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
     background: linear-gradient(135deg, #831843 0%, #db2777 52%, #f9a8d4 100%);
 }
 
+.tralla-board-tile.tr-bg-linux,
+.tralla-kanban-page.tr-bg-linux,
+.tralla-board-create-theme-swatch.tr-bg-linux {
+    background: linear-gradient(135deg, #111827 0%, #9a3412 52%, #c2410c 100%);
+}
+
+.tralla-board-tile.tr-bg-windows,
+.tralla-kanban-page.tr-bg-windows,
+.tralla-board-create-theme-swatch.tr-bg-windows {
+    background: linear-gradient(135deg, #0c4a6e 0%, #0369a1 52%, #1d4ed8 100%);
+}
+
+.tralla-board-tile.tr-bg-mac,
+.tralla-kanban-page.tr-bg-mac,
+.tralla-board-create-theme-swatch.tr-bg-mac {
+    background: linear-gradient(135deg, #111827 0%, #475569 52%, #64748b 100%);
+}
+
+.tralla-board-tile.tr-bg-tickets,
+.tralla-kanban-page.tr-bg-tickets,
+.tralla-board-create-theme-swatch.tr-bg-tickets {
+    background: linear-gradient(135deg, #0f172a 0%, #155e75 52%, #0f766e 100%);
+}
+
+.tralla-board-tile.tr-bg-maintenance,
+.tralla-kanban-page.tr-bg-maintenance,
+.tralla-board-create-theme-swatch.tr-bg-maintenance {
+    background: linear-gradient(135deg, #431407 0%, #92400e 52%, #b45309 100%);
+}
+
 .tralla-kanban-head {
     align-items: flex-start;
     backdrop-filter: blur(8px);

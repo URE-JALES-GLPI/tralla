@@ -263,7 +263,8 @@ echo "<script>document.title = 'Tralla';</script>";
                     <?= Html::hidden('id', ['value' => (int) $id]) ?>
                     <div class="tralla-field">
                         <label for="tralla-member-add-user">Usuário</label>
-                        <?php User::dropdown(['name' => 'users_id', 'right' => 'all', 'display_emptychoice' => true]); ?>
+                        <?php User::dropdown(['name' => 'users_id', 'right' => 'all', 'display_emptychoice' => true,
+                            'used' => array_column($members, 'users_id')]); ?>
                     </div>
                     <div class="tralla-field">
                         <label for="tralla-member-add-role">Papel</label>
