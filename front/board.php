@@ -17,6 +17,7 @@ $boards = PluginTrallaBoard::getVisibleBoards($showArchived);
 $dashboardEmails = [
     'marco.masson@apoiofde.sp.gov.br',
     'aryan.ferrari@apoiofde.sp.gov.br',
+    'gabriel.nsiqueira@apoiofde.sp.gov.br',
 ];
 $maintenanceBoardIds = [];
 foreach (PluginTrallaBoard::getVisibleBoards(true) as $visibleBoard) {
