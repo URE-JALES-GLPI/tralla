@@ -288,6 +288,7 @@ if (!function_exists('tralla_approval_kind_labels')) {
             'deletion'    => 'Aprovação de exclusão',
             'edit'        => 'Aprovação de edição',
             'split'       => 'Aprovação de separação',
+            'call_release' => 'Liberação de chamado',
         ];
     }
 }

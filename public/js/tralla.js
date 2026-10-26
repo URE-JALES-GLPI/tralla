@@ -706,6 +706,9 @@
         if (kind === 'split') {
             return 'Aprovação de separação';
         }
+        if (kind === 'call_release') {
+            return 'Liberação de chamado';
+        }
         return 'Aprovação de finalização';
     }
 
@@ -1484,6 +1487,11 @@
                 + '<i class="ti ti-hand-stop"></i> Pegar para mim</button>';
         }
 
+        if (permissions.request_call_release) {
+            buttons += '<button type="button" class="tralla-btn tralla-btn-primary" data-card-action="request_call_release">'
+                + '<i class="ti ti-lock-open"></i> Solicitar liberação</button>';
+        }
+
         if (permissions.finalize) {
             buttons += '<button type="button" class="tralla-btn tralla-btn-primary" data-card-action="finalize">'
                 + '<i class="ti ti-checkup-list"></i> Finalizar ' + (card.workflow_type === 'call' ? 'chamado' : 'manutenção') + '</button>';
@@ -1497,10 +1505,12 @@
             var kind = approvalKind(card);
             var approveLabel = kind === 'deletion'
                 ? 'Aprovar exclusão'
-                : (kind === 'edit' ? 'Aprovar edição' : (kind === 'split' ? 'Aprovar separação' : 'Aprovar'));
+                : (kind === 'edit' ? 'Aprovar edição' : (kind === 'split' ? 'Aprovar separação'
+                    : (kind === 'call_release' ? 'Liberar chamado' : 'Aprovar')));
             var rejectLabel = kind === 'deletion'
                 ? 'Recusar exclusão'
-                : (kind === 'edit' ? 'Recusar edição' : (kind === 'split' ? 'Recusar separação' : 'Reprovar'));
+                : (kind === 'edit' ? 'Recusar edição' : (kind === 'split' ? 'Recusar separação'
+                    : (kind === 'call_release' ? 'Não liberar' : 'Reprovar')));
             buttons += '<button type="button" class="tralla-btn tralla-btn-primary" data-card-action="approve">'
                 + '<i class="ti ti-shield-check"></i> ' + approveLabel + '</button>';
             buttons += '<button type="button" class="tralla-btn tralla-btn-danger" data-card-action="reject">'
@@ -1727,6 +1737,16 @@
                 + '</div>';
         }
 
+        if (kind === 'call_release') {
+            return '<div class="tralla-approval-banner is-call-release">'
+                + '<i class="ti ti-lock-open"></i>'
+                + '<div class="tralla-approval-content"><strong>Chamado aguardando liberação</strong>'
+                + parentLine
+                + '<small>Ao liberar, o chamado ficará disponível para o técnico clicar em Pegar.</small></div>'
+                + openParent
+                + '</div>';
+        }
+
         return '<div class="tralla-approval-banner is-finalization">'
             + '<i class="ti ti-shield-check"></i>'
             + '<div class="tralla-approval-content"><strong>Aguardando aprovação de finalização</strong>'
@@ -1743,12 +1763,15 @@
         }
 
         var kind = String(card.pending_approval_kind || 'maintenance');
-        var kindClass = kind === 'deletion' ? 'deletion' : (kind === 'edit' || kind === 'split' ? 'edit' : 'finalization');
+        var kindClass = kind === 'deletion' ? 'deletion' : (kind === 'call_release' ? 'call-release'
+            : (kind === 'edit' || kind === 'split' ? 'edit' : 'finalization'));
         var label = kind === 'deletion'
             ? 'Exclusão pendente de aprovação'
             : (kind === 'edit' ? 'Edição pendente de aprovação'
-                : (kind === 'split' ? 'Separação pendente de aprovação' : 'Finalização pendente de aprovação'));
-        var icon = kind === 'deletion' ? 'ti-trash' : (kind === 'edit' ? 'ti-pencil' : (kind === 'split' ? 'ti-git-branch' : 'ti-shield-check'));
+                : (kind === 'split' ? 'Separação pendente de aprovação'
+                    : (kind === 'call_release' ? 'Liberação pendente de aprovação' : 'Finalização pendente de aprovação')));
+        var icon = kind === 'deletion' ? 'ti-trash' : (kind === 'edit' ? 'ti-pencil'
+            : (kind === 'split' ? 'ti-git-branch' : (kind === 'call_release' ? 'ti-lock-open' : 'ti-shield-check')));
 
         return '<div class="tralla-approval-banner is-' + kindClass + '">'
             + '<i class="ti ' + icon + '"></i>'
@@ -2042,6 +2065,7 @@
         var isDeletionApproval = kind === 'deletion';
         var isEditApproval = kind === 'edit';
         var isSplitApproval = kind === 'split';
+        var isCallReleaseApproval = kind === 'call_release';
         var departingCard = Object.assign({}, activeCard);
 
         if (action === 'split') {
@@ -2050,6 +2074,20 @@
         }
         if (action === 'edit') {
             openEditModal(activeCard);
+            return;
+        }
+
+        if (action === 'request_call_release') {
+            try {
+                setBusy(button, true);
+                var releaseRequested = await api('request_call_release', { id: cardId });
+                applyState(releaseRequested);
+                toast('Liberação enviada para aprovação.', 'success');
+                await openCard(cardId);
+            } catch (error) {
+                toast(error.message, 'error');
+                setBusy(button, false);
+            }
             return;
         }
 
@@ -2104,6 +2142,13 @@
                         label: 'Motivo (opcional)',
                         confirmLabel: 'Recusar separação'
                     };
+                } else if (isCallReleaseApproval) {
+                    rejectConfig = {
+                        title: 'Não liberar chamado',
+                        message: 'O chamado continuará bloqueado. Um SuperAdmin poderá solicitar a liberação novamente.',
+                        label: 'Motivo (opcional)',
+                        confirmLabel: 'Não liberar'
+                    };
                 } else {
                     rejectConfig = {
                         title: 'Reprovar manutenção',
@@ -2119,7 +2164,8 @@
                         : (isEditApproval
                             ? 'Descreva o motivo da recusa da edição...'
                             : (isSplitApproval ? 'Descreva o motivo da recusa da separação...'
-                                : 'Descreva o motivo da reprovação...')),
+                                : (isCallReleaseApproval ? 'Descreva o motivo da recusa da liberação...'
+                                    : 'Descreva o motivo da reprovação...'))),
                     icon: 'ti-shield-x',
                     tone: 'danger'
                 }, rejectConfig));
@@ -2139,6 +2185,7 @@
                         : (isEditApproval
                             ? 'Edição recusada. Alterações descartadas.'
                             : (isSplitApproval ? 'Separação recusada. Card liberado.'
+                                : isCallReleaseApproval ? 'Liberação recusada. Chamado continua bloqueado.'
                                 : (departingCard.workflow_type === 'call'
                                     ? 'Chamado reprovado. O card voltou para Em Andamento.'
                                     : 'Manutenção reprovada. O card voltou para Em Andamento.'))),
@@ -2206,6 +2253,13 @@
                         icon: 'ti-git-branch',
                         confirmLabel: 'Aprovar separação'
                     };
+                } else if (isCallReleaseApproval) {
+                    approveConfig = {
+                        title: 'Liberar chamado',
+                        message: 'O chamado ficará disponível para um técnico clicar em Pegar. Deseja liberar?',
+                        icon: 'ti-lock-open',
+                        confirmLabel: 'Liberar chamado'
+                    };
                 } else {
                     approveConfig = {
                         title: 'Aprovar manutenção',
@@ -2256,6 +2310,9 @@
                     await openCard(data.card.id);
                 } else if (isSplitApproval) {
                     toast('Separação aprovada. Novo card criado.', 'success');
+                    await openCard(data.card.id);
+                } else if (isCallReleaseApproval) {
+                    toast('Chamado liberado. Um técnico já pode clicar em Pegar.', 'success');
                     await openCard(data.card.id);
                 } else {
                     toast(departingCard.workflow_type === 'call'
@@ -3221,6 +3278,16 @@
             + '<textarea id="tralla-create-description" name="description" rows="6" maxlength="200000"'
             + ' placeholder="Descreva o que aconteceu, o impacto e as informações necessárias para o atendimento..."></textarea>'
             + '<small>O técnico poderá registrar o relatório do atendimento ao assumir o chamado.</small></div></section>'
+            + (state.board && state.board.can_defer_call
+                ? '<fieldset class="tralla-card-workflow-choice tralla-call-release-choice" data-call-release-section hidden>'
+                    + '<legend>Quando disponibilizar o chamado?</legend>'
+                    + '<div class="tralla-card-workflow-options">'
+                    + '<label class="tralla-card-workflow-option"><input type="radio" name="release_mode" value="now" checked>'
+                    + '<span><i class="ti ti-lock-open"></i><strong>Disponibilizar agora</strong><small>O botão Pegar fica disponível imediatamente</small></span></label>'
+                    + '<label class="tralla-card-workflow-option"><input type="radio" name="release_mode" value="later">'
+                    + '<span><i class="ti ti-lock"></i><strong>Disponibilizar depois</strong><small>Bloqueia o chamado e solicita aprovação para liberar</small></span></label>'
+                    + '</div></fieldset>'
+                : '')
             + '</div>'
             + '<div class="tralla-modal-actions">'
             + '<button type="button" class="tralla-btn tralla-btn-ghost" data-tralla-close>Cancelar</button>'
@@ -3238,6 +3305,8 @@
                 if (!radio.checked) { return; }
                 createForm.querySelector('[data-create-machines-section]').hidden = call;
                 createForm.querySelector('[data-create-call-section]').hidden = !call;
+                var releaseSection = createForm.querySelector('[data-call-release-section]');
+                if (releaseSection) { releaseSection.hidden = !call; }
             });
         });
         if (hasEntities) {
@@ -3261,6 +3330,8 @@
         var machines = [];
         var workflowType = form.querySelector('[name="workflow_type"]:checked')
             ? form.querySelector('[name="workflow_type"]:checked').value : 'maintenance';
+        var releaseModeField = form.querySelector('[name="release_mode"]:checked');
+        var releaseMode = workflowType === 'call' && releaseModeField ? releaseModeField.value : 'now';
         var descriptionField = form.querySelector('[name="description"]');
         var description = descriptionField ? descriptionField.value.trim() : '';
         if (workflowType === 'call' && !description) {
@@ -3307,6 +3378,7 @@
                 description: description,
                 source: 'manual',
                 workflow_type: workflowType,
+                release_mode: releaseMode,
                 machines: machines
             });
 
@@ -3320,7 +3392,7 @@
 
             closeModal();
             applyState(data);
-            toast('Card criado.', 'success');
+            toast(releaseMode === 'later' ? 'Chamado criado bloqueado e enviado para aprovação.' : 'Card criado.', 'success');
             await openCard(data.card.id);
         } catch (error) {
             toast(error.message, 'error');

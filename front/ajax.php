@@ -238,6 +238,7 @@ try {
                 'description' => tralla_post_string('description'),
                 'source'      => tralla_post_string('source', 'manual'),
                 'workflow_type' => tralla_post_string('workflow_type', 'maintenance'),
+                'release_mode' => tralla_post_string('release_mode', 'now'),
                 'machines'    => $machines,
             ], $userId);
             tralla_json([
@@ -425,6 +426,11 @@ try {
             tralla_ajax_require(READ);
             $cardId = tralla_post_int('id');
             $detail = PluginTrallaCard::decide($cardId, true, '', $userId, $isAdmin);
+            tralla_json(['ok' => true, 'data' => ['card' => $detail, 'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id'])]]);
+
+        case 'request_call_release':
+            tralla_ajax_require(READ);
+            $detail = PluginTrallaCard::requestCallRelease(tralla_post_int('id'), $userId);
             tralla_json(['ok' => true, 'data' => ['card' => $detail, 'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id'])]]);
 
         case 'reject_card':

@@ -1154,6 +1154,13 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 .tralla-call-report textarea { min-height: 160px; resize: vertical; width: 100%; }
 .tralla-call-report [data-save-call-report] { margin-top: 10px; }
 [data-create-machines-section][hidden], [data-create-call-section][hidden] { display: none !important; }
+[data-call-release-section][hidden] { display: none !important; }
+.tralla-call-release-choice { margin-top: 16px; }
+.tralla-call-release-choice input[value="later"]:checked + span {
+    background: #fff4e5;
+    border-color: #e8a23b;
+    color: #704000;
+}
 @media (max-width: 520px) { .tralla-card-workflow-options { grid-template-columns: 1fr; } }
 
 .tralla-board-scroll .tralla-card.is-dragging {
@@ -3864,6 +3871,10 @@ body.tralla-modal-open {
     background: var(--tr-purple);
 }
 
+.tralla-card-label-approval-call_release {
+    background: #b06a0a;
+}
+
 .tralla-pill.approval-final {
     background: var(--tr-primary-soft);
     color: var(--tr-primary);
@@ -3883,6 +3894,17 @@ body.tralla-modal-open {
     background: var(--tr-primary-soft);
     border-color: color-mix(in srgb, var(--tr-primary) 25%, transparent);
     color: var(--tr-primary);
+}
+
+.tralla-pill.approval-call_release {
+    background: #fff4e5;
+    color: #875000;
+}
+
+.tralla-approval-banner.is-call-release {
+    background: #fff4e5;
+    border-color: #efc783;
+    color: #704000;
 }
 
 .tralla-approval-banner.is-deletion {
@@ -4112,6 +4134,11 @@ body.tralla-modal-open {
 
 .tralla-board-scroll .tralla-card.approval-split {
     border: 2px solid var(--tr-purple);
+    border-left-width: 4px;
+}
+
+.tralla-board-scroll .tralla-card.approval-call_release {
+    border: 2px solid #d59631;
     border-left-width: 4px;
 }
 .tralla-edit-machine .tralla-field {

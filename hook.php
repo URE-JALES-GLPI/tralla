@@ -131,7 +131,7 @@ function plugin_tralla_install(): bool
                 `rejection_reason`        TEXT         DEFAULT NULL,
                 `users_id_approver`       INT {$sign} NOT NULL DEFAULT '0',
                 `is_deleted`              TINYINT(1)   NOT NULL DEFAULT 0,
-                `approval_kind`           VARCHAR(20)  NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|deletion|edit|split',
+                `approval_kind`           VARCHAR(20)  NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|deletion|edit|split|call_release',
                 `edit_payload`            LONGTEXT     DEFAULT NULL COMMENT 'JSON de edição pendente',
                 `deletion_reason`         TEXT         DEFAULT NULL,
                 `deletion_requested_at`   DATETIME     DEFAULT NULL,
@@ -163,7 +163,7 @@ function plugin_tralla_install(): bool
         'service_report'              => 'LONGTEXT DEFAULT NULL',
         'workflow_type'               => "VARCHAR(20) NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|call'",
         'is_deleted'                  => 'TINYINT(1)   NOT NULL DEFAULT 0',
-        'approval_kind'               => "VARCHAR(20)  NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|deletion|edit|split'",
+        'approval_kind'               => "VARCHAR(20)  NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|deletion|edit|split|call_release'",
         'edit_payload'                => 'LONGTEXT     DEFAULT NULL',
         'family_cards_id'             => "INT {$sign} NOT NULL DEFAULT 0",
         'code_root_cards_id'          => "INT {$sign} NOT NULL DEFAULT 0",
@@ -281,7 +281,7 @@ function plugin_tralla_install(): bool
         ") or die($DB->error());
         $DB->doQuery("
             ALTER TABLE `glpi_plugin_tralla_cards`
-            MODIFY `approval_kind` VARCHAR(20) NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|deletion|edit|split'
+            MODIFY `approval_kind` VARCHAR(20) NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|deletion|edit|split|call_release'
         ") or die($DB->error());
     }
 

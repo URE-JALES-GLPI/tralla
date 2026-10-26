@@ -185,6 +185,11 @@ class PluginTrallaCard extends CommonDBTM
                 $card['status_label'] = $card['approval_kind_label'];
             } else {
                 $card['status_label'] = tralla_status_label((string) $card['status']);
+                if ((string) ($card['workflow_type'] ?? '') === 'call'
+                    && (string) $card['status'] === 'pending' && !empty($card['is_locked'])) {
+                    $card['status_label'] = (int) ($card['approval_cards_id'] ?? 0) > 0
+                        ? 'Aguardando liberação' : 'Liberação recusada';
+                }
                 $card['pending_approval_kind'] = $pendingApprovalKinds[(int) $card['id']] ?? '';
             }
             $card['source_label'] = tralla_source_label((string) $card['source']);
@@ -259,6 +264,11 @@ class PluginTrallaCard extends CommonDBTM
         $card['category'] = (string) ($list['category'] ?? '');
         $card['code'] = tralla_display_code($card, $boardType);
         $card['status_label'] = tralla_status_label((string) $card['status']);
+        if ((int) $card['stage'] === 1 && (string) ($card['workflow_type'] ?? '') === 'call'
+            && (string) $card['status'] === 'pending' && !empty($card['is_locked'])) {
+            $card['status_label'] = (int) ($card['approval_cards_id'] ?? 0) > 0
+                ? 'Aguardando liberação' : 'Liberação recusada';
+        }
         $card['approval_kind_label'] = '';
         if ((int) $card['stage'] === 2) {
             $card['approval_kind_label'] = tralla_approval_kind_label(
@@ -429,6 +439,15 @@ class PluginTrallaCard extends CommonDBTM
             && !$locked
             && $canUpdate;
 
+        $canRequestCallRelease = $role === 'superadmin'
+            && $boardType === 'maintenance'
+            && $isCall
+            && $stage === 1
+            && $status === 'pending'
+            && $locked
+            && empty($card['is_archived'])
+            && (int) ($card['approval_cards_id'] ?? 0) === 0;
+
         $canApprove = $isMember
             && $boardType === 'maintenance'
             && $stage === 2
@@ -460,6 +479,7 @@ class PluginTrallaCard extends CommonDBTM
             'split'            => $canSplit,
             'edit_request'     => $canEditRequest,
             'take'             => $canTake,
+            'request_call_release' => $canRequestCallRelease,
             'finalize'         => $canFinalize,
             'approve'          => $canApprove,
             'reject'           => $canApprove,
@@ -523,6 +543,17 @@ class PluginTrallaCard extends CommonDBTM
             if ($list === null) {
                 throw new RuntimeException('O quadro não possui a lista "Manutenção Pendente".');
             }
+            $deferCall = $workflowType === 'call' && (string) ($data['release_mode'] ?? 'now') === 'later';
+            $approvalList = null;
+            if ($deferCall) {
+                if (PluginTrallaBoard::roleFor($boards_id, $userId) !== 'superadmin') {
+                    throw new RuntimeException('Somente SuperAdmin pode disponibilizar chamados depois.');
+                }
+                $approvalList = PluginTrallaBoard::findListByCategory($boards_id, 'maintenance_approval');
+                if ($approvalList === null) {
+                    throw new RuntimeException('O quadro não possui a lista "Manutenção Aprovação".');
+                }
+            }
 
             $requestedMachines = $data['machines'] ?? [];
             if ($workflowType === 'call' && $description === '') {
@@ -568,6 +599,10 @@ class PluginTrallaCard extends CommonDBTM
                 }
             }
 
+            if ($deferCall) {
+                $DB->beginTransaction();
+            }
+            try {
             $DB->insert('glpi_plugin_tralla_cards', [
                 'plugin_tralla_boards_id' => $boards_id,
                 'plugin_tralla_lists_id'  => (int) $list['id'],
@@ -585,7 +620,7 @@ class PluginTrallaCard extends CommonDBTM
                 'split_from_cards_id'     => 0,
                 'status'                  => 'pending',
                 'workflow_type'           => $workflowType,
-                'is_locked'               => 0,
+                'is_locked'               => $deferCall ? 1 : 0,
                 'is_archived'             => 0,
                 'source'                  => $source,
                 'machines_total'          => count($machines),
@@ -610,8 +645,23 @@ class PluginTrallaCard extends CommonDBTM
                 $rank += 1024.0;
             }
 
+            if ($deferCall) {
+                $approvalId = self::createCallReleaseApproval($cardId, $boards_id, $approvalList, $userId, $now);
+                $DB->update('glpi_plugin_tralla_cards', ['approval_cards_id' => $approvalId], ['id' => $cardId]);
+                PluginTrallaHistory::log($cardId, $userId, 'call_release_requested', 'Chamado criado bloqueado; aguardando liberação.');
+            }
+
             PluginTrallaHistory::log($cardId, $userId, 'card_created',
                 ($workflowType === 'call' ? 'Chamado' : 'Card de manutenção') . ' criado com ' . count($machines) . ' máquina(s).');
+            if ($deferCall) {
+                $DB->commit();
+            }
+            } catch (Throwable $e) {
+                if ($deferCall) {
+                    $DB->rollBack();
+                }
+                throw $e;
+            }
 
             return self::getCardDetail($cardId, $userId);
         }
@@ -648,6 +698,86 @@ class PluginTrallaCard extends CommonDBTM
         $cardId = (int) $DB->insertId();
 
         PluginTrallaHistory::log($cardId, $userId, 'card_created', 'Card criado.');
+
+        return self::getCardDetail($cardId, $userId);
+    }
+
+    private static function createCallReleaseApproval(int $cardId, int $boardId, array $list, int $userId, string $now): int
+    {
+        global $DB;
+        $card = self::getCard($cardId);
+        if ($card === null) {
+            throw new RuntimeException('Chamado não encontrado.');
+        }
+        $sequence = self::nextCodeSequence($cardId);
+        $DB->insert('glpi_plugin_tralla_cards', [
+            'plugin_tralla_boards_id' => $boardId,
+            'plugin_tralla_lists_id' => (int) $list['id'],
+            'name' => (string) $card['name'],
+            'description' => (string) $card['description'],
+            'rank' => self::nextRankForList((int) $list['id']),
+            'users_id' => $userId,
+            'technician_id' => 0,
+            'stage' => 2,
+            'parent_cards_id' => $cardId,
+            'family_cards_id' => $cardId,
+            'code_root_cards_id' => $cardId,
+            'family_seq' => $sequence,
+            'approval_kind' => 'call_release',
+            'workflow_type' => 'call',
+            'status' => 'waiting_approval',
+            'is_locked' => 0,
+            'is_archived' => 0,
+            'source' => (string) $card['source'],
+            'date_creation' => $now,
+            'date_mod' => $now,
+        ]);
+        $approvalId = (int) $DB->insertId();
+        PluginTrallaHistory::log($approvalId, $userId, 'approval_created', 'Aguardando liberação do chamado.');
+        return $approvalId;
+    }
+
+    public static function requestCallRelease(int $cardId, int $userId = 0): array
+    {
+        global $DB;
+        $userId = $userId ?: (int) Session::getLoginUserID();
+        $card = self::getCard($cardId);
+        if ($card === null) {
+            throw new RuntimeException('Chamado não encontrado.');
+        }
+        self::assertBoardAccess($card);
+        $boardId = (int) $card['plugin_tralla_boards_id'];
+        if (PluginTrallaBoard::roleFor($boardId, $userId) !== 'superadmin') {
+            throw new RuntimeException('Somente SuperAdmin pode solicitar a liberação.');
+        }
+        $approvalList = PluginTrallaBoard::findListByCategory($boardId, 'maintenance_approval');
+        if ($approvalList === null) {
+            throw new RuntimeException('O quadro não possui a lista "Manutenção Aprovação".');
+        }
+
+        $DB->beginTransaction();
+        try {
+            self::lockCardRow($cardId);
+            $card = self::getCard($cardId);
+            if ($card === null || (string) ($card['workflow_type'] ?? '') !== 'call'
+                || (int) $card['stage'] !== 1 || (string) $card['status'] !== 'pending'
+                || empty($card['is_locked']) || !empty($card['is_archived'])
+                || (int) ($card['approval_cards_id'] ?? 0) !== 0) {
+                throw new RuntimeException('Este chamado não está disponível para uma nova solicitação.');
+            }
+            $now = tralla_now();
+            $approvalId = self::createCallReleaseApproval($cardId, $boardId, $approvalList, $userId, $now);
+            $DB->update('glpi_plugin_tralla_cards', [
+                'approval_cards_id' => $approvalId,
+                'rejection_reason' => null,
+                'date_mod' => $now,
+            ], ['id' => $cardId]);
+            PluginTrallaHistory::log($cardId, $userId, 'call_release_requested', 'Nova solicitação de liberação enviada para aprovação.');
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
+        }
 
         return self::getCardDetail($cardId, $userId);
     }
@@ -773,16 +903,27 @@ class PluginTrallaCard extends CommonDBTM
         }
 
         $now = tralla_now();
-        $DB->update('glpi_plugin_tralla_cards', [
-            'plugin_tralla_lists_id' => (int) $list['id'],
-            'technician_id'          => $userId,
-            'status'                 => 'in_progress',
-            'date_taken'             => $now,
-            'date_mod'               => $now,
-            'rank'                   => self::nextRankForList((int) $list['id']),
-        ], ['id' => $id]);
-
-        PluginTrallaHistory::log($id, $userId, 'card_taken', 'Card pego por ' . tralla_user_name($userId) . '.');
+        $DB->beginTransaction();
+        try {
+            self::lockCardRow($id);
+            $card = self::getCard($id);
+            if ($card === null || !tralla_can_transition($card, 'take', $boardType)) {
+                throw new RuntimeException('Este card já foi pego ou não está disponível.');
+            }
+            $DB->update('glpi_plugin_tralla_cards', [
+                'plugin_tralla_lists_id' => (int) $list['id'],
+                'technician_id'          => $userId,
+                'status'                 => 'in_progress',
+                'date_taken'             => $now,
+                'date_mod'               => $now,
+                'rank'                   => self::nextRankForList((int) $list['id']),
+            ], ['id' => $id]);
+            PluginTrallaHistory::log($id, $userId, 'card_taken', 'Card pego por ' . tralla_user_name($userId) . '.');
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
+        }
 
         return self::getCardDetail($id, $userId);
     }
@@ -1176,6 +1317,9 @@ class PluginTrallaCard extends CommonDBTM
         if ($kind === 'split') {
             return self::decideSplit($approvalId, $approve, $reason, $userId, $isAdmin);
         }
+        if ($kind === 'call_release') {
+            return self::decideCallRelease($approvalId, $approve, $reason, $userId);
+        }
         if (!tralla_can_transition($approval, $approve ? 'approve' : 'reject', 'maintenance')) {
             throw new RuntimeException('Este card não está aguardando aprovação.');
         }
@@ -1307,6 +1451,80 @@ class PluginTrallaCard extends CommonDBTM
         $detail['family_ready'] = $familyReady;
 
         return $detail;
+    }
+
+    private static function decideCallRelease(int $approvalId, bool $approve, string $reason, int $userId): array
+    {
+        global $DB;
+        $approval = self::getCard($approvalId);
+        if ($approval === null || (int) $approval['stage'] !== 2
+            || (string) ($approval['approval_kind'] ?? '') !== 'call_release'
+            || (string) $approval['status'] !== 'waiting_approval' || !empty($approval['is_archived'])) {
+            throw new RuntimeException('Solicitação de liberação não encontrada.');
+        }
+        $parentId = (int) $approval['parent_cards_id'];
+        $parent = self::getCard($parentId);
+        if ($parent === null) {
+            throw new RuntimeException('Chamado de origem não encontrado.');
+        }
+        self::assertBoardAccess($parent);
+        $boardId = (int) $parent['plugin_tralla_boards_id'];
+        if (!self::userIsApprover($userId, $boardId)) {
+            throw new RuntimeException('Sem permissão para liberar chamados.');
+        }
+
+        $DB->beginTransaction();
+        try {
+            self::lockCardRow($parentId);
+            $approval = self::getCard($approvalId);
+            $parent = self::getCard($parentId);
+            if ($approval === null || $parent === null
+                || (int) $approval['stage'] !== 2
+                || (string) ($approval['approval_kind'] ?? '') !== 'call_release'
+                || (string) $approval['status'] !== 'waiting_approval'
+                || !empty($approval['is_archived'])
+                || (int) $approval['parent_cards_id'] !== $parentId
+                || (int) $approval['plugin_tralla_boards_id'] !== $boardId
+                || (string) ($parent['workflow_type'] ?? '') !== 'call'
+                || (int) $parent['stage'] !== 1
+                || (string) $parent['status'] !== 'pending'
+                || empty($parent['is_locked']) || !empty($parent['is_archived'])
+                || (int) ($parent['approval_cards_id'] ?? 0) !== $approvalId) {
+                throw new RuntimeException('Este chamado não está aguardando liberação.');
+            }
+            if (!self::userIsApprover($userId, $boardId)) {
+                throw new RuntimeException('Sem permissão para liberar chamados.');
+            }
+
+            $now = tralla_now();
+            $reason = trim(strip_tags($reason));
+            $DB->update('glpi_plugin_tralla_cards', [
+                'approval_cards_id' => 0,
+                'is_locked' => $approve ? 0 : 1,
+                'users_id_approver' => $userId,
+                'date_approved' => $approve ? $now : null,
+                'rejection_reason' => !$approve && $reason !== '' ? $reason : null,
+                'date_mod' => $now,
+            ], ['id' => $parentId]);
+            $DB->update('glpi_plugin_tralla_cards', [
+                'status' => $approve ? 'approved' : 'rejected',
+                'is_archived' => 1,
+                'users_id_approver' => $userId,
+                'rejection_reason' => !$approve && $reason !== '' ? $reason : null,
+                'date_mod' => $now,
+            ], ['id' => $approvalId]);
+            $message = $approve
+                ? 'Chamado liberado para ser assumido por um técnico.'
+                : 'Liberação do chamado recusada.' . ($reason !== '' ? ' Motivo: ' . $reason : '');
+            PluginTrallaHistory::log($parentId, $userId, $approve ? 'call_released' : 'call_release_rejected', $message);
+            PluginTrallaHistory::log($approvalId, $userId, $approve ? 'approval_approved' : 'approval_rejected', $message);
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
+        }
+
+        return self::getCardDetail($parentId, $userId);
     }
 
     public static function decideEdit(int $approvalId, bool $approve, string $reason, int $userId, bool $isAdmin): array

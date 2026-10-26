@@ -49,6 +49,7 @@ $bootstrap = [
         'entities_id'    => (int) $board->fields['entities_id'],
         'role'           => $role,
         'role_label'     => $roleLabel,
+        'can_defer_call' => $role === 'superadmin',
     ],
     'lists' => array_map(static function (array $list): array {
         return [
