@@ -1264,10 +1264,12 @@
         var cardTop = '<div class="tralla-card-top">'
             + '<span class="tralla-card-id-chip" title="ID do card: ' + attr(cardCode) + '">'
             + esc(cardCode) + '</span>'
+            + (card.workflow_type === 'call' ? '<span class="tralla-card-call-badge">Chamado</span>' : '')
             + (label || '<span class="tralla-card-top-spacer" aria-hidden="true"></span>')
             + '</div>';
 
-        return '<article class="tralla-card' + (card.is_locked ? ' is-locked' : '') + (cardApprovalClass ? ' ' + cardApprovalClass : '') + departingClass
+        return '<article class="tralla-card' + (card.workflow_type === 'call' ? ' is-call' : '')
+            + (card.is_locked ? ' is-locked' : '') + (cardApprovalClass ? ' ' + cardApprovalClass : '') + departingClass
             + '" data-card-id="' + cardId + '"'
             + (canDrag ? ' draggable="true"' : '')
             + ' tabindex="0" role="button" aria-label="Abrir card ' + attr(card.name) + '">'
@@ -1439,6 +1441,7 @@
             + '<div>'
             + '<div class="tralla-detail-code">' + esc(card.code || ('#' + card.id))
             + ' · ' + esc(card.list_name || '') + '</div>'
+            + (card.workflow_type === 'call' ? '<span class="tralla-card-call-badge">Chamado</span>' : '')
             + '<h2 class="tralla-detail-title">' + esc(card.name) + '</h2>'
             + (sub ? '<div class="tralla-detail-sub">' + sub + '</div>' : '')
             + '</div>'
@@ -1457,7 +1460,7 @@
         var rows = '';
         rows += metaRow('Código', card.code || ('#' + card.id));
         rows += metaRow('Lista', card.list_name);
-        rows += metaRow('Tipo', isMaintenance ? 'Manutenção' : 'Normal');
+        rows += metaRow('Tipo', isMaintenance ? (card.workflow_type === 'call' ? 'Chamado' : 'Manutenção') : 'Normal');
         rows += metaRow('Responsável', card.technician_name || 'Não atribuído');
         rows += metaRow('Criado por', card.creator_name);
         rows += metaRow('Criado em', formatDate(card.date_creation));
@@ -1483,9 +1486,11 @@
 
         if (permissions.finalize) {
             buttons += '<button type="button" class="tralla-btn tralla-btn-primary" data-card-action="finalize">'
-                + '<i class="ti ti-checkup-list"></i> Finalizar manutenção</button>';
+                + '<i class="ti ti-checkup-list"></i> Finalizar ' + (card.workflow_type === 'call' ? 'chamado' : 'manutenção') + '</button>';
         } else if (card.status === 'in_progress' && Number(card.stage) === 1) {
-            note = 'Preencha o relatório, marque Serviço realizado e escolha o status de todas as máquinas. Ao menos uma deve estar Concluída ou Inservível.';
+            note = card.workflow_type === 'call'
+                ? 'Preencha o relatório, marque Serviço realizado e deixe todas as máquinas como Concluída ou Inservível.'
+                : 'Preencha o relatório, marque Serviço realizado e escolha o status de todas as máquinas. Ao menos uma deve estar Concluída ou Inservível.';
         }
 
         if (permissions.approve) {
@@ -2102,7 +2107,9 @@
                         : (isEditApproval
                             ? 'Edição recusada. Alterações descartadas.'
                             : (isSplitApproval ? 'Separação recusada. Card liberado.'
-                                : 'Manutenção reprovada. O card voltou para Em Andamento.')),
+                                : (departingCard.workflow_type === 'call'
+                                    ? 'Chamado reprovado. O card voltou para Em Andamento.'
+                                    : 'Manutenção reprovada. O card voltou para Em Andamento.'))),
                     'success'
                 );
                 await openCard(rejected.card.id);
@@ -2131,8 +2138,9 @@
                     return machine.status === 'pending';
                 }).length;
                 var finalizeConfirmed = await confirmDialog({
-                    title: 'Finalizar manutenção',
-                    message: pendingCount > 0
+                    title: activeCard.workflow_type === 'call' ? 'Finalizar chamado' : 'Finalizar manutenção',
+                    message: activeCard.workflow_type === 'call'
+                        ? 'Finalizar o chamado e enviar para aprovação?' : pendingCount > 0
                         ? 'Enviar as máquinas concluídas ou inservíveis para aprovação e reunir ' + pendingCount + ' pendente(s) em um novo card?'
                         : 'Finalizar a manutenção e enviar para aprovação?',
                     icon: 'ti-checkup-list',
@@ -2199,7 +2207,8 @@
             } else if (action === 'finalize') {
                 data = await api('finalize_card', { id: cardId });
                 applyState(data);
-                toast(data.pending_card
+                toast(departingCard.workflow_type === 'call'
+                    ? 'Chamado finalizado e enviado para aprovação.' : data.pending_card
                     ? 'Manutenção enviada para aprovação. Máquinas pendentes no card ' + (data.pending_card.code || ('#' + data.pending_card.id)) + '.'
                     : 'Manutenção finalizada e enviada para aprovação.', 'success');
                 await openCard(data.approval ? data.approval.id : cardId);
@@ -2217,7 +2226,8 @@
                     toast('Separação aprovada. Novo card criado.', 'success');
                     await openCard(data.card.id);
                 } else {
-                    toast(data.card.family_ready
+                    toast(departingCard.workflow_type === 'call'
+                        ? 'Chamado aprovado e concluído.' : data.card.family_ready
                         ? 'Manutenção aprovada. Família reunida para retirada.'
                         : 'Manutenção aprovada. Aguardando os demais cards da família.', 'success');
                     await openCard(data.card.id);
@@ -3168,6 +3178,10 @@
             + '<p>' + esc(list.name) + ' · ' + (isMaintenance ? 'Fluxo de manutenção' : 'Quadro normal') + '</p>'
             + '</div>' + modalCloseButton() + '</div>'
             + '<div class="tralla-modal-body">'
+            + '<fieldset class="tralla-card-workflow-choice"><legend>Qual tipo de card?</legend>'
+            + '<label><input type="radio" name="workflow_type" value="maintenance" checked> Manutenção</label>'
+            + '<label><input type="radio" name="workflow_type" value="call"> Chamado</label>'
+            + '</fieldset>'
             + nameField
             + machinesSection
             + '</div>'
@@ -3236,6 +3250,8 @@
                 list_id: Number(form.dataset.listId || 0),
                 name: name,
                 source: 'manual',
+                workflow_type: form.querySelector('[name="workflow_type"]:checked')
+                    ? form.querySelector('[name="workflow_type"]:checked').value : 'maintenance',
                 machines: machines
             });
 

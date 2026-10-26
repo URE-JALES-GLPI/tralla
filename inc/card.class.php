@@ -375,6 +375,7 @@ class PluginTrallaCard extends CommonDBTM
         $role = $isAdmin ? 'superadmin' : PluginTrallaBoard::roleFor($boardId, $userId);
         $isMember = $role !== '';
         $status = (string) ($card['status'] ?? '');
+        $isCall = (string) ($card['workflow_type'] ?? 'maintenance') === 'call';
         $stage = (int) ($card['stage'] ?? 1);
         $locked = !empty($card['is_locked']);
         $isTechnician = (int) ($card['technician_id'] ?? 0) > 0
@@ -395,13 +396,15 @@ class PluginTrallaCard extends CommonDBTM
             && !$locked
             && ($isTechnician || $isAdmin)
             && tralla_all_machines_filled($card['machines'] ?? [])
-            && tralla_finalization_partition($card['machines'] ?? [])['ready'] !== [];
+            && tralla_finalization_partition($card['machines'] ?? [])['ready'] !== []
+            && (!$isCall || tralla_finalization_partition($card['machines'] ?? [])['pending'] === []);
 
         $canEditCard = $isMember
             && $boardType === 'normal'
             && $canUpdate;
 
         $canSplit = $isMember
+            && !$isCall
             && $boardType === 'maintenance'
             && $stage === 1
             && in_array($status, ['pending', 'in_progress'], true)
@@ -431,6 +434,7 @@ class PluginTrallaCard extends CommonDBTM
             && self::userIsApprover($userId, $boardId);
 
         $canConfirm = $isMember
+            && !$isCall
             && $boardType === 'maintenance'
             && $stage === 1
             && $status === 'withdrawal'
@@ -496,6 +500,10 @@ class PluginTrallaCard extends CommonDBTM
 
         $boardType = self::getBoardType($boards_id);
         $name = tralla_normalize_label($data['name'] ?? '');
+        $workflowType = $boardType === 'maintenance' ? (string) ($data['workflow_type'] ?? 'maintenance') : 'maintenance';
+        if (!in_array($workflowType, ['maintenance', 'call'], true)) {
+            throw new RuntimeException('Tipo de card inválido.');
+        }
         if ($name === '') {
             throw new RuntimeException('Informe o nome do card.');
         }
@@ -568,6 +576,7 @@ class PluginTrallaCard extends CommonDBTM
                 'family_seq'              => 1,
                 'split_from_cards_id'     => 0,
                 'status'                  => 'pending',
+                'workflow_type'           => $workflowType,
                 'is_locked'               => 0,
                 'is_archived'             => 0,
                 'source'                  => $source,
@@ -593,7 +602,8 @@ class PluginTrallaCard extends CommonDBTM
                 $rank += 1024.0;
             }
 
-            PluginTrallaHistory::log($cardId, $userId, 'card_created', 'Card de manutenção criado com ' . count($machines) . ' máquina(s).');
+            PluginTrallaHistory::log($cardId, $userId, 'card_created',
+                ($workflowType === 'call' ? 'Chamado' : 'Card de manutenção') . ' criado com ' . count($machines) . ' máquina(s).');
 
             return self::getCardDetail($cardId, $userId);
         }
@@ -797,7 +807,9 @@ class PluginTrallaCard extends CommonDBTM
             'machine'  => PluginTrallaMachine::getMachine($machineId),
             'progress' => tralla_machines_progress($machines),
             'can_finalize' => tralla_all_machines_filled($machines)
-                && tralla_finalization_partition($machines)['ready'] !== [],
+                && tralla_finalization_partition($machines)['ready'] !== []
+                && ((string) ($card['workflow_type'] ?? 'maintenance') !== 'call'
+                    || tralla_finalization_partition($machines)['pending'] === []),
         ];
     }
 
@@ -980,6 +992,10 @@ class PluginTrallaCard extends CommonDBTM
             if ($partition['ready'] === []) {
                 throw new RuntimeException('Conclua ou marque como Inservível ao menos uma máquina antes de finalizar.');
             }
+            $isCall = (string) ($card['workflow_type'] ?? 'maintenance') === 'call';
+            if ($isCall && $partition['pending'] !== []) {
+                throw new RuntimeException('Conclua ou marque como Inservível todas as máquinas do chamado antes de finalizar.');
+            }
 
             $approvalList = PluginTrallaBoard::findListByCategory($boards_id, 'maintenance_approval');
             if ($approvalList === null) {
@@ -1010,6 +1026,7 @@ class PluginTrallaCard extends CommonDBTM
                     'split_from_cards_id'     => $id,
                     'approval_kind'           => 'maintenance',
                     'status'                  => 'pending',
+                    'workflow_type'           => (string) ($card['workflow_type'] ?? 'maintenance'),
                     'is_locked'               => 0,
                     'is_archived'             => 0,
                     'source'                  => (string) $card['source'],
@@ -1047,6 +1064,7 @@ class PluginTrallaCard extends CommonDBTM
                 'split_from_cards_id'     => 0,
                 'approval_kind'           => 'maintenance',
                 'status'                  => 'waiting_approval',
+                'workflow_type'           => (string) ($card['workflow_type'] ?? 'maintenance'),
                 'is_locked'               => 0,
                 'is_archived'             => 0,
                 'source'                  => (string) $card['source'],
@@ -1085,7 +1103,7 @@ class PluginTrallaCard extends CommonDBTM
                 PluginTrallaHistory::log($id, $userId, 'card_split', 'Máquinas pendentes reunidas no novo card ' . $pendingCode . '.');
                 PluginTrallaHistory::log($pendingCardId, $userId, 'card_split', 'Card criado com as máquinas pendentes de ' . tralla_display_code($card, $boardType) . '.');
             }
-            PluginTrallaHistory::log($id, $userId, 'card_finalized', 'Manutenção finalizada; card de aprovação ' . $approvalCode . ' criado.');
+            PluginTrallaHistory::log($id, $userId, 'card_finalized', ($isCall ? 'Chamado' : 'Manutenção') . ' finalizado; card de aprovação ' . $approvalCode . ' criado.');
             PluginTrallaHistory::log($approvalId, $userId, 'approval_created', 'Aguardando decisão de aprovação.');
 
             $DB->commit();
@@ -1171,8 +1189,16 @@ class PluginTrallaCard extends CommonDBTM
             }
 
             if ($approve) {
+                $isCall = (string) ($parent['workflow_type'] ?? 'maintenance') === 'call';
+                $doneList = $isCall
+                    ? PluginTrallaBoard::findListByCategory($boards_id, 'maintenance_done') : null;
+                if ($isCall && $doneList === null) {
+                    throw new RuntimeException('O quadro não possui a lista "Manutenção Concluído".');
+                }
                 $DB->update('glpi_plugin_tralla_cards', [
-                    'status'            => 'approved',
+                    'status'            => $isCall ? 'done' : 'approved',
+                    'plugin_tralla_lists_id' => $isCall ? (int) $doneList['id'] : (int) $parent['plugin_tralla_lists_id'],
+                    'rank'              => $isCall ? self::nextRankForList((int) $doneList['id']) : (float) $parent['rank'],
                     'is_locked'         => 1,
                     'approval_cards_id' => 0,
                     'users_id_approver' => $userId,
@@ -1188,19 +1214,17 @@ class PluginTrallaCard extends CommonDBTM
                     'date_mod'          => $now,
                 ], ['id' => $approvalId]);
 
-                $familyReady = self::syncFamilyWithdrawal(
-                    $boards_id,
-                    self::familyRoot($parent),
-                    $userId
+                $familyReady = $isCall || self::syncFamilyWithdrawal(
+                    $boards_id, self::familyRoot($parent), $userId
                 );
 
                 PluginTrallaHistory::log(
                     $parentId,
                     $userId,
                     'approval_approved',
-                    $familyReady
+                    $isCall ? 'Chamado aprovado e concluído.' : ($familyReady
                         ? 'Manutenção aprovada; família liberada para retirada.'
-                        : 'Manutenção aprovada; aguardando os demais cards da família.'
+                        : 'Manutenção aprovada; aguardando os demais cards da família.')
                 );
                 PluginTrallaHistory::log($approvalId, $userId, 'approval_approved', 'Aprovação concluída.');
             } else {
@@ -1605,6 +1629,7 @@ class PluginTrallaCard extends CommonDBTM
                 'family_seq'              => $approvalSeq,
                 'split_from_cards_id'     => 0,
                 'approval_kind'           => 'edit',
+                'workflow_type'           => (string) ($fresh['workflow_type'] ?? 'maintenance'),
                 'edit_payload'            => json_encode($payload, JSON_UNESCAPED_UNICODE),
                 'status'                  => 'waiting_approval',
                 'is_locked'               => 0,
@@ -2267,6 +2292,7 @@ class PluginTrallaCard extends CommonDBTM
                     'family_seq'              => $approvalSeq,
                     'split_from_cards_id'     => 0,
                     'approval_kind'           => 'deletion',
+                    'workflow_type'           => (string) ($fresh['workflow_type'] ?? 'maintenance'),
                     'status'                  => 'waiting_approval',
                     'is_locked'               => 0,
                     'is_archived'             => 0,

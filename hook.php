@@ -115,6 +115,7 @@ function plugin_tralla_install(): bool
                 `family_seq`              INT {$sign} NOT NULL DEFAULT '1' COMMENT 'posição na numeração visual',
                 `split_from_cards_id`     INT {$sign} NOT NULL DEFAULT '0' COMMENT 'card que originou a separação',
                 `status`                  VARCHAR(30)  NOT NULL DEFAULT '' COMMENT 'normal,pending,in_progress,waiting_approval,withdrawal,done,approved,rejected,deletion_pending,deleted',
+                `workflow_type`           VARCHAR(20)  NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|call',
                 `is_locked`               TINYINT(1)   NOT NULL DEFAULT '0',
                 `is_archived`             TINYINT(1)   NOT NULL DEFAULT '0',
                 `source`                  VARCHAR(30)  NOT NULL DEFAULT '' COMMENT 'notebook_desktop|tablet_mobile|manual',
@@ -158,6 +159,7 @@ function plugin_tralla_install(): bool
 
     // Colunas de exclusão em tabelas de cards já existentes.
     $cards_columns = [
+        'workflow_type'               => "VARCHAR(20) NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|call'",
         'is_deleted'                  => 'TINYINT(1)   NOT NULL DEFAULT 0',
         'approval_kind'               => "VARCHAR(20)  NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|deletion|edit|split'",
         'edit_payload'                => 'LONGTEXT     DEFAULT NULL',

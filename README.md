@@ -7,6 +7,8 @@ O Tralla combina dois tipos de quadro:
 - **Normal**: listas e cards livres, com drag & drop.
 - **Manutenção**: fluxo controlado com técnico responsável, relatório por máquina, aprovação, retirada e conclusão.
 
+Dentro de um quadro de manutenção, cada card pode ser **Manutenção** ou **Chamado**. O Chamado usa o mesmo preenchimento e a aprovação, mas não permite separar máquinas e, depois de aprovado, vai direto para **Concluído**, sem retirada. Os cards de Chamado têm destaque roxo.
+
 ## Requisitos
 
 - GLPI `>= 12.0.0` e `<= 12.0.99`

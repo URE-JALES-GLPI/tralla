@@ -377,7 +377,8 @@ if (!function_exists('tralla_can_transition')) {
             case 'reject':
                 return $stage === 2 && $status === 'waiting_approval';
             case 'withdraw':
-                return $stage === 1 && $status === 'withdrawal' && !$locked;
+                return $stage === 1 && $status === 'withdrawal' && !$locked
+                    && (string) ($card['workflow_type'] ?? 'maintenance') !== 'call';
         }
 
         return false;

@@ -1107,6 +1107,31 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
     border: 0;
     box-shadow: var(--tr-card-shadow-hover);
 }
+.tralla-board-scroll .tralla-card.is-call,
+.tralla-board-scroll .tralla-card.is-call:hover {
+    border-left: 4px solid #8b5cf6;
+    background: color-mix(in srgb, var(--tr-card-bg) 91%, #8b5cf6);
+}
+.tralla-card-call-badge {
+    background: #ede9fe;
+    border-radius: 5px;
+    color: #5b21b6;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 5px;
+    white-space: nowrap;
+}
+.tralla-card.is-call .tralla-card-top { flex-wrap: wrap; }
+.tralla-card-workflow-choice {
+    border: 1px solid var(--tr-border);
+    border-radius: 8px;
+    display: flex;
+    gap: 18px;
+    margin: 0 0 16px;
+    padding: 12px;
+}
+.tralla-card-workflow-choice legend { font-weight: 700; padding: 0 5px; }
+.tralla-card-workflow-choice label { align-items: center; cursor: pointer; display: inline-flex; gap: 5px; }
 
 .tralla-board-scroll .tralla-card.is-dragging {
     opacity: 0.38;

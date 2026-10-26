@@ -237,6 +237,7 @@ try {
                 'name'        => tralla_post_string('name'),
                 'description' => tralla_post_string('description'),
                 'source'      => tralla_post_string('source', 'manual'),
+                'workflow_type' => tralla_post_string('workflow_type', 'maintenance'),
                 'machines'    => $machines,
             ], $userId);
             tralla_json([
