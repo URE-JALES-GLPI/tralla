@@ -757,7 +757,7 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 }
 
 .tralla-list.is-drop-target {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.95), 0 8px 20px rgba(0, 0, 0, 0.24);
+    box-shadow: 0 0 0 2px var(--tr-primary), 0 8px 20px rgba(0, 0, 0, 0.24);
 }
 
 .tralla-list-head {
@@ -874,9 +874,18 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 }
 
 .tralla-board-scroll .tralla-card.is-dragging {
-    box-shadow: 0 12px 28px rgba(9, 30, 66, 0.35);
-    opacity: 0.9;
-    transform: rotate(3deg);
+    opacity: 0.38;
+}
+
+.tralla-board-scroll .tralla-card.tralla-drop-preview,
+.tralla-board-scroll .tralla-card.tralla-drop-preview:hover {
+    background: var(--tr-card-bg);
+    border: 2px dashed var(--tr-primary);
+    box-shadow: 0 4px 14px rgba(9, 30, 66, 0.16);
+    cursor: grabbing;
+    flex: 0 0 auto;
+    opacity: 0.78;
+    pointer-events: none;
 }
 
 .tralla-board-scroll .tralla-card.is-locked {

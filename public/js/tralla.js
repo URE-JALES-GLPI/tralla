@@ -344,6 +344,9 @@
     var labels = state.labels || {};
     var activeCard = null;
     var dragCardId = null;
+    var dragSource = null;
+    var dragPreview = null;
+    var moveInFlight = false;
     var lastFocused = null;
     var shouldRefreshBoard = false;
     var saveTimers = {};
@@ -655,7 +658,7 @@
         if (document.querySelector('.tralla-dialog-layer')) {
             return true;
         }
-        if (dragCardId !== null || inlineComposerListId !== null) {
+        if (dragCardId !== null || moveInFlight || inlineComposerListId !== null) {
             return true;
         }
         if (Object.keys(saveTimers).length > 0) {
@@ -1061,18 +1064,70 @@
             + '</article>';
     }
 
-    function computeDropRank(container, movingId, clientY) {
-        var cards = Array.prototype.slice.call(container.querySelectorAll('.tralla-card'))
+    function dropContainer(target) {
+        var list = target.closest('.tralla-list');
+        return list && listsEl.contains(list) ? list.querySelector('.tralla-cards') : null;
+    }
+
+    function clearDropPreview(keepSource) {
+        if (dragPreview) {
+            dragPreview.remove();
+            dragPreview = null;
+        }
+        if (dragSource && !keepSource) {
+            dragSource.classList.remove('is-dragging');
+            dragSource = null;
+        }
+        Array.prototype.forEach.call(listsEl.querySelectorAll('.is-drag-over, .is-drop-target'), function (element) {
+            element.classList.remove('is-drag-over', 'is-drop-target');
+        });
+    }
+
+    function positionDropPreview(container, clientY) {
+        if (!dragSource) {
+            return;
+        }
+        if (!dragPreview) {
+            dragPreview = dragSource.cloneNode(true);
+            dragPreview.classList.remove('is-dragging');
+            dragPreview.classList.add('tralla-drop-preview');
+            dragPreview.removeAttribute('data-card-id');
+            dragPreview.removeAttribute('draggable');
+            dragPreview.removeAttribute('tabindex');
+            dragPreview.removeAttribute('role');
+            dragPreview.setAttribute('aria-hidden', 'true');
+        }
+
+        var cards = Array.prototype.slice.call(container.querySelectorAll('.tralla-card:not(.tralla-drop-preview)'))
+            .filter(function (element) {
+                return Number(element.dataset.cardId) !== dragCardId;
+            });
+        var next = cards.find(function (element) {
+            var rect = element.getBoundingClientRect();
+            return clientY < rect.top + rect.height / 2;
+        });
+        if (dragPreview.parentNode !== container || dragPreview.nextElementSibling !== (next || null)) {
+            container.insertBefore(dragPreview, next || null);
+        }
+
+        Array.prototype.forEach.call(listsEl.querySelectorAll('.is-drag-over, .is-drop-target'), function (element) {
+            element.classList.remove('is-drag-over', 'is-drop-target');
+        });
+        container.classList.add('is-drag-over');
+        container.closest('.tralla-list').classList.add('is-drop-target');
+    }
+
+    function computeDropRank(container, movingId) {
+        var cards = Array.prototype.slice.call(container.querySelectorAll('.tralla-card:not(.tralla-drop-preview)'))
             .filter(function (element) {
                 return Number(element.dataset.cardId) !== Number(movingId);
             });
-
+        var previewIndex = Array.prototype.indexOf.call(container.children, dragPreview);
         var previous = null;
         var next = null;
 
         cards.forEach(function (element) {
-            var rect = element.getBoundingClientRect();
-            if (clientY >= rect.top + (rect.height / 2)) {
+            if (Array.prototype.indexOf.call(container.children, element) < previewIndex) {
                 previous = element;
             } else if (!next) {
                 next = element;
@@ -1091,7 +1146,7 @@
             return previousRank + 1024;
         }
         if (nextRank !== null) {
-            return Math.max(1, nextRank / 2);
+            return nextRank > 0 ? nextRank / 2 : 1;
         }
         return 1024;
     }
@@ -3068,62 +3123,71 @@
 
     listsEl.addEventListener('dragstart', function (event) {
         var cardElement = event.target.closest('.tralla-card');
-        if (!cardElement || isMaintenance || !can.move_card) {
+        if (!cardElement || isMaintenance || !can.move_card || moveInFlight || searchQuery !== '') {
             event.preventDefault();
             return;
         }
         dragCardId = Number(cardElement.dataset.cardId);
-        cardElement.classList.add('is-dragging');
+        dragSource = cardElement;
         event.dataTransfer.effectAllowed = 'move';
         event.dataTransfer.setData('text/plain', String(dragCardId));
+        // Let the browser capture the original card as the cursor image first.
+        window.setTimeout(function () {
+            if (dragSource === cardElement) {
+                cardElement.classList.add('is-dragging');
+            }
+        }, 0);
     });
 
-    listsEl.addEventListener('dragend', function (event) {
-        var cardElement = event.target.closest('.tralla-card');
-        if (cardElement) {
-            cardElement.classList.remove('is-dragging');
-        }
+    listsEl.addEventListener('dragend', function () {
         dragCardId = null;
-        Array.prototype.forEach.call(listsEl.querySelectorAll('.is-drag-over, .is-drop-target'), function (element) {
-            element.classList.remove('is-drag-over', 'is-drop-target');
-        });
+        clearDropPreview();
     });
 
     listsEl.addEventListener('dragover', function (event) {
-        var container = event.target.closest('.tralla-cards');
+        var container = dropContainer(event.target);
         if (!container || dragCardId === null) {
             return;
         }
         event.preventDefault();
         event.dataTransfer.dropEffect = 'move';
-        container.classList.add('is-drag-over');
-        var list = container.closest('.tralla-list');
-        if (list) {
-            list.classList.add('is-drop-target');
-        }
+        positionDropPreview(container, event.clientY);
     });
 
     listsEl.addEventListener('dragleave', function (event) {
-        var container = event.target.closest('.tralla-cards');
-        if (container && !container.contains(event.relatedTarget)) {
-            container.classList.remove('is-drag-over');
-            var list = container.closest('.tralla-list');
-            if (list) {
-                list.classList.remove('is-drop-target');
-            }
+        var bounds = listsEl.getBoundingClientRect();
+        var outside = event.clientX < bounds.left || event.clientX > bounds.right
+            || event.clientY < bounds.top || event.clientY > bounds.bottom;
+        if (outside && !listsEl.contains(event.relatedTarget)) {
+            clearDropPreview(true);
         }
     });
 
     listsEl.addEventListener('drop', async function (event) {
-        var container = event.target.closest('.tralla-cards');
+        var container = dropContainer(event.target);
         if (!container || dragCardId === null) {
             return;
         }
         event.preventDefault();
+        positionDropPreview(container, event.clientY);
         var movingId = dragCardId;
         var listId = Number(container.dataset.listId);
-        var rank = computeDropRank(container, movingId, event.clientY);
+        var rank = computeDropRank(container, movingId);
+        var card = getCard(movingId);
+        var originalListId = card ? Number(card.plugin_tralla_lists_id) : 0;
+        var originalRank = card ? Number(card.rank) : 0;
         dragCardId = null;
+        clearDropPreview();
+
+        if (!card || !Number.isFinite(rank)) {
+            return;
+        }
+
+        // Show the resulting board immediately while the server saves the move.
+        card.plugin_tralla_lists_id = listId;
+        card.rank = rank;
+        moveInFlight = true;
+        renderBoard();
 
         try {
             var data = await api('card_move', {
@@ -3133,7 +3197,12 @@
             });
             applyState(data);
         } catch (error) {
+            card.plugin_tralla_lists_id = originalListId;
+            card.rank = originalRank;
+            renderBoard();
             toast(error.message, 'error');
+        } finally {
+            moveInFlight = false;
         }
     });
 
