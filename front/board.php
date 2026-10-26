@@ -39,7 +39,12 @@ $pluginUrl = $root . '/plugins/tralla';
         <?php foreach ($dashboard as $person): ?>
             <article class="tralla-user-dash-card">
                 <header>
-                    <i class="ti ti-user-circle" aria-hidden="true"></i>
+                    <?php $personPicture = (int) $person['users_id'] > 0 ? tralla_user_picture_url((int) $person['users_id']) : ''; ?>
+                    <?php if ($personPicture !== ''): ?>
+                        <img class="tralla-user-dash-avatar" src="<?= tralla_h($personPicture) ?>" alt="" loading="lazy">
+                    <?php else: ?>
+                        <i class="ti ti-user-circle" aria-hidden="true"></i>
+                    <?php endif; ?>
                     <div>
                         <strong><?= tralla_h($person['name']) ?></strong>
                         <small><?= tralla_h($person['email']) ?></small>

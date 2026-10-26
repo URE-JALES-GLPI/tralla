@@ -3924,6 +3924,15 @@ body.tralla-modal-open {
     font-size: 28px;
     color: var(--tr-primary);
 }
+.tralla-user-dash-card .tralla-user-dash-avatar {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--tr-primary-soft);
+    background: var(--tr-primary-soft);
+}
 .tralla-user-dash-card header strong {
     display: block;
     font-size: 15px;
