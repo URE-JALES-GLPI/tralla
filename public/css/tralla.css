@@ -366,6 +366,38 @@ body[data-theme="dark"] .tralla-toast,
     transition: box-shadow 160ms ease, transform 160ms ease;
 }
 
+.tralla-board-tile-wrap {
+    min-width: 0;
+    position: relative;
+}
+
+.tralla-board-tile-edit {
+    align-items: center;
+    background: rgba(8, 22, 45, 0.52);
+    border: 1px solid rgba(255, 255, 255, 0.48);
+    border-radius: 9px;
+    color: #fff;
+    display: inline-flex;
+    height: 36px;
+    justify-content: center;
+    position: absolute;
+    right: 14px;
+    top: 14px;
+    width: 36px;
+    z-index: 2;
+}
+
+.tralla-board-tile-edit:hover,
+.tralla-board-tile-edit:focus-visible {
+    background: rgba(8, 22, 45, 0.85);
+    color: #fff;
+}
+
+.tralla-board-tile-edit:focus-visible {
+    outline: 3px solid #fff;
+    outline-offset: 2px;
+}
+
 .tralla-board-tile::after {
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 55%);
     content: "";
@@ -554,31 +586,56 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 .tralla-board-tile.tr-bg-linux,
 .tralla-kanban-page.tr-bg-linux,
 .tralla-board-create-theme-swatch.tr-bg-linux {
-    background: linear-gradient(135deg, #111827 0%, #9a3412 52%, #c2410c 100%);
+    background-color: #111827;
+    background-image: linear-gradient(180deg, rgba(6, 14, 35, 0.18), rgba(6, 14, 35, 0.38)), url('../img/wallpapers/linux.svg');
 }
 
 .tralla-board-tile.tr-bg-windows,
 .tralla-kanban-page.tr-bg-windows,
 .tralla-board-create-theme-swatch.tr-bg-windows {
-    background: linear-gradient(135deg, #0c4a6e 0%, #0369a1 52%, #1d4ed8 100%);
+    background-color: #0c4a6e;
+    background-image: linear-gradient(180deg, rgba(6, 14, 35, 0.18), rgba(6, 14, 35, 0.38)), url('../img/wallpapers/windows.svg');
 }
 
 .tralla-board-tile.tr-bg-mac,
 .tralla-kanban-page.tr-bg-mac,
 .tralla-board-create-theme-swatch.tr-bg-mac {
-    background: linear-gradient(135deg, #111827 0%, #475569 52%, #64748b 100%);
+    background-color: #111827;
+    background-image: linear-gradient(180deg, rgba(6, 14, 35, 0.18), rgba(6, 14, 35, 0.38)), url('../img/wallpapers/mac.svg');
 }
 
 .tralla-board-tile.tr-bg-tickets,
 .tralla-kanban-page.tr-bg-tickets,
 .tralla-board-create-theme-swatch.tr-bg-tickets {
-    background: linear-gradient(135deg, #0f172a 0%, #155e75 52%, #0f766e 100%);
+    background-color: #0f172a;
+    background-image: linear-gradient(180deg, rgba(6, 14, 35, 0.18), rgba(6, 14, 35, 0.38)), url('../img/wallpapers/chamados.svg');
 }
 
 .tralla-board-tile.tr-bg-maintenance,
 .tralla-kanban-page.tr-bg-maintenance,
 .tralla-board-create-theme-swatch.tr-bg-maintenance {
-    background: linear-gradient(135deg, #431407 0%, #92400e 52%, #b45309 100%);
+    background-color: #0b2447;
+    background-image: linear-gradient(180deg, rgba(6, 14, 35, 0.18), rgba(6, 14, 35, 0.38)), url('../img/wallpapers/manutencao.svg');
+}
+
+.tralla-board-tile.tr-bg-linux,
+.tralla-kanban-page.tr-bg-linux,
+.tralla-board-create-theme-swatch.tr-bg-linux,
+.tralla-board-tile.tr-bg-windows,
+.tralla-kanban-page.tr-bg-windows,
+.tralla-board-create-theme-swatch.tr-bg-windows,
+.tralla-board-tile.tr-bg-mac,
+.tralla-kanban-page.tr-bg-mac,
+.tralla-board-create-theme-swatch.tr-bg-mac,
+.tralla-board-tile.tr-bg-tickets,
+.tralla-kanban-page.tr-bg-tickets,
+.tralla-board-create-theme-swatch.tr-bg-tickets,
+.tralla-board-tile.tr-bg-maintenance,
+.tralla-kanban-page.tr-bg-maintenance,
+.tralla-board-create-theme-swatch.tr-bg-maintenance {
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
 }
 
 .tralla-kanban-head {
@@ -2115,8 +2172,15 @@ body[data-theme="dark"] .tralla-add-card:disabled:hover,
     border-radius: 5px;
     box-shadow: inset 0 0 0 1px rgba(9, 30, 66, 0.16);
     flex: 0 0 auto;
-    height: 28px;
-    width: 28px;
+    height: 36px;
+    width: 52px;
+}
+
+.tralla-edit-theme-preview {
+    display: block;
+    height: 120px;
+    margin-top: 10px;
+    width: 100%;
 }
 
 .tralla-board-create-theme-swatch.tr-bg-ocean {

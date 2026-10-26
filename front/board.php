@@ -111,31 +111,40 @@ $pluginUrl = $root . '/plugins/tralla';
                 $type = (string) $board['type'];
                 $isMaintenance = $type === 'maintenance';
                 $background = tralla_valid_background((string) $board['background']);
+                $canEditBoard = $canUpdate && PluginTrallaBoard::canAdminBoard($boardId);
                 ?>
-                <a class="tralla-board-tile tr-bg-<?= tralla_h($background) ?>"
-                   href="<?= tralla_h($pluginUrl) ?>/front/kanban.php?boards_id=<?= $boardId ?>">
-                    <span class="tralla-board-type <?= $isMaintenance ? 'is-maintenance' : '' ?>">
-                        <i class="ti <?= $isMaintenance ? 'ti-tool' : 'ti-layout-kanban' ?>"></i>
-                        <?= $isMaintenance ? 'Manutenção' : 'Normal' ?>
-                    </span>
-                    <h2><?= tralla_h($board['name']) ?></h2>
-                    <?php if (trim((string) $board['comment']) !== ''): ?>
-                        <p class="tralla-board-comment"><?= tralla_h($board['comment']) ?></p>
-                    <?php endif; ?>
-                    <div class="tralla-board-metrics">
-                        <span><i class="ti ti-list"></i> <?= (int) $stats['lists'] ?> listas</span>
-                        <span><i class="ti ti-cards"></i> <?= (int) $stats['cards'] ?> cards</span>
-                        <?php if ($isMaintenance): ?>
-                            <span class="tralla-pill pending"><i class="ti ti-clock"></i> <?= (int) $stats['pending'] ?> pendentes</span>
-                            <span class="tralla-pill is-in-progress"><i class="ti ti-progress"></i> <?= (int) $stats['in_progress'] ?> em andamento</span>
-                            <span class="tralla-pill withdrawal"><i class="ti ti-package"></i> <?= (int) $stats['withdrawal'] ?> retiradas</span>
+                <div class="tralla-board-tile-wrap">
+                    <a class="tralla-board-tile tr-bg-<?= tralla_h($background) ?>"
+                       href="<?= tralla_h($pluginUrl) ?>/front/kanban.php?boards_id=<?= $boardId ?>">
+                        <span class="tralla-board-type <?= $isMaintenance ? 'is-maintenance' : '' ?>">
+                            <i class="ti <?= $isMaintenance ? 'ti-tool' : 'ti-layout-kanban' ?>"></i>
+                            <?= $isMaintenance ? 'Manutenção' : 'Normal' ?>
+                        </span>
+                        <h2><?= tralla_h($board['name']) ?></h2>
+                        <?php if (trim((string) $board['comment']) !== ''): ?>
+                            <p class="tralla-board-comment"><?= tralla_h($board['comment']) ?></p>
                         <?php endif; ?>
-                    </div>
-                    <footer>
-                        <span><?= tralla_h(tralla_user_name((int) $board['users_id'])) ?></span>
-                        <span><?= tralla_h(tralla_date($board['date_mod'])) ?></span>
-                    </footer>
-                </a>
+                        <div class="tralla-board-metrics">
+                            <span><i class="ti ti-list"></i> <?= (int) $stats['lists'] ?> listas</span>
+                            <span><i class="ti ti-cards"></i> <?= (int) $stats['cards'] ?> cards</span>
+                            <?php if ($isMaintenance): ?>
+                                <span class="tralla-pill pending"><i class="ti ti-clock"></i> <?= (int) $stats['pending'] ?> pendentes</span>
+                                <span class="tralla-pill is-in-progress"><i class="ti ti-progress"></i> <?= (int) $stats['in_progress'] ?> em andamento</span>
+                                <span class="tralla-pill withdrawal"><i class="ti ti-package"></i> <?= (int) $stats['withdrawal'] ?> retiradas</span>
+                            <?php endif; ?>
+                        </div>
+                        <footer>
+                            <span><?= tralla_h(tralla_user_name((int) $board['users_id'])) ?></span>
+                            <span><?= tralla_h(tralla_date($board['date_mod'])) ?></span>
+                        </footer>
+                    </a>
+                    <?php if ($canEditBoard): ?>
+                        <a class="tralla-board-tile-edit" href="<?= tralla_h($pluginUrl) ?>/front/board.form.php?id=<?= $boardId ?>"
+                           aria-label="Editar quadro <?= tralla_h($board['name']) ?>" title="Editar quadro">
+                            <i class="ti ti-pencil" aria-hidden="true"></i>
+                        </a>
+                    <?php endif; ?>
+                </div>
             <?php endforeach; ?>
         </div>
     <?php endif; ?>

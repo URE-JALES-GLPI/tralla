@@ -8,6 +8,14 @@
     var bootstrapEl = document.getElementById('tralla-bootstrap');
     var root = document.getElementById('tralla-kanban');
     var boardModal = document.getElementById('tralla-board-create');
+    var themeSelect = document.querySelector('[data-tralla-theme-select]');
+    var themePreview = document.querySelector('[data-tralla-theme-preview]');
+
+    if (themeSelect && themePreview) {
+        themeSelect.addEventListener('change', function () {
+            themePreview.className = 'tralla-board-create-theme-swatch tralla-edit-theme-preview tr-bg-' + themeSelect.value;
+        });
+    }
 
     /**
      * Closes a modal only when the pointer press starts on its backdrop.

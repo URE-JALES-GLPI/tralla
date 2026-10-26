@@ -190,13 +190,15 @@ echo "<script>document.title = 'Tralla';</script>";
             </div>
             <div class="tralla-field">
                 <label for="tralla-edit-background">Tema</label>
-                <select id="tralla-edit-background" name="background" <?= $canUpdate ? '' : 'disabled' ?>>
+                <select id="tralla-edit-background" name="background" data-tralla-theme-select <?= $canUpdate ? '' : 'disabled' ?>>
                     <?php foreach (tralla_backgrounds() as $value => $label): ?>
                         <option value="<?= tralla_h($value) ?>" <?= $board->fields['background'] === $value ? 'selected' : '' ?>>
                             <?= tralla_h($label) ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
+                <span class="tralla-board-create-theme-swatch tralla-edit-theme-preview tr-bg-<?= tralla_h(tralla_valid_background((string) $board->fields['background'])) ?>"
+                      data-tralla-theme-preview aria-hidden="true"></span>
             </div>
             <div class="tralla-field">
                 <label for="tralla-edit-comment">Descrição</label>
