@@ -429,6 +429,108 @@
         });
     }, true);
 
+    /* Perfil do responsável, disponível na página inicial e no detalhe do card. */
+    var profileLayer = null;
+    var profilePreviousFocus = null;
+    var profileRequest = 0;
+
+    function closeUserProfile() {
+        if (!profileLayer) { return; }
+        profileLayer.remove();
+        profileLayer = null;
+        if ((!boardModal || boardModal.hidden)
+            && !(document.getElementById('tralla-modal-root') || {}).innerHTML) {
+            document.body.classList.remove('tralla-modal-open');
+        }
+        if (profilePreviousFocus && document.contains(profilePreviousFocus)) {
+            profilePreviousFocus.focus();
+        }
+        profilePreviousFocus = null;
+    }
+
+    async function openUserProfile(trigger) {
+        var usersId = Number(trigger.dataset.userProfile || 0);
+        if (!usersId) { return; }
+        var dash = document.querySelector('[data-user-profile-ajax]');
+        var bootstrap = document.getElementById('tralla-bootstrap');
+        var config = bootstrap ? JSON.parse(bootstrap.textContent || '{}') : {};
+        var ajaxUrl = dash ? dash.dataset.userProfileAjax : (config.urls || {}).ajax;
+        var csrf = dash ? dash.dataset.userProfileCsrf : config.csrf;
+        if (!ajaxUrl) { return; }
+        var requestId = ++profileRequest;
+        profilePreviousFocus = trigger;
+        var body = new FormData();
+        body.set('action', 'user_profile');
+        body.set('users_id', String(usersId));
+        body.set('_glpi_csrf_token', csrf || '');
+        try {
+            var response = await fetch(ajaxUrl, { method: 'POST', body: body, credentials: 'same-origin' });
+            var result = await response.json();
+            if (!response.ok || !result.ok) {
+                throw new Error(result.error || 'Não foi possível abrir o perfil.');
+            }
+            if (requestId !== profileRequest) { return; }
+            closeUserProfile();
+            profilePreviousFocus = trigger;
+            var user = result.user;
+            var stats = user.stats || {};
+            var stage = trigger.dataset.userStage || '';
+            var photo = user.picture_url
+                ? '<img src="' + dialogEscape(user.picture_url) + '" alt="Foto de ' + dialogEscape(user.name) + '">'
+                : '<span>' + dialogEscape(String(user.name || '?').charAt(0).toUpperCase()) + '</span>';
+            var steps = [
+                ['pending', 'Pendente', 'is-pending'],
+                ['in_progress', 'Em andamento', 'is-progress'],
+                ['withdrawal', 'Retirada', 'is-withdrawal'],
+                ['done', 'Concluído', 'is-done']
+            ];
+            profileLayer = document.createElement('div');
+            profileLayer.className = 'tralla-user-profile-layer';
+            profileLayer.innerHTML = '<div class="tralla-modal-backdrop" data-user-profile-backdrop></div>'
+                + '<section class="tralla-user-profile tralla-modal" role="dialog" aria-modal="true" aria-label="Informações de '
+                + dialogEscape(user.name) + '">'
+                + '<button type="button" class="tralla-icon-btn tralla-user-profile-close" data-user-profile-close aria-label="Fechar"><i class="ti ti-x"></i></button>'
+                + '<div class="tralla-user-profile-head"><button type="button" class="tralla-user-profile-photo" data-user-photo-expand aria-label="Ampliar foto">'
+                + photo + '</button><div><h2>' + dialogEscape(user.name) + '</h2>'
+                + (user.email ? '<p>' + dialogEscape(user.email) + '</p>' : '')
+                + '<small>Usuário GLPI #' + Number(user.id) + '</small></div></div>'
+                + '<h3>Manutenções</h3><p class="tralla-user-profile-caption">Quadros de manutenção aos quais você tem acesso</p>'
+                + '<div class="tralla-user-profile-stats">' + steps.map(function (step) {
+                    return '<div class="' + step[2] + (stage === step[0] ? ' is-selected' : '') + '"><span>'
+                        + step[1] + '</span><strong>' + Number(stats[step[0]] || 0) + '</strong></div>';
+                }).join('') + '</div></section>';
+            document.body.appendChild(profileLayer);
+            document.body.classList.add('tralla-modal-open');
+            bindBackdropDismiss(profileLayer.querySelector('[data-user-profile-backdrop]'), closeUserProfile);
+            profileLayer.querySelector('[data-user-profile-close]').focus();
+        } catch (error) {
+            window.alert(error.message || 'Não foi possível abrir o perfil.');
+        }
+    }
+
+    document.addEventListener('click', function (event) {
+        var trigger = event.target.closest('[data-user-profile]');
+        if (trigger) {
+            event.preventDefault();
+            openUserProfile(trigger);
+            return;
+        }
+        if (!profileLayer) { return; }
+        if (event.target.closest('[data-user-profile-close]')) { closeUserProfile(); return; }
+        var photo = event.target.closest('[data-user-photo-expand]');
+        if (photo) {
+            profileLayer.classList.toggle('is-photo-expanded');
+            photo.setAttribute('aria-label', profileLayer.classList.contains('is-photo-expanded') ? 'Reduzir foto' : 'Ampliar foto');
+        }
+    });
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && profileLayer) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            closeUserProfile();
+        }
+    }, true);
+
     if (!bootstrapEl || !root) {
         return;
     }
@@ -1327,8 +1429,10 @@
             sub += '<span>' + esc(card.source_label) + '</span>';
         }
         if (card.technician_name) {
-            sub += '<span class="tralla-card-tech">' + avatar(card.technician_name, card.technician_picture_url)
-                + esc(card.technician_name) + '</span>';
+            sub += '<button type="button" class="tralla-card-tech tralla-user-profile-trigger" data-user-profile="'
+                + Number(card.technician_id) + '" aria-label="Ver informações de ' + attr(card.technician_name) + '">'
+                + avatar(card.technician_name, card.technician_picture_url)
+                + esc(card.technician_name) + '</button>';
         }
 
         return '<div class="tralla-modal-head">'

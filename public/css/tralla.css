@@ -4136,6 +4136,20 @@ body.tralla-modal-open {
     gap: var(--tr-space-3);
     margin-bottom: var(--tr-space-3);
 }
+.tralla-user-dash-person {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    display: flex;
+    gap: var(--tr-space-3);
+    min-width: 0;
+    padding: 0;
+    text-align: left;
+}
+.tralla-user-dash-person:not(:disabled) { cursor: pointer; }
+.tralla-user-dash-person:hover strong { color: var(--tr-primary); }
+.tralla-user-dash-person > i { color: var(--tr-primary); font-size: 28px; }
 .tralla-user-dash-card header > i {
     font-size: 28px;
     color: var(--tr-primary);
@@ -4177,6 +4191,24 @@ body.tralla-modal-open {
     color: var(--tr-text-soft);
     line-height: 1.2;
 }
+.tralla-user-dash-card dt button {
+    background: transparent;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 48px;
+    padding: 0;
+    width: 100%;
+}
+.tralla-user-dash-card dt button:hover { text-decoration: underline; }
+.tralla-user-dash-card dt b { font-size: 22px; font-variant-numeric: tabular-nums; }
+.tralla-user-dash-card .is-pending b { color: var(--tr-warning); }
+.tralla-user-dash-card .is-progress b { color: var(--tr-primary); }
+.tralla-user-dash-card .is-withdrawal b { color: var(--tr-purple); }
+.tralla-user-dash-card .is-done b { color: var(--tr-success); }
 .tralla-user-dash-card dd {
     margin: 2px 0 0;
     font-size: 22px;
@@ -4195,6 +4227,71 @@ body.tralla-modal-open {
     margin: 0;
     color: var(--tr-muted);
     font-size: 13px;
+}
+.tralla-user-profile-trigger {
+    background: transparent;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    padding: 0;
+}
+.tralla-user-profile-trigger:hover { text-decoration: underline; }
+.tralla-user-profile-layer {
+    align-items: center;
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    padding: 20px;
+    position: fixed;
+    z-index: 1400;
+}
+.tralla-user-profile-layer .tralla-modal-backdrop { position: absolute; z-index: 0; }
+.tralla-user-profile {
+    max-width: 560px;
+    padding: 28px;
+    position: relative;
+    z-index: 1;
+}
+.tralla-user-profile-close { position: absolute; right: 12px; top: 12px; }
+.tralla-user-profile-head { align-items: center; display: flex; gap: 18px; padding-right: 24px; }
+.tralla-user-profile-head h2 { font-size: 21px; margin: 0 0 4px; overflow-wrap: anywhere; }
+.tralla-user-profile-head p { color: var(--tr-muted); margin: 0 0 4px; overflow-wrap: anywhere; }
+.tralla-user-profile-head small { color: var(--tr-muted); }
+.tralla-user-profile-photo {
+    align-items: center;
+    background: var(--tr-primary-soft);
+    border: 3px solid var(--tr-primary-soft);
+    border-radius: 50%;
+    color: var(--tr-primary);
+    cursor: pointer;
+    display: flex;
+    flex: 0 0 76px;
+    font-size: 32px;
+    font-weight: 700;
+    height: 76px;
+    justify-content: center;
+    overflow: hidden;
+    padding: 0;
+    transition: height 180ms ease, flex-basis 180ms ease;
+}
+.tralla-user-profile-photo img { height: 100%; object-fit: cover; width: 100%; }
+.tralla-user-profile h3 { font-size: 15px; margin: 25px 0 2px; }
+.tralla-user-profile-caption { color: var(--tr-muted); font-size: 12px; margin: 0 0 12px; }
+.tralla-user-profile-stats { display: grid; gap: 9px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.tralla-user-profile-stats > div { border-radius: 8px; display: flex; flex-direction: column; gap: 3px; padding: 11px 8px; text-align: center; }
+.tralla-user-profile-stats span { font-size: 11px; }
+.tralla-user-profile-stats strong { font-size: 23px; }
+.tralla-user-profile-stats .is-pending { background: var(--tr-warning-soft); color: var(--tr-warning); }
+.tralla-user-profile-stats .is-progress { background: var(--tr-primary-soft); color: var(--tr-primary); }
+.tralla-user-profile-stats .is-withdrawal { background: var(--tr-purple-soft); color: var(--tr-purple); }
+.tralla-user-profile-stats .is-done { background: var(--tr-success-soft); color: var(--tr-success); }
+.tralla-user-profile-stats .is-selected { outline: 2px solid currentColor; outline-offset: 2px; }
+.tralla-user-profile-layer.is-photo-expanded .tralla-user-profile-head { flex-direction: column; padding-right: 0; text-align: center; }
+.tralla-user-profile-layer.is-photo-expanded .tralla-user-profile-photo { flex-basis: 240px; height: 240px; width: 240px; }
+@media (max-width: 480px) {
+    .tralla-user-profile { padding: 22px; }
+    .tralla-user-profile-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 480px) {
     .tralla-user-dash-card dl { grid-template-columns: repeat(2, 1fr); }

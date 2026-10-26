@@ -46,29 +46,31 @@ $pluginUrl = $root . '/plugins/tralla';
 ?>
 <div class="tralla-page tralla-boards-page">
     <?php if ($dashboard !== []): ?>
-    <section class="tralla-user-dash" aria-label="Manutenções por usuário">
+    <section class="tralla-user-dash" aria-label="Manutenções por usuário"
+             data-user-profile-ajax="<?= tralla_h($pluginUrl) ?>/front/ajax.php"
+             data-user-profile-csrf="<?= tralla_h(tralla_csrf_token()) ?>">
         <?php foreach ($dashboard as $person): ?>
             <article class="tralla-user-dash-card">
                 <header>
                     <?php $personPicture = (int) $person['users_id'] > 0 ? tralla_user_picture_url((int) $person['users_id']) : ''; ?>
-                    <?php if ($personPicture !== ''): ?>
-                        <img class="tralla-user-dash-avatar" src="<?= tralla_h($personPicture) ?>" alt="" loading="lazy">
-                    <?php else: ?>
-                        <i class="ti ti-user-circle" aria-hidden="true"></i>
-                    <?php endif; ?>
-                    <div>
-                        <strong><?= tralla_h($person['name']) ?></strong>
-                        <small><?= tralla_h($person['email']) ?></small>
-                    </div>
+                    <button type="button" class="tralla-user-dash-person" data-user-profile="<?= (int) $person['users_id'] ?>"
+                            aria-label="Ver informações de <?= tralla_h($person['name']) ?>" <?= (int) $person['users_id'] === 0 ? 'disabled' : '' ?>>
+                        <?php if ($personPicture !== ''): ?>
+                            <img class="tralla-user-dash-avatar" src="<?= tralla_h($personPicture) ?>" alt="" loading="lazy">
+                        <?php else: ?>
+                            <i class="ti ti-user-circle" aria-hidden="true"></i>
+                        <?php endif; ?>
+                        <span><strong><?= tralla_h($person['name']) ?></strong><small><?= tralla_h($person['email']) ?></small></span>
+                    </button>
                 </header>
                 <?php if ((int) $person['users_id'] === 0): ?>
                     <p class="tralla-user-dash-missing">Usuário não encontrado no GLPI.</p>
                 <?php else: ?>
                     <dl>
-                        <div class="is-pending"><dt>Pendente</dt><dd><?= (int) $person['pending'] ?></dd></div>
-                        <div class="is-progress"><dt>Em andamento</dt><dd><?= (int) $person['in_progress'] ?></dd></div>
-                        <div class="is-withdrawal"><dt>Retirada</dt><dd><?= (int) $person['withdrawal'] ?></dd></div>
-                        <div class="is-done"><dt>Concluído</dt><dd><?= (int) $person['done'] ?></dd></div>
+                        <div class="is-pending"><dt><button type="button" data-user-profile="<?= (int) $person['users_id'] ?>" data-user-stage="pending">Pendente <b><?= (int) $person['pending'] ?></b></button></dt></div>
+                        <div class="is-progress"><dt><button type="button" data-user-profile="<?= (int) $person['users_id'] ?>" data-user-stage="in_progress">Em andamento <b><?= (int) $person['in_progress'] ?></b></button></dt></div>
+                        <div class="is-withdrawal"><dt><button type="button" data-user-profile="<?= (int) $person['users_id'] ?>" data-user-stage="withdrawal">Retirada <b><?= (int) $person['withdrawal'] ?></b></button></dt></div>
+                        <div class="is-done"><dt><button type="button" data-user-profile="<?= (int) $person['users_id'] ?>" data-user-stage="done">Concluído <b><?= (int) $person['done'] ?></b></button></dt></div>
                     </dl>
                 <?php endif; ?>
             </article>

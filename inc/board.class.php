@@ -447,39 +447,40 @@ class PluginTrallaBoard extends CommonDBTM
                 'done'        => 0,
             ];
 
-            if ($usersId > 0 && $boardIds !== []) {
-                $base = [
-                    'plugin_tralla_boards_id' => array_values(array_map('intval', $boardIds)),
-                    'stage'                   => 1,
-                    'is_deleted'              => 0,
-                ];
-
-                $item['pending'] = countElementsInTable('glpi_plugin_tralla_cards', $base + [
-                    'status'        => 'pending',
-                    'is_archived'   => 0,
-                    'technician_id' => 0,
-                    'users_id'      => $usersId,
-                ]);
-                $item['in_progress'] = countElementsInTable('glpi_plugin_tralla_cards', $base + [
-                    'status'        => 'in_progress',
-                    'is_archived'   => 0,
-                    'technician_id' => $usersId,
-                ]);
-                $item['withdrawal'] = countElementsInTable('glpi_plugin_tralla_cards', $base + [
-                    'status'        => 'withdrawal',
-                    'is_archived'   => 0,
-                    'technician_id' => $usersId,
-                ]);
-                $item['done'] = countElementsInTable('glpi_plugin_tralla_cards', $base + [
-                    'status'        => 'done',
-                    'technician_id' => $usersId,
-                ]);
-            }
+            $item = array_merge($item, self::getUserMaintenanceStats($usersId, $boardIds));
 
             $summary[$email] = $item;
         }
 
         return array_values($summary);
+    }
+
+    /** @param int[] $boardIds */
+    public static function getUserMaintenanceStats(int $usersId, array $boardIds): array
+    {
+        $stats = ['pending' => 0, 'in_progress' => 0, 'withdrawal' => 0, 'done' => 0];
+        if ($usersId <= 0 || $boardIds === []) {
+            return $stats;
+        }
+
+        $base = [
+            'plugin_tralla_boards_id' => array_values(array_map('intval', $boardIds)),
+            'stage'                   => 1,
+            'is_deleted'              => 0,
+        ];
+        $stats['pending'] = countElementsInTable('glpi_plugin_tralla_cards', $base + [
+            'status' => 'pending', 'is_archived' => 0, 'technician_id' => 0, 'users_id' => $usersId,
+        ]);
+        foreach (['in_progress', 'withdrawal'] as $status) {
+            $stats[$status] = countElementsInTable('glpi_plugin_tralla_cards', $base + [
+                'status' => $status, 'is_archived' => 0, 'technician_id' => $usersId,
+            ]);
+        }
+        $stats['done'] = countElementsInTable('glpi_plugin_tralla_cards', $base + [
+            'status' => 'done', 'technician_id' => $usersId,
+        ]);
+
+        return $stats;
     }
 
     /**

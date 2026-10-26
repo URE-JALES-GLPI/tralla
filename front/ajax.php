@@ -35,6 +35,33 @@ $isAdmin = Session::haveRight('plugin_tralla', PURGE);
 
 try {
     switch ($action) {
+        case 'user_profile':
+            $profileUserId = tralla_post_int('users_id');
+            $profile = tralla_user_profile($profileUserId);
+            if ($profileUserId <= 0 || $profile['name'] === '') {
+                throw new RuntimeException('Usuário não encontrado.');
+            }
+            $maintenanceBoardIds = [];
+            foreach (PluginTrallaBoard::getVisibleBoards(true) as $visibleBoard) {
+                if ((string) $visibleBoard['type'] === 'maintenance') {
+                    $maintenanceBoardIds[] = (int) $visibleBoard['id'];
+                }
+            }
+            $email = '';
+            foreach ($DB->request([
+                'SELECT' => ['email'], 'FROM' => 'glpi_useremails',
+                'WHERE' => ['users_id' => $profileUserId], 'LIMIT' => 1,
+            ]) as $userEmail) {
+                $email = (string) $userEmail['email'];
+            }
+            tralla_json(['ok' => true, 'user' => [
+                'id' => $profileUserId,
+                'name' => $profile['name'],
+                'email' => $email,
+                'picture_url' => $profile['picture_url'],
+                'stats' => PluginTrallaBoard::getUserMaintenanceStats($profileUserId, $maintenanceBoardIds),
+            ]]);
+
         case 'board_group_create':
         case 'board_group_rename':
         case 'board_group_delete':
