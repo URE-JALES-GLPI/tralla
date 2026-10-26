@@ -395,9 +395,11 @@ class PluginTrallaCard extends CommonDBTM
             && $status === 'in_progress'
             && !$locked
             && ($isTechnician || $isAdmin)
-            && tralla_all_machines_filled($card['machines'] ?? [])
-            && tralla_finalization_partition($card['machines'] ?? [])['ready'] !== []
-            && (!$isCall || tralla_finalization_partition($card['machines'] ?? [])['pending'] === []);
+            && ($isCall && ($card['machines'] ?? []) === []
+                ? trim((string) ($card['service_report'] ?? '')) !== ''
+                : (tralla_all_machines_filled($card['machines'] ?? [])
+                    && tralla_finalization_partition($card['machines'] ?? [])['ready'] !== []
+                    && (!$isCall || tralla_finalization_partition($card['machines'] ?? [])['pending'] === [])));
 
         $canEditCard = $isMember
             && $boardType === 'normal'
@@ -453,8 +455,8 @@ class PluginTrallaCard extends CommonDBTM
             'view'             => true,
             'edit_card'        => $canEditCard,
             'edit_machines'    => $canEditMachines,
-            'add_machine'      => $canEditMachines,
-            'delete_machine'   => $canEditMachines,
+            'add_machine'      => $canEditMachines && !$isCall,
+            'delete_machine'   => $canEditMachines && !$isCall,
             'split'            => $canSplit,
             'edit_request'     => $canEditRequest,
             'take'             => $canTake,
@@ -523,8 +525,14 @@ class PluginTrallaCard extends CommonDBTM
             }
 
             $requestedMachines = $data['machines'] ?? [];
-            if (!is_array($requestedMachines) || $requestedMachines === []) {
+            if ($workflowType === 'call' && $description === '') {
+                throw new RuntimeException('Descreva a situação do chamado.');
+            }
+            if ($workflowType !== 'call' && (!is_array($requestedMachines) || $requestedMachines === [])) {
                 throw new RuntimeException('Informe ao menos uma máquina.');
+            }
+            if ($workflowType === 'call') {
+                $requestedMachines = [];
             }
 
             $machines = [];
@@ -677,6 +685,28 @@ class PluginTrallaCard extends CommonDBTM
 
         $DB->update('glpi_plugin_tralla_cards', $fields, ['id' => $id]);
         PluginTrallaHistory::log($id, $userId ?: (int) Session::getLoginUserID(), 'card_updated', 'Dados do card atualizados.');
+
+        return self::getCardDetail($id, $userId);
+    }
+
+    public static function updateCallReport(int $id, string $report, int $userId = 0, bool $isAdmin = false): array
+    {
+        global $DB;
+        $userId = $userId ?: (int) Session::getLoginUserID();
+        $card = self::getCard($id);
+        if ($card === null) {
+            throw new RuntimeException('Chamado não encontrado.');
+        }
+        self::assertBoardAccess($card);
+        if ((string) ($card['workflow_type'] ?? 'maintenance') !== 'call'
+            || empty(self::permissionsFor($card, 'maintenance', $userId, $isAdmin)['edit_machines'])) {
+            throw new RuntimeException('Somente o técnico responsável pode editar o relatório do chamado em andamento.');
+        }
+        $DB->update('glpi_plugin_tralla_cards', [
+            'service_report' => tralla_normalize_report($report),
+            'date_mod' => tralla_now(),
+        ], ['id' => $id]);
+        PluginTrallaHistory::log($id, $userId, 'call_report_updated', 'Relatório do chamado atualizado.');
 
         return self::getCardDetail($id, $userId);
     }
@@ -985,14 +1015,18 @@ class PluginTrallaCard extends CommonDBTM
             }
 
             $machines = PluginTrallaMachine::getMachinesForCard($id);
-            if (!tralla_all_machines_filled($machines)) {
+            $isCall = (string) ($card['workflow_type'] ?? 'maintenance') === 'call';
+            $callWithoutMachines = $isCall && $machines === [];
+            if ($callWithoutMachines && trim((string) ($card['service_report'] ?? '')) === '') {
+                throw new RuntimeException('Preencha o relatório do chamado antes de finalizar.');
+            }
+            if (!$callWithoutMachines && !tralla_all_machines_filled($machines)) {
                 throw new RuntimeException('Preencha o relatório, marque Serviço realizado e escolha o status de todas as máquinas antes de finalizar.');
             }
-            $partition = tralla_finalization_partition($machines);
-            if ($partition['ready'] === []) {
+            $partition = $callWithoutMachines ? ['ready' => [], 'pending' => []] : tralla_finalization_partition($machines);
+            if (!$callWithoutMachines && $partition['ready'] === []) {
                 throw new RuntimeException('Conclua ou marque como Inservível ao menos uma máquina antes de finalizar.');
             }
-            $isCall = (string) ($card['workflow_type'] ?? 'maintenance') === 'call';
             if ($isCall && $partition['pending'] !== []) {
                 throw new RuntimeException('Conclua ou marque como Inservível todas as máquinas do chamado antes de finalizar.');
             }
@@ -1065,6 +1099,7 @@ class PluginTrallaCard extends CommonDBTM
                 'approval_kind'           => 'maintenance',
                 'status'                  => 'waiting_approval',
                 'workflow_type'           => (string) ($card['workflow_type'] ?? 'maintenance'),
+                'service_report'          => (string) ($card['service_report'] ?? ''),
                 'is_locked'               => 0,
                 'is_archived'             => 0,
                 'source'                  => (string) $card['source'],
@@ -1630,6 +1665,7 @@ class PluginTrallaCard extends CommonDBTM
                 'split_from_cards_id'     => 0,
                 'approval_kind'           => 'edit',
                 'workflow_type'           => (string) ($fresh['workflow_type'] ?? 'maintenance'),
+                'service_report'          => (string) ($fresh['service_report'] ?? ''),
                 'edit_payload'            => json_encode($payload, JSON_UNESCAPED_UNICODE),
                 'status'                  => 'waiting_approval',
                 'is_locked'               => 0,
@@ -2293,6 +2329,7 @@ class PluginTrallaCard extends CommonDBTM
                     'split_from_cards_id'     => 0,
                     'approval_kind'           => 'deletion',
                     'workflow_type'           => (string) ($fresh['workflow_type'] ?? 'maintenance'),
+                    'service_report'          => (string) ($fresh['service_report'] ?? ''),
                     'status'                  => 'waiting_approval',
                     'is_locked'               => 0,
                     'is_archived'             => 0,

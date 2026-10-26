@@ -104,6 +104,7 @@ function plugin_tralla_install(): bool
                 `plugin_tralla_lists_id`  INT {$sign} NOT NULL DEFAULT '0',
                 `name`                    VARCHAR(255) NOT NULL DEFAULT '',
                 `description`             LONGTEXT     DEFAULT NULL,
+                `service_report`          LONGTEXT     DEFAULT NULL,
                 `rank`                    DOUBLE       NOT NULL DEFAULT '0',
                 `users_id`                INT {$sign} NOT NULL DEFAULT '0',
                 `technician_id`           INT {$sign} NOT NULL DEFAULT '0',
@@ -159,6 +160,7 @@ function plugin_tralla_install(): bool
 
     // Colunas de exclusão em tabelas de cards já existentes.
     $cards_columns = [
+        'service_report'              => 'LONGTEXT DEFAULT NULL',
         'workflow_type'               => "VARCHAR(20) NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|call'",
         'is_deleted'                  => 'TINYINT(1)   NOT NULL DEFAULT 0',
         'approval_kind'               => "VARCHAR(20)  NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|deletion|edit|split'",

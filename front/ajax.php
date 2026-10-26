@@ -261,6 +261,14 @@ try {
             ], $userId, $isAdmin);
             tralla_json(['ok' => true, 'data' => ['card' => $detail, 'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id'])]]);
 
+        case 'call_report_update':
+            tralla_ajax_require(UPDATE);
+            $detail = PluginTrallaCard::updateCallReport(tralla_post_int('id'), tralla_post_string('report'), $userId, $isAdmin);
+            tralla_json(['ok' => true, 'data' => [
+                'card' => $detail,
+                'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id']),
+            ]]);
+
         case 'card_move':
             tralla_ajax_require(UPDATE);
             $cardId = tralla_post_int('id');

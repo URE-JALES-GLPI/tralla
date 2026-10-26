@@ -1488,8 +1488,8 @@
             buttons += '<button type="button" class="tralla-btn tralla-btn-primary" data-card-action="finalize">'
                 + '<i class="ti ti-checkup-list"></i> Finalizar ' + (card.workflow_type === 'call' ? 'chamado' : 'manutenção') + '</button>';
         } else if (card.status === 'in_progress' && Number(card.stage) === 1) {
-            note = card.workflow_type === 'call'
-                ? 'Preencha o relatório, marque Serviço realizado e deixe todas as máquinas como Concluída ou Inservível.'
+            note = card.workflow_type === 'call' && Number(card.machine_count || 0) === 0
+                ? 'Registre e salve o relatório do atendimento para finalizar o chamado.'
                 : 'Preencha o relatório, marque Serviço realizado e escolha o status de todas as máquinas. Ao menos uma deve estar Concluída ou Inservível.';
         }
 
@@ -1828,7 +1828,23 @@
         body += renderFamily(card);
         body += renderApproval(card);
 
-        if (isMaintenance) {
+        var hasLegacyCallMachines = card.workflow_type === 'call' && (
+            (card.machines || []).length > 0 || (card.parent && (card.parent.machines || []).length > 0));
+        if (isMaintenance && card.workflow_type === 'call' && !hasLegacyCallMachines) {
+            var callSource = card;
+            var canEditCall = Number(card.stage) === 1 && !!permissions.edit_machines;
+            body += '<section class="tralla-detail-section tralla-call-report">'
+                + '<h3><i class="ti ti-file-report"></i> Relatório do atendimento</h3>'
+                + (canEditCall
+                    ? '<div class="tralla-field"><label for="tralla-call-report">Descreva o atendimento realizado</label>'
+                        + '<textarea id="tralla-call-report" rows="7" maxlength="200000" placeholder="Registre o diagnóstico e a solução aplicada...">'
+                        + esc(callSource.service_report || '') + '</textarea></div>'
+                        + '<button type="button" class="tralla-btn tralla-btn-primary" data-save-call-report><i class="ti ti-device-floppy"></i> Salvar relatório</button>'
+                    : '<div class="tralla-detail-description">'
+                        + (callSource.service_report ? esc(callSource.service_report) : '<span class="tralla-empty-mini">Ainda não há relatório.</span>')
+                        + '</div>')
+                + '</section>';
+        } else if (isMaintenance) {
             body += renderMachines(card);
         }
 
@@ -1889,6 +1905,22 @@
             toast('Card atualizado.', 'success');
             await openCard(activeCard.id);
             shouldRefreshBoard = false;
+        } catch (error) {
+            toast(error.message, 'error');
+            setBusy(button, false);
+        }
+    }
+
+    async function saveCallReport(button) {
+        if (!activeCard) { return; }
+        var field = modalRoot.querySelector('#tralla-call-report');
+        if (!field) { return; }
+        setBusy(button, true);
+        try {
+            var data = await api('call_report_update', { id: activeCard.id, report: field.value });
+            applyState(data);
+            toast('Relatório do chamado salvo.', 'success');
+            await openCard(data.card.id);
         } catch (error) {
             toast(error.message, 'error');
             setBusy(button, false);
@@ -3148,7 +3180,7 @@
         }
 
         var machinesSection = isMaintenance
-            ? '<section class="tralla-detail-section">'
+            ? '<section class="tralla-detail-section" data-create-machines-section>'
                 + '<h3><i class="ti ti-device-desktop"></i> Máquinas *</h3>'
                 + '<div id="tralla-create-machines"></div>'
                 + '<button type="button" class="tralla-add-card" data-add-create-machine style="margin:0;padding-left:0">'
@@ -3179,11 +3211,20 @@
             + '</div>' + modalCloseButton() + '</div>'
             + '<div class="tralla-modal-body">'
             + '<fieldset class="tralla-card-workflow-choice"><legend>Qual tipo de card?</legend>'
-            + '<label><input type="radio" name="workflow_type" value="maintenance" checked> Manutenção</label>'
-            + '<label><input type="radio" name="workflow_type" value="call"> Chamado</label>'
+            + '<div class="tralla-card-workflow-options">'
+            + '<label class="tralla-card-workflow-option"><input type="radio" name="workflow_type" value="maintenance" checked>'
+            + '<span><i class="ti ti-tool"></i><strong>Manutenção</strong><small>Equipamentos, aprovação e retirada</small></span></label>'
+            + '<label class="tralla-card-workflow-option"><input type="radio" name="workflow_type" value="call">'
+            + '<span><i class="ti ti-headset"></i><strong>Chamado</strong><small>Situação, atendimento e aprovação</small></span></label>'
+            + '</div>'
             + '</fieldset>'
             + nameField
             + machinesSection
+            + '<section class="tralla-detail-section tralla-create-call-description" data-create-call-section hidden>'
+            + '<div class="tralla-field"><label for="tralla-create-description">Descrição da situação *</label>'
+            + '<textarea id="tralla-create-description" name="description" rows="6" maxlength="200000"'
+            + ' placeholder="Descreva o que aconteceu, o impacto e as informações necessárias para o atendimento..."></textarea>'
+            + '<small>O técnico poderá registrar o relatório do atendimento ao assumir o chamado.</small></div></section>'
             + '</div>'
             + '<div class="tralla-modal-actions">'
             + '<button type="button" class="tralla-btn tralla-btn-ghost" data-tralla-close>Cancelar</button>'
@@ -3194,6 +3235,15 @@
         if (isMaintenance) {
             addCreateMachineRow();
         }
+        var createForm = modalRoot.querySelector('#tralla-create-card-form');
+        createForm.querySelectorAll('[name="workflow_type"]').forEach(function (radio) {
+            radio.addEventListener('change', function () {
+                var call = radio.value === 'call' && radio.checked;
+                if (!radio.checked) { return; }
+                createForm.querySelector('[data-create-machines-section]').hidden = call;
+                createForm.querySelector('[data-create-call-section]').hidden = !call;
+            });
+        });
         if (hasEntities) {
             setupEntityCombobox('tralla-create-name', 'tralla-create-name-list');
         }
@@ -3213,8 +3263,17 @@
         }
 
         var machines = [];
+        var workflowType = form.querySelector('[name="workflow_type"]:checked')
+            ? form.querySelector('[name="workflow_type"]:checked').value : 'maintenance';
+        var descriptionField = form.querySelector('[name="description"]');
+        var description = descriptionField ? descriptionField.value.trim() : '';
+        if (workflowType === 'call' && !description) {
+            toast('Descreva a situação do chamado.', 'error');
+            descriptionField.focus();
+            return;
+        }
         var invalidQuantity = false;
-        Array.prototype.forEach.call(form.querySelectorAll('[data-create-machine]'), function (row) {
+        Array.prototype.forEach.call(workflowType === 'call' ? [] : form.querySelectorAll('[data-create-machine]'), function (row) {
             var model = row.querySelector('[data-create-model]');
             var quantityEl = row.querySelector('[data-create-quantity]');
             var modelId = model ? Number(model.value) : 0;
@@ -3236,7 +3295,7 @@
             return;
         }
 
-        if (!inline && isMaintenance && !machines.length) {
+        if (!inline && isMaintenance && workflowType !== 'call' && !machines.length) {
             toast('Adicione ao menos uma máquina com modelo selecionado.', 'error');
             return;
         }
@@ -3249,9 +3308,9 @@
                 boards_id: state.board.id,
                 list_id: Number(form.dataset.listId || 0),
                 name: name,
+                description: description,
                 source: 'manual',
-                workflow_type: form.querySelector('[name="workflow_type"]:checked')
-                    ? form.querySelector('[name="workflow_type"]:checked').value : 'maintenance',
+                workflow_type: workflowType,
                 machines: machines
             });
 
@@ -3630,6 +3689,11 @@
         var saveButton = event.target.closest('[data-save-card]');
         if (saveButton) {
             saveCard(saveButton);
+            return;
+        }
+        var saveCallButton = event.target.closest('[data-save-call-report]');
+        if (saveCallButton) {
+            saveCallReport(saveCallButton);
             return;
         }
 
