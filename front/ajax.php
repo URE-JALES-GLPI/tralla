@@ -3,6 +3,7 @@ include('../../../inc/includes.php');
 
 require_once GLPI_ROOT . '/plugins/tralla/inc/compat.php';
 require_once GLPI_ROOT . '/plugins/tralla/inc/helpers.php';
+require_once GLPI_ROOT . '/plugins/tralla/inc/boardgroup.class.php';
 
 global $CFG_GLPI;
 
@@ -34,6 +35,27 @@ $isAdmin = Session::haveRight('plugin_tralla', PURGE);
 
 try {
     switch ($action) {
+        case 'board_group_create':
+        case 'board_group_rename':
+        case 'board_group_delete':
+        case 'board_group_shift':
+        case 'board_group_move':
+            $accessibleIds = array_map('intval', array_column(PluginTrallaBoard::getVisibleBoards(true), 'id'));
+            $groupId = tralla_post_string('group_id');
+            if ($action === 'board_group_create') {
+                PluginTrallaBoardGroup::create($userId, $accessibleIds, tralla_post_string('name'));
+            } elseif ($action === 'board_group_rename') {
+                PluginTrallaBoardGroup::rename($userId, $accessibleIds, $groupId, tralla_post_string('name'));
+            } elseif ($action === 'board_group_delete') {
+                PluginTrallaBoardGroup::delete($userId, $accessibleIds, $groupId);
+            } elseif ($action === 'board_group_shift') {
+                PluginTrallaBoardGroup::shift($userId, $accessibleIds, $groupId, tralla_post_int('direction'));
+            } else {
+                PluginTrallaBoardGroup::move($userId, $accessibleIds, tralla_post_int('board_id'), $groupId,
+                    tralla_post_int('before_board_id'));
+            }
+            tralla_json(['ok' => true]);
+
         case 'state':
             $boards_id = tralla_post_int('boards_id');
             if (!PluginTrallaBoard::canViewBoard($boards_id)) {

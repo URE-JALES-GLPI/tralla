@@ -30,6 +30,8 @@ O Tralla combina dois tipos de quadro:
 
 ## Primeiros passos
 
+Na página inicial, crie **Grupos** e arraste seus quadros entre eles para organizar os atalhos. Cada usuário tem sua própria organização; mover um quadro nessa página não altera o quadro nem a organização dos demais. Também é possível renomear, excluir e mudar a ordem dos grupos. Ao excluir um grupo, seus quadros voltam para **Sem grupo**.
+
 ### 1. Configurar modelos de máquina
 
 Antes de criar cards de manutenção, cadastre ao menos um modelo:

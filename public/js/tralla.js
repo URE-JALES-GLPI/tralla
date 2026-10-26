@@ -8,6 +8,122 @@
     var bootstrapEl = document.getElementById('tralla-bootstrap');
     var root = document.getElementById('tralla-kanban');
     var boardModal = document.getElementById('tralla-board-create');
+    var organizer = document.querySelector('[data-board-organizer]');
+
+    if (organizer) {
+        var draggedBoard = null;
+        var placeholder = document.createElement('div');
+        placeholder.className = 'tralla-board-drop-placeholder';
+        placeholder.setAttribute('aria-hidden', 'true');
+
+        function dropzoneFor(target) {
+            var group = target.closest('[data-group-id]');
+            return group ? group.querySelector('[data-board-dropzone]') : null;
+        }
+
+        async function organize(action, data) {
+            var body = new FormData();
+            body.set('action', 'board_group_' + action);
+            body.set('_glpi_csrf_token', organizer.dataset.csrfToken || '');
+            Object.keys(data || {}).forEach(function (key) { body.set(key, String(data[key])); });
+            var response = await fetch(organizer.dataset.ajaxUrl, {
+                method: 'POST', body: body, credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            var result;
+            try { result = await response.json(); } catch (error) { throw new Error('Resposta inválida do servidor.'); }
+            if (!response.ok || !result.ok) { throw new Error(result.error || 'Não foi possível salvar a organização.'); }
+            window.location.reload();
+        }
+
+        var createGroup = organizer.querySelector('[data-board-group-create]');
+        var groupFocus = document.querySelector('[data-group-create-focus]');
+        if (groupFocus) {
+            groupFocus.addEventListener('click', function () {
+                createGroup.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'end' });
+                createGroup.querySelector('[name="name"]').focus();
+            });
+        }
+        createGroup.addEventListener('submit', function (event) {
+            event.preventDefault();
+            var name = createGroup.querySelector('[name="name"]').value.trim();
+            if (!name) { return; }
+            organize('create', { name: name }).catch(function (error) { alert(error.message); });
+        });
+
+        organizer.addEventListener('click', function (event) {
+            var button = event.target.closest('[data-group-action]');
+            if (!button) { return; }
+            var action = button.dataset.groupAction;
+            var data = { group_id: button.dataset.groupId };
+            if (action === 'rename') {
+                var name = window.prompt('Novo nome do grupo:', button.dataset.groupName);
+                if (name === null) { return; }
+                data.name = name.trim();
+                if (!data.name) { return; }
+            } else if (action === 'delete') {
+                if (!window.confirm('Excluir o grupo "' + button.dataset.groupName + '"? Os quadros voltarão para Sem grupo.')) { return; }
+            } else if (action === 'shift') {
+                data.direction = button.dataset.direction;
+            }
+            organize(action, data).catch(function (error) { alert(error.message); });
+        });
+
+        organizer.addEventListener('dragstart', function (event) {
+            var tile = event.target.closest('[data-board-id]');
+            if (!tile) { return; }
+            draggedBoard = tile;
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', tile.dataset.boardId);
+            event.dataTransfer.setDragImage(tile, 24, 24);
+            requestAnimationFrame(function () { tile.classList.add('is-dragging'); });
+        });
+
+        organizer.addEventListener('dragover', function (event) {
+            if (!draggedBoard) { return; }
+            var zone = dropzoneFor(event.target);
+            if (!zone) { return; }
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+            organizer.querySelectorAll('.is-drop-target').forEach(function (group) { group.classList.remove('is-drop-target'); });
+            zone.closest('[data-group-id]').classList.add('is-drop-target');
+            var next = event.target.closest('[data-board-id]');
+            if (next && next.parentElement === zone) {
+                if (event.clientY < next.getBoundingClientRect().top + next.offsetHeight / 2) {
+                    zone.insertBefore(placeholder, next);
+                } else {
+                    next.after(placeholder);
+                }
+            } else if (event.target !== placeholder) {
+                zone.append(placeholder);
+            }
+        });
+
+        organizer.addEventListener('drop', function (event) {
+            if (!draggedBoard) { return; }
+            var zone = dropzoneFor(event.target);
+            if (!zone) { return; }
+            event.preventDefault();
+            var next = placeholder.nextElementSibling;
+            while (next && !next.matches('[data-board-id]')) { next = next.nextElementSibling; }
+            var data = {
+                board_id: draggedBoard.dataset.boardId,
+                group_id: zone.closest('[data-group-id]').dataset.groupId,
+                before_board_id: next ? next.dataset.boardId : 0
+            };
+            placeholder.remove();
+            draggedBoard.classList.remove('is-dragging');
+            draggedBoard = null;
+            organize('move', data).catch(function (error) { alert(error.message); });
+        });
+
+        organizer.addEventListener('dragend', function () {
+            placeholder.remove();
+            organizer.querySelectorAll('.is-drop-target').forEach(function (group) { group.classList.remove('is-drop-target'); });
+            if (draggedBoard) { draggedBoard.classList.remove('is-dragging'); }
+            draggedBoard = null;
+        });
+    }
     var themeSelect = document.querySelector('[data-tralla-theme-select]');
     var themePreview = document.querySelector('[data-tralla-theme-preview]');
 

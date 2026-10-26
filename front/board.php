@@ -3,6 +3,7 @@ include('../../../inc/includes.php');
 
 require_once GLPI_ROOT . '/plugins/tralla/inc/compat.php';
 require_once GLPI_ROOT . '/plugins/tralla/inc/helpers.php';
+require_once GLPI_ROOT . '/plugins/tralla/inc/boardgroup.class.php';
 
 global $CFG_GLPI;
 
@@ -12,6 +13,16 @@ $canCreate = Session::haveRight('plugin_tralla', CREATE);
 $canUpdate = Session::haveRight('plugin_tralla', UPDATE);
 $showArchived = isset($_GET['archived']) && (int) $_GET['archived'] === 1;
 $boards = PluginTrallaBoard::getVisibleBoards($showArchived);
+$boardsById = [];
+foreach ($boards as $visibleBoard) {
+    $boardsById[(int) $visibleBoard['id']] = $visibleBoard;
+}
+$accessibleIds = array_map('intval', array_column(PluginTrallaBoard::getVisibleBoards(true), 'id'));
+$organization = PluginTrallaBoardGroup::display((int) Session::getLoginUserID(), $accessibleIds, array_keys($boardsById));
+$boardGroups = array_merge(
+    [['id' => '', 'name' => 'Sem grupo', 'board_ids' => $organization['ungrouped']]],
+    $organization['groups']
+);
 
 // Usuários exibidos no painel do topo (cards de manutenção por situação).
 $dashboardEmails = [
@@ -83,6 +94,9 @@ $pluginUrl = $root . '/plugins/tralla';
                     <i class="ti ti-settings"></i> Configurações
                 </a>
             <?php endif; ?>
+            <button type="button" class="tralla-btn tralla-btn-ghost" data-group-create-focus>
+                <i class="ti ti-layout-columns"></i> Novo grupo
+            </button>
             <?php if ($canCreate): ?>
                 <button type="button" class="tralla-btn tralla-btn-primary" data-tralla-modal="tralla-board-create">
                     <i class="ti ti-plus"></i> Novo quadro
@@ -102,9 +116,28 @@ $pluginUrl = $root . '/plugins/tralla';
                 </button>
             <?php endif; ?>
         </div>
-    <?php else: ?>
-        <div class="tralla-board-grid">
-            <?php foreach ($boards as $board): ?>
+    <?php endif; ?>
+        <section class="tralla-board-organizer" data-board-organizer
+                 data-ajax-url="<?= tralla_h($pluginUrl) ?>/front/ajax.php"
+                 data-csrf-token="<?= tralla_h(tralla_csrf_token()) ?>" aria-label="Grupos pessoais de quadros">
+          <p class="tralla-board-organizer-hint">Arraste os quadros entre os grupos. Esta organização é pessoal.</p>
+          <div class="tralla-board-groups">
+            <?php foreach ($boardGroups as $groupIndex => $group): ?>
+              <section class="tralla-board-group" data-group-id="<?= tralla_h($group['id']) ?>">
+                <header class="tralla-board-group-head">
+                    <div><h2><?= tralla_h($group['name']) ?></h2><span><?= count($group['board_ids']) ?> quadro(s)</span></div>
+                    <?php if ($group['id'] !== ''): ?>
+                        <div class="tralla-board-group-actions">
+                            <button type="button" data-group-action="shift" data-direction="-1" data-group-id="<?= tralla_h($group['id']) ?>" title="Mover grupo para a esquerda" aria-label="Mover <?= tralla_h($group['name']) ?> para a esquerda" <?= $groupIndex === 1 ? 'disabled' : '' ?>><i class="ti ti-arrow-left"></i></button>
+                            <button type="button" data-group-action="shift" data-direction="1" data-group-id="<?= tralla_h($group['id']) ?>" title="Mover grupo para a direita" aria-label="Mover <?= tralla_h($group['name']) ?> para a direita" <?= $groupIndex === count($boardGroups) - 1 ? 'disabled' : '' ?>><i class="ti ti-arrow-right"></i></button>
+                            <button type="button" data-group-action="rename" data-group-id="<?= tralla_h($group['id']) ?>" data-group-name="<?= tralla_h($group['name']) ?>" title="Renomear grupo" aria-label="Renomear <?= tralla_h($group['name']) ?>"><i class="ti ti-pencil"></i></button>
+                            <button type="button" data-group-action="delete" data-group-id="<?= tralla_h($group['id']) ?>" data-group-name="<?= tralla_h($group['name']) ?>" title="Excluir grupo" aria-label="Excluir <?= tralla_h($group['name']) ?>"><i class="ti ti-trash"></i></button>
+                        </div>
+                    <?php endif; ?>
+                </header>
+                <div class="tralla-board-grid" data-board-dropzone>
+            <?php foreach ($group['board_ids'] as $groupBoardId): ?>
+                <?php if (!isset($boardsById[$groupBoardId])) { continue; } $board = $boardsById[$groupBoardId]; ?>
                 <?php
                 $boardId = (int) $board['id'];
                 $stats = PluginTrallaBoard::getStats($boardId);
@@ -113,7 +146,7 @@ $pluginUrl = $root . '/plugins/tralla';
                 $background = tralla_valid_background((string) $board['background']);
                 $canEditBoard = $canUpdate && PluginTrallaBoard::canAdminBoard($boardId);
                 ?>
-                <div class="tralla-board-tile-wrap">
+                <div class="tralla-board-tile-wrap" draggable="true" data-board-id="<?= $boardId ?>">
                     <a class="tralla-board-tile tr-bg-<?= tralla_h($background) ?>"
                        href="<?= tralla_h($pluginUrl) ?>/front/kanban.php?boards_id=<?= $boardId ?>">
                         <span class="tralla-board-type <?= $isMaintenance ? 'is-maintenance' : '' ?>">
@@ -146,8 +179,17 @@ $pluginUrl = $root . '/plugins/tralla';
                     <?php endif; ?>
                 </div>
             <?php endforeach; ?>
-        </div>
-    <?php endif; ?>
+                <?php if ($group['board_ids'] === []): ?><p class="tralla-board-group-empty">Arraste um quadro para cá.</p><?php endif; ?>
+                </div>
+              </section>
+            <?php endforeach; ?>
+            <form class="tralla-board-group-create" data-board-group-create>
+                <label for="tralla-new-group">Novo grupo</label>
+                <input id="tralla-new-group" name="name" type="text" maxlength="80" placeholder="Nome do grupo" required>
+                <button type="submit" class="tralla-btn tralla-btn-primary"><i class="ti ti-plus"></i> Criar grupo</button>
+            </form>
+          </div>
+        </section>
 </div>
 
 <?php if ($canCreate): ?>
@@ -221,7 +263,7 @@ $backgrounds = tralla_backgrounds();
                         <span class="tralla-board-create-section-icon" aria-hidden="true"><i class="ti ti-palette"></i></span>
                         <div>
                             <h3 id="tralla-board-create-appearance-title">Aparência</h3>
-                            <p>Escolha o tema visual e a cor de destaque do quadro.</p>
+                            <p>Escolha o tema visual do quadro.</p>
                         </div>
                     </div>
                     <fieldset class="tralla-board-create-theme">
