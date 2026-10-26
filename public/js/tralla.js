@@ -1042,6 +1042,10 @@
             ? '<button type="button" class="tralla-card-take" data-card-take="' + cardId + '" title="Pegar para mim">'
                 + '<i class="ti ti-hand-stop" aria-hidden="true"></i> Pegar</button>'
             : '';
+        var termButton = card.assignature_term_url
+            ? '<a class="tralla-card-term" href="' + attr(card.assignature_term_url) + '" target="_blank" rel="noopener noreferrer" title="Abrir termo assinado">'
+                + '<i class="ti ti-file-check" aria-hidden="true"></i> Termo assinado</a>'
+            : '';
 
         var cardCode = String(card.code || ('#' + cardId));
         var cardTop = '<div class="tralla-card-top">'
@@ -1057,11 +1061,12 @@
             + '<span class="tralla-card-edit" aria-hidden="true"><i class="ti ti-pencil"></i></span>'
             + cardTop
             + '<h4 class="tralla-card-title">' + esc(card.name) + '</h4>'
-            + ((badges || tech || takeButton)
+            + ((badges || tech || takeButton || termButton)
                 ? '<div class="tralla-card-footer">'
                     + '<div class="tralla-card-badges">' + badges + '</div>'
                     + tech
                     + takeButton
+                    + termButton
                     + '</div>'
                 : '')
             + '</article>';
@@ -1564,6 +1569,10 @@
     }
 
     function renderAssignature(card) {
+        if (card.assignature_term_url) {
+            return '<a class="tralla-assignature-link" href="' + attr(card.assignature_term_url) + '" target="_blank" rel="noopener noreferrer">'
+                + '<i class="ti ti-file-check"></i><span>Abrir termo assinado</span></a>';
+        }
         if (!card.assignature_url) {
             return '';
         }
@@ -3226,6 +3235,10 @@
             return;
         }
 
+        if (event.target.closest('.tralla-card-term')) {
+            event.stopPropagation();
+            return;
+        }
         var cardElement = event.target.closest('.tralla-card');
         if (cardElement) {
             openCard(Number(cardElement.dataset.cardId));
@@ -3236,7 +3249,7 @@
         if (event.key !== 'Enter' && event.key !== ' ') {
             return;
         }
-        if (event.target.closest('[data-card-take]')) {
+        if (event.target.closest('[data-card-take], .tralla-card-term')) {
             return;
         }
         var cardElement = event.target.closest('.tralla-card');

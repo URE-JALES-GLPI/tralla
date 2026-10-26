@@ -150,6 +150,17 @@ class PluginTrallaConfig
         return $base . $separator . 'card=' . $cards_id;
     }
 
+    public static function assignatureTermUrl(int $cards_id): string
+    {
+        $base = self::assignatureUrl();
+        if ($base === '' || !preg_match('~/front/request\.php(?:\?|$)~', $base)) {
+            return '';
+        }
+
+        $url = preg_replace('~/front/request\.php(?=\?|$)~', '/front/term.php', $base);
+        return $url . (str_contains($url, '?') ? '&' : '?') . 'card=' . $cards_id;
+    }
+
     public static function clearCache(): void
     {
         self::$cache = null;

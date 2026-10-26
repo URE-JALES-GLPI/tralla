@@ -193,6 +193,9 @@ class PluginTrallaCard extends CommonDBTM
             $card['creator_name'] = tralla_user_name((int) $card['users_id']);
             $card['category'] = (string) ($list['category'] ?? '');
             $card['list_name'] = (string) ($list['name'] ?? '');
+            $card['assignature_term_url'] = (string) $card['status'] === 'done' && !empty($card['assignature_sent'])
+                ? PluginTrallaConfig::assignatureTermUrl((int) $card['id'])
+                : '';
             $card['machine_count'] = count($machines) ?: (int) $card['machines_total'];
             $card['machine_summary'] = PluginTrallaMachine::summarizeModels($machines, $modelNames);
             $card['progress'] = tralla_machines_progress($machines);
@@ -350,6 +353,9 @@ class PluginTrallaCard extends CommonDBTM
 
         $card['assignature_url'] = ((string) $card['status'] === 'withdrawal' || !empty($card['assignature_sent']))
             ? PluginTrallaConfig::assignatureCardUrl($id)
+            : '';
+        $card['assignature_term_url'] = (string) $card['status'] === 'done' && !empty($card['assignature_sent'])
+            ? PluginTrallaConfig::assignatureTermUrl($id)
             : '';
         $card['permissions'] = self::permissionsFor($card, $boardType, $userId, $isAdmin);
         if ((int) $card['stage'] === 1 && !empty($card['permissions']['split'])) {
