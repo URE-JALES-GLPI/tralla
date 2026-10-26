@@ -111,7 +111,8 @@ function plugin_tralla_install(): bool
                 `parent_cards_id`         INT {$sign} NOT NULL DEFAULT '0' COMMENT 'card /1 de origem quando stage=2',
                 `approval_cards_id`       INT {$sign} NOT NULL DEFAULT '0' COMMENT 'card /2 gerado pelo /1',
                 `family_cards_id`         INT {$sign} NOT NULL DEFAULT '0' COMMENT 'card raiz da família',
-                `family_seq`              INT {$sign} NOT NULL DEFAULT '1' COMMENT 'posição na família',
+                `code_root_cards_id`      INT {$sign} NOT NULL DEFAULT '0' COMMENT 'raiz da numeração visual',
+                `family_seq`              INT {$sign} NOT NULL DEFAULT '1' COMMENT 'posição na numeração visual',
                 `split_from_cards_id`     INT {$sign} NOT NULL DEFAULT '0' COMMENT 'card que originou a separação',
                 `status`                  VARCHAR(30)  NOT NULL DEFAULT '' COMMENT 'normal,pending,in_progress,waiting_approval,withdrawal,done,approved,rejected,deletion_pending,deleted',
                 `is_locked`               TINYINT(1)   NOT NULL DEFAULT '0',
@@ -145,6 +146,7 @@ function plugin_tralla_install(): bool
                 KEY `plugin_tralla_lists_id` (`plugin_tralla_lists_id`),
                 KEY `parent_cards_id` (`parent_cards_id`),
                 KEY `family_cards_id` (`family_cards_id`),
+                KEY `code_root_cards_id` (`code_root_cards_id`),
                 KEY `family_seq` (`family_seq`),
                 KEY `split_from_cards_id` (`split_from_cards_id`),
                 KEY `stage` (`stage`),
@@ -160,6 +162,7 @@ function plugin_tralla_install(): bool
         'approval_kind'               => "VARCHAR(20)  NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|deletion|edit'",
         'edit_payload'                => 'LONGTEXT     DEFAULT NULL',
         'family_cards_id'             => "INT {$sign} NOT NULL DEFAULT 0",
+        'code_root_cards_id'          => "INT {$sign} NOT NULL DEFAULT 0",
         'family_seq'                  => "INT {$sign} NOT NULL DEFAULT 1",
         'split_from_cards_id'         => "INT {$sign} NOT NULL DEFAULT 0",
         'deletion_reason'             => 'TEXT         DEFAULT NULL',
@@ -176,6 +179,9 @@ function plugin_tralla_install(): bool
     foreach ($cards_columns as $field => $definition) {
         if (!$DB->fieldExists('glpi_plugin_tralla_cards', $field)) {
             $DB->doQuery("ALTER TABLE `glpi_plugin_tralla_cards` ADD COLUMN `{$field}` {$definition}") or die($DB->error());
+            if ($field === 'code_root_cards_id') {
+                $DB->doQuery('ALTER TABLE `glpi_plugin_tralla_cards` ADD KEY `code_root_cards_id` (`code_root_cards_id`)') or die($DB->error());
+            }
             if ($field === 'is_deleted') {
                 $added_is_deleted = true;
             } elseif ($field === 'approval_kind') {
@@ -217,6 +223,52 @@ function plugin_tralla_install(): bool
         SET `family_cards_id` = `parent_cards_id`, `family_seq` = 1
         WHERE `stage` = 2 AND `parent_cards_id` > 0 AND (`family_cards_id` = 0 OR `family_seq` = 0)
     ") or die($DB->error());
+
+    // A retirada usa family_cards_id; a numeração também inclui cards pendentes
+    // separados que continuam o código visual da origem. Reconstitui a ordem de
+    // criação, incluindo aprovações antigas e cards arquivados.
+    $visualRoots = [];
+    $visualNumbers = [];
+    $codeFixes = [];
+    foreach ($DB->request([
+        'SELECT' => ['id', 'stage', 'parent_cards_id', 'split_from_cards_id', 'family_cards_id', 'code_root_cards_id', 'family_seq'],
+        'FROM'   => 'glpi_plugin_tralla_cards',
+        'ORDER'  => 'id ASC',
+    ]) as $codeCard) {
+        $cardId = (int) $codeCard['id'];
+        $sourceId = (int) $codeCard['stage'] === 2
+            ? (int) $codeCard['parent_cards_id']
+            : (int) $codeCard['split_from_cards_id'];
+        $root = $sourceId > 0 && isset($visualRoots[$sourceId])
+            ? $visualRoots[$sourceId]
+            : (int) $codeCard['code_root_cards_id'];
+        if ($root <= 0) {
+            $root = (int) $codeCard['family_cards_id'] ?: $cardId;
+        }
+        $visualRoots[$cardId] = $root;
+        $visualNumbers[$root] = ($visualNumbers[$root] ?? 0) + 1;
+        if ((int) $codeCard['code_root_cards_id'] !== $root
+            || (int) $codeCard['family_seq'] !== $visualNumbers[$root]) {
+            $codeFixes[$cardId] = [
+                'code_root_cards_id' => $root,
+                'family_seq' => $visualNumbers[$root],
+            ];
+        }
+    }
+    if ($codeFixes !== []) {
+        $DB->beginTransaction();
+        try {
+            foreach ($codeFixes as $cardId => $codeFields) {
+                if ($DB->update('glpi_plugin_tralla_cards', $codeFields, ['id' => $cardId]) === false) {
+                    throw new RuntimeException('Falha ao corrigir a numeração visual dos cards.');
+                }
+            }
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
+        }
+    }
 
     if ($cards_table_existed) {
         $DB->doQuery("

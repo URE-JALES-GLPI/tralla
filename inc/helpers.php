@@ -220,7 +220,10 @@ if (!function_exists('tralla_display_code')) {
     {
         $stage = (int) ($card['stage'] ?? 1);
         $id = (int) ($card['id'] ?? 0);
-        $familyRoot = (int) ($card['family_cards_id'] ?? 0);
+        $familyRoot = (int) ($card['code_root_cards_id'] ?? 0);
+        if ($familyRoot <= 0) {
+            $familyRoot = (int) ($card['family_cards_id'] ?? 0);
+        }
         $familySeq = (int) ($card['family_seq'] ?? 0);
 
         if ($stage === 2) {
@@ -228,7 +231,7 @@ if (!function_exists('tralla_display_code')) {
                 $familyRoot = (int) ($card['parent_cards_id'] ?? 0);
             }
             if ($familySeq <= 0) {
-                $familySeq = 1;
+                $familySeq = 2;
             }
 
             return $familyRoot > 0 ? 'AP-' . $familyRoot . '/' . $familySeq : '';

@@ -800,7 +800,7 @@
 
         var cardId = String(card.id || '');
         var code = String(card.code || ('#' + cardId));
-        var familyRoot = Number(card.family_cards_id || 0);
+        var familyRoot = Number(card.code_root_cards_id || card.family_cards_id || 0);
         var familySeq = Number(card.family_seq || 0);
         var parts = [
             card.name,
@@ -1657,11 +1657,21 @@
         }
     }
 
-    var TRALLA_CHALLENGE_WORDS = ['MASSON','PAIVA','FERRARI','SAWATA','NETO','MASSON','PAIVA','FERRARI','SAWATA','NETO','MASSON','PAIVA','FERRARI','SAWATA','NETO','MASSON','PAIVA','FERRARI','SAWATA','NETO','ALFA','BRAVO','CHARLIE','DELTA','ECHO','FOXTROT','GOLF','HOTEL','INDIA','JULIET','KILO','LIMA','MIKE','NOVEMBER','OSCAR','PAPA','QUEBEC','ROMEO','SIERRA','TANGO','UNIFORM','VICTOR','WHISKEY','XRAY','YANKEE','ZULU','AMARELO','AZUL','VERDE','VERMELHO','PRETO','BRANCO','CINZA','ROSA','ROXO','LARANJA','MARROM','PRATA','DOURADO','BRONZE','COBRE','FERRO','ACO','MADEIRA','PEDRA','VIDRO','PLASTICO','BORRACHA','TECIDO','PAPEL','COURO','LINHO','SEDA','LA','ALGODAO','NYLON','POLIESTER','VINIL','ACRILICO','CERAMICA','PORCELANA','FAIANCA','LOICA','BARRO','ARGILA','AREIA','GRAVA','SEIXO','PEDREGULHO','CAL','CIMENTO','CONCRETO','ASFALTO','BETUME','TAR','PITCH','RESINA'];
+    var TRALLA_CHALLENGE_PRIORITY_WORDS = ['PAIVA', 'MASSON', 'NETO', 'FERRARI', 'SAWATA'];
+    var TRALLA_CHALLENGE_WORDS = [
+        'BACKUP', 'SERVIDOR', 'REDE', 'ROTEADOR', 'SWITCH', 'FIREWALL',
+        'SOFTWARE', 'HARDWARE', 'TECLADO', 'MONITOR', 'PROCESSADOR', 'MEMORIA',
+        'SISTEMA', 'CODIGO', 'ARQUIVO', 'DADOS', 'NUVEM', 'NAVEGADOR',
+        'ANTIVIRUS', 'IMPRESSORA', 'LOGIN', 'SENHA', 'USUARIO', 'SUPORTE',
+        'CHAMADO', 'NOTEBOOK', 'DESKTOP', 'MOUSE', 'WIFI', 'SERVICO',
+        'INTERNET', 'ETHERNET', 'PROGRAMA', 'APLICATIVO', 'TERMINAL', 'CONEXAO'
+    ];
 
     function pickChallengeWord() {
-        var idx = Math.floor(Math.random() * TRALLA_CHALLENGE_WORDS.length);
-        return TRALLA_CHALLENGE_WORDS[idx];
+        var words = Math.random() < 0.7
+            ? TRALLA_CHALLENGE_PRIORITY_WORDS
+            : TRALLA_CHALLENGE_WORDS;
+        return words[Math.floor(Math.random() * words.length)];
     }
 
     function wordChallenge() {

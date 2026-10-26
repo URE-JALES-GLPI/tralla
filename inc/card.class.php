@@ -542,6 +542,7 @@ class PluginTrallaCard extends CommonDBTM
                 'parent_cards_id'         => 0,
                 'approval_cards_id'       => 0,
                 'family_cards_id'         => 0,
+                'code_root_cards_id'      => 0,
                 'family_seq'              => 1,
                 'split_from_cards_id'     => 0,
                 'status'                  => 'pending',
@@ -556,6 +557,7 @@ class PluginTrallaCard extends CommonDBTM
 
             $DB->update('glpi_plugin_tralla_cards', [
                 'family_cards_id' => $cardId,
+                'code_root_cards_id' => $cardId,
                 'family_seq'      => 1,
             ], ['id' => $cardId]);
 
@@ -932,8 +934,11 @@ class PluginTrallaCard extends CommonDBTM
 
         $pendingCardId = 0;
         $approvalId = 0;
+        $familyRoot = self::familyRoot($card);
+        $codeRoot = self::codeRoot($card);
         $DB->beginTransaction();
         try {
+            self::lockCardRow($codeRoot);
             self::lockCardRow($id);
             $card = self::getCard($id);
             if ($card === null || !tralla_can_transition($card, 'finalize', $boardType)) {
@@ -965,6 +970,7 @@ class PluginTrallaCard extends CommonDBTM
                 if ($pendingList === null) {
                     throw new RuntimeException('O quadro não possui a lista "Manutenção Pendente".');
                 }
+                $pendingSeq = self::nextCodeSequence($codeRoot);
                 $DB->insert('glpi_plugin_tralla_cards', [
                     'plugin_tralla_boards_id' => $boards_id,
                     'plugin_tralla_lists_id'  => (int) $pendingList['id'],
@@ -977,7 +983,8 @@ class PluginTrallaCard extends CommonDBTM
                     'parent_cards_id'         => 0,
                     'approval_cards_id'       => 0,
                     'family_cards_id'         => 0,
-                    'family_seq'              => 1,
+                    'code_root_cards_id'      => $codeRoot,
+                    'family_seq'              => $pendingSeq,
                     'split_from_cards_id'     => $id,
                     'approval_kind'           => 'maintenance',
                     'status'                  => 'pending',
@@ -1000,6 +1007,7 @@ class PluginTrallaCard extends CommonDBTM
                 PluginTrallaMachine::refreshCardTotal($id);
             }
 
+            $approvalSeq = self::nextCodeSequence($codeRoot);
             $DB->insert('glpi_plugin_tralla_cards', [
                 'plugin_tralla_boards_id' => $boards_id,
                 'plugin_tralla_lists_id'  => (int) $approvalList['id'],
@@ -1011,8 +1019,9 @@ class PluginTrallaCard extends CommonDBTM
                 'stage'                   => 2,
                 'parent_cards_id'         => $id,
                 'approval_cards_id'       => 0,
-                'family_cards_id'         => self::familyRoot($card),
-                'family_seq'              => self::familySequence($card),
+                'family_cards_id'         => $familyRoot,
+                'code_root_cards_id'      => $codeRoot,
+                'family_seq'              => $approvalSeq,
                 'split_from_cards_id'     => 0,
                 'approval_kind'           => 'maintenance',
                 'status'                  => 'waiting_approval',
@@ -1038,8 +1047,9 @@ class PluginTrallaCard extends CommonDBTM
                 'id'              => $approvalId,
                 'stage'           => 2,
                 'parent_cards_id' => $id,
-                'family_cards_id' => self::familyRoot($card),
-                'family_seq'      => self::familySequence($card),
+                'family_cards_id' => $familyRoot,
+                'code_root_cards_id' => $codeRoot,
+                'family_seq'      => $approvalSeq,
             ], $boardType);
 
             if ($pendingCardId > 0) {
@@ -1047,7 +1057,8 @@ class PluginTrallaCard extends CommonDBTM
                     'id' => $pendingCardId,
                     'stage' => 1,
                     'family_cards_id' => $pendingCardId,
-                    'family_seq' => 1,
+                    'code_root_cards_id' => $codeRoot,
+                    'family_seq' => $pendingSeq,
                 ], $boardType);
                 PluginTrallaHistory::log($id, $userId, 'card_split', 'Máquinas pendentes reunidas no novo card ' . $pendingCode . '.');
                 PluginTrallaHistory::log($pendingCardId, $userId, 'card_split', 'Card criado com as máquinas pendentes de ' . tralla_display_code($card, $boardType) . '.');
@@ -1522,8 +1533,11 @@ class PluginTrallaCard extends CommonDBTM
         }
 
         $approvalId = 0;
+        $familyRoot = self::familyRoot($card);
+        $codeRoot = self::codeRoot($card);
         $DB->beginTransaction();
         try {
+            self::lockCardRow($codeRoot);
             self::lockCardRow($id);
 
             $fresh = self::getCard($id);
@@ -1546,6 +1560,7 @@ class PluginTrallaCard extends CommonDBTM
                 'machines'     => $machines,
                 'new_machines' => $newMachines,
             ];
+            $approvalSeq = self::nextCodeSequence($codeRoot);
             $now = tralla_now();
 
             $DB->insert('glpi_plugin_tralla_cards', [
@@ -1559,8 +1574,9 @@ class PluginTrallaCard extends CommonDBTM
                 'stage'                   => 2,
                 'parent_cards_id'         => $id,
                 'approval_cards_id'       => 0,
-                'family_cards_id'         => self::familyRoot($fresh),
-                'family_seq'              => self::familySequence($fresh),
+                'family_cards_id'         => $familyRoot,
+                'code_root_cards_id'      => $codeRoot,
+                'family_seq'              => $approvalSeq,
                 'split_from_cards_id'     => 0,
                 'approval_kind'           => 'edit',
                 'edit_payload'            => json_encode($payload, JSON_UNESCAPED_UNICODE),
@@ -1645,6 +1661,7 @@ class PluginTrallaCard extends CommonDBTM
         }
 
         $root = self::familyRoot($card);
+        $codeRoot = self::codeRoot($card);
         if (!self::familyIsIdle($root)) {
             throw new RuntimeException('A família precisa estar toda Pendente ou Em Andamento para ser separada.');
         }
@@ -1652,6 +1669,7 @@ class PluginTrallaCard extends CommonDBTM
         $childId = 0;
         $DB->beginTransaction();
         try {
+            self::lockCardRow($codeRoot);
             self::lockCardRow($id);
             self::lockFamilyRows($root);
 
@@ -1687,15 +1705,7 @@ class PluginTrallaCard extends CommonDBTM
                 throw new RuntimeException('O quadro não possui a lista "Manutenção Em Andamento".');
             }
 
-            $seqRow = $DB->request([
-                'SELECT' => ['MAX' => 'family_seq AS max_seq'],
-                'FROM'   => 'glpi_plugin_tralla_cards',
-                'WHERE'  => [
-                    'family_cards_id' => $root,
-                    'stage'           => 1,
-                ],
-            ])->current();
-            $nextSeq = max(1, (int) ($seqRow['max_seq'] ?? 0)) + 1;
+            $nextSeq = self::nextCodeSequence($codeRoot);
 
             $now = tralla_now();
             $DB->insert('glpi_plugin_tralla_cards', [
@@ -1710,6 +1720,7 @@ class PluginTrallaCard extends CommonDBTM
                 'parent_cards_id'         => 0,
                 'approval_cards_id'       => 0,
                 'family_cards_id'         => $root,
+                'code_root_cards_id'      => $codeRoot,
                 'family_seq'              => $nextSeq,
                 'split_from_cards_id'     => $id,
                 'approval_kind'           => 'maintenance',
@@ -2063,9 +2074,12 @@ class PluginTrallaCard extends CommonDBTM
 
         $approvalId = 0;
         $isMaintenance = false;
+        $familyRoot = self::familyRoot($card);
+        $codeRoot = self::codeRoot($card);
 
         $DB->beginTransaction();
         try {
+            self::lockCardRow($codeRoot);
             self::lockCardRow($id);
 
             $fresh = self::getCard($id);
@@ -2089,6 +2103,7 @@ class PluginTrallaCard extends CommonDBTM
                     throw new RuntimeException('O quadro não possui a lista "Manutenção Aprovação".');
                 }
 
+                $approvalSeq = self::nextCodeSequence($codeRoot);
                 $now = tralla_now();
                 $DB->insert('glpi_plugin_tralla_cards', [
                     'plugin_tralla_boards_id' => (int) $fresh['plugin_tralla_boards_id'],
@@ -2101,8 +2116,9 @@ class PluginTrallaCard extends CommonDBTM
                     'stage'                   => 2,
                     'parent_cards_id'         => $id,
                     'approval_cards_id'       => 0,
-                    'family_cards_id'         => self::familyRoot($fresh),
-                    'family_seq'              => self::familySequence($fresh),
+                    'family_cards_id'         => $familyRoot,
+                    'code_root_cards_id'      => $codeRoot,
+                    'family_seq'              => $approvalSeq,
                     'split_from_cards_id'     => 0,
                     'approval_kind'           => 'deletion',
                     'status'                  => 'waiting_approval',
@@ -2334,14 +2350,23 @@ class PluginTrallaCard extends CommonDBTM
         return (int) ($card['id'] ?? 0);
     }
 
-    private static function familySequence(array $card): int
+    private static function codeRoot(array $card): int
     {
-        $sequence = (int) ($card['family_seq'] ?? 0);
-        if ($sequence > 0) {
-            return $sequence;
-        }
+        $root = (int) ($card['code_root_cards_id'] ?? 0);
+        return $root > 0 ? $root : self::familyRoot($card);
+    }
 
-        return (int) ($card['stage'] ?? 1) === 2 ? 2 : 1;
+    private static function nextCodeSequence(int $root): int
+    {
+        global $DB;
+
+        $row = $DB->request([
+            'SELECT' => ['MAX' => 'family_seq AS max_seq'],
+            'FROM'   => 'glpi_plugin_tralla_cards',
+            'WHERE'  => ['code_root_cards_id' => $root],
+        ])->current();
+
+        return max(1, (int) ($row['max_seq'] ?? 0)) + 1;
     }
 
     private static function familyIsIdle(int $root): bool
