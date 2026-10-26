@@ -1173,11 +1173,8 @@
 
         var composerOpen = !isMaintenance && can.create_card && Number(inlineComposerListId) === listId;
         var addCardBlocked = !!addCardBlockedCategories[list.category];
-        var addCardAttrs = addCardBlocked
-            ? ' disabled aria-disabled="true" title="Novos cards de manutenção são criados em Manutenção Pendente."'
-            : '';
-        var addCard = can.create_card && !composerOpen
-            ? '<button type="button" class="tralla-add-card" data-add-card="' + listId + '"' + addCardAttrs + '>'
+        var addCard = can.create_card && !composerOpen && !addCardBlocked
+            ? '<button type="button" class="tralla-add-card" data-add-card="' + listId + '">'
                 + '<i class="ti ti-plus"></i> Adicionar card</button>'
             : '';
         var composer = composerOpen ? renderInlineCardComposer(listId) : '';
