@@ -439,7 +439,7 @@ class PluginTrallaCard extends CommonDBTM
             && !$locked
             && $canUpdate;
 
-        $canRequestCallRelease = $role === 'superadmin'
+        $canRequestCallRelease = PluginTrallaBoardUser::getRole($boardId, $userId) === 'superadmin'
             && $boardType === 'maintenance'
             && $isCall
             && $stage === 1
@@ -546,8 +546,8 @@ class PluginTrallaCard extends CommonDBTM
             $deferCall = $workflowType === 'call' && (string) ($data['release_mode'] ?? 'now') === 'later';
             $approvalList = null;
             if ($deferCall) {
-                if (PluginTrallaBoard::roleFor($boards_id, $userId) !== 'superadmin') {
-                    throw new RuntimeException('Somente SuperAdmin pode disponibilizar chamados depois.');
+                if (PluginTrallaBoardUser::getRole($boards_id, $userId) !== 'superadmin') {
+                    throw new RuntimeException('Somente quem tem o papel SuperAdmin neste quadro pode disponibilizar chamados depois.');
                 }
                 $approvalList = PluginTrallaBoard::findListByCategory($boards_id, 'maintenance_approval');
                 if ($approvalList === null) {
@@ -747,8 +747,8 @@ class PluginTrallaCard extends CommonDBTM
         }
         self::assertBoardAccess($card);
         $boardId = (int) $card['plugin_tralla_boards_id'];
-        if (PluginTrallaBoard::roleFor($boardId, $userId) !== 'superadmin') {
-            throw new RuntimeException('Somente SuperAdmin pode solicitar a liberação.');
+        if (PluginTrallaBoardUser::getRole($boardId, $userId) !== 'superadmin') {
+            throw new RuntimeException('Somente quem tem o papel SuperAdmin neste quadro pode solicitar a liberação.');
         }
         $approvalList = PluginTrallaBoard::findListByCategory($boardId, 'maintenance_approval');
         if ($approvalList === null) {
