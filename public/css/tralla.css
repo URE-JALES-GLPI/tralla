@@ -3608,6 +3608,10 @@ body.tralla-modal-open {
     background: var(--tr-success);
 }
 
+.tralla-card-label-approval-split {
+    background: var(--tr-purple);
+}
+
 .tralla-pill.approval-final {
     background: var(--tr-primary-soft);
     color: var(--tr-primary);
@@ -3839,16 +3843,24 @@ body.tralla-modal-open {
         grid-template-columns: 1fr;
     }
 }
-.tralla-card.approval-final {
-    border-left: 4px solid var(--tr-primary);
+.tralla-board-scroll .tralla-card.approval-final {
+    border: 2px solid var(--tr-primary);
+    border-left-width: 4px;
 }
 
-.tralla-card.approval-deletion {
-    border-left: 4px solid var(--tr-approval-deletion);
+.tralla-board-scroll .tralla-card.approval-deletion {
+    border: 2px solid var(--tr-approval-deletion);
+    border-left-width: 4px;
 }
 
-.tralla-card.approval-edit {
-    border-left: 4px solid var(--tr-success);
+.tralla-board-scroll .tralla-card.approval-edit {
+    border: 2px solid var(--tr-success);
+    border-left-width: 4px;
+}
+
+.tralla-board-scroll .tralla-card.approval-split {
+    border: 2px solid var(--tr-purple);
+    border-left-width: 4px;
 }
 .tralla-edit-machine .tralla-field {
     margin-top: 10px;
