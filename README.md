@@ -72,11 +72,11 @@ Pendente --Pegar--> Em Andamento --Finalizar--> Aprovação (/2)
 - **Pegar**: grava o técnico responsável e move o card para Em Andamento. No card minimizado em Manutenção Pendente, o botão compacto **Pegar** executa a ação sem abrir o modal.
 - **Editar máquinas**: somente o técnico responsável, enquanto o card está em andamento e desbloqueado.
 - **Finalizar**: exige relatório, **Serviço realizado** e status `done`, `not_repairable` (Inservível) ou `pending` em todas as máquinas. É necessário ao menos uma máquina concluída ou inservível. As máquinas pendentes são reunidas em um novo card na lista **Manutenção Pendente**; o card atual segue para aprovação com as demais máquinas.
-- **Aprovar**: move o `/1` para Retirada, desbloqueia e arquiva o `/2` como aprovado.
+- **Aprovar finalização**: arquiva o card de aprovação. Quando todos os cards de uma separação estiverem aprovados, reúne as máquinas no card de origem, arquiva os cards separados e libera somente a origem para Retirada.
 - **Reprovar**: devolve o `/1` para Em Andamento com o motivo registrado e arquiva o `/2`.
-- **Confirmar retirada**: move o `/1` para Concluído e grava a data de retirada. Em cards com família, confirmar em um membro confirma a retirada de toda a família.
-- **Separar card**: seleciona máquinas de um card em andamento e cria um card irmão `/N` com o mesmo responsável; bloqueado quando algum membro da família está em aprovação ou retirada.
-- **Solicitar edição**: técnico ou admin com atualização solicita alteração de nome e máquinas; cria card `/2` de aprovação de edição. Aprovar aplica as alterações; reprovar descarta.
+- **Confirmar retirada**: move o card de origem para Concluído e grava a data de retirada.
+- **Separar card**: seleciona máquinas e cria uma aprovação com o próximo número visual. Se aprovada, cria um card irmão com o número seguinte; se recusada, nenhuma máquina é movida. A separação fica bloqueada quando algum membro da família está em aprovação ou retirada.
+- **Solicitar edição**: técnico ou admin com atualização solicita alteração de nome e máquinas; cria um card de aprovação com o próximo número visual. Aprovar aplica as alterações; reprovar descarta.
 - **Cards decididos**: após aprovação ou reprovação, o card de aprovação permanece no quadro por 10 segundos com selo `Aprovado` ou `Reprovado` antes de sair.
 - **Concluído**: somente leitura.
 

@@ -9,7 +9,7 @@ use Glpi\Http\SessionManager;
 require_once __DIR__ . '/inc/compat.php';
 require_once __DIR__ . '/inc/helpers.php';
 
-define('PLUGIN_TRALLA_VERSION', '1.3.1');
+define('PLUGIN_TRALLA_VERSION', '1.3.2');
 define('PLUGIN_TRALLA_MIN_GLPI', '12.0.0');
 define('PLUGIN_TRALLA_MAX_GLPI', '12.0.99');
 

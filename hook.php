@@ -129,7 +129,7 @@ function plugin_tralla_install(): bool
                 `rejection_reason`        TEXT         DEFAULT NULL,
                 `users_id_approver`       INT {$sign} NOT NULL DEFAULT '0',
                 `is_deleted`              TINYINT(1)   NOT NULL DEFAULT 0,
-                `approval_kind`           VARCHAR(20)  NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|deletion|edit',
+                `approval_kind`           VARCHAR(20)  NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|deletion|edit|split',
                 `edit_payload`            LONGTEXT     DEFAULT NULL COMMENT 'JSON de edição pendente',
                 `deletion_reason`         TEXT         DEFAULT NULL,
                 `deletion_requested_at`   DATETIME     DEFAULT NULL,
@@ -159,7 +159,7 @@ function plugin_tralla_install(): bool
     // Colunas de exclusão em tabelas de cards já existentes.
     $cards_columns = [
         'is_deleted'                  => 'TINYINT(1)   NOT NULL DEFAULT 0',
-        'approval_kind'               => "VARCHAR(20)  NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|deletion|edit'",
+        'approval_kind'               => "VARCHAR(20)  NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|deletion|edit|split'",
         'edit_payload'                => 'LONGTEXT     DEFAULT NULL',
         'family_cards_id'             => "INT {$sign} NOT NULL DEFAULT 0",
         'code_root_cards_id'          => "INT {$sign} NOT NULL DEFAULT 0",
@@ -277,7 +277,7 @@ function plugin_tralla_install(): bool
         ") or die($DB->error());
         $DB->doQuery("
             ALTER TABLE `glpi_plugin_tralla_cards`
-            MODIFY `approval_kind` VARCHAR(20) NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|deletion|edit'
+            MODIFY `approval_kind` VARCHAR(20) NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|deletion|edit|split'
         ") or die($DB->error());
     }
 

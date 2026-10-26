@@ -261,6 +261,7 @@ if (!function_exists('tralla_approval_kind_labels')) {
             'maintenance' => 'Aprovação de finalização',
             'deletion'    => 'Aprovação de exclusão',
             'edit'        => 'Aprovação de edição',
+            'split'       => 'Aprovação de separação',
         ];
     }
 }

@@ -247,7 +247,7 @@ try {
             tralla_json(['ok' => true, 'data' => [
                 'state' => tralla_ajax_state((int) $result['card']['plugin_tralla_boards_id']),
                 'card'  => $result['card'],
-                'child' => $result['child'],
+                'approval' => $result['approval'],
             ]]);
 
         case 'edit_request':

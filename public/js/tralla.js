@@ -490,6 +490,9 @@
         if (kind === 'edit') {
             return 'Aprovação de edição';
         }
+        if (kind === 'split') {
+            return 'Aprovação de separação';
+        }
         return 'Aprovação de finalização';
     }
 
@@ -1269,10 +1272,10 @@
             var kind = approvalKind(card);
             var approveLabel = kind === 'deletion'
                 ? 'Aprovar exclusão'
-                : (kind === 'edit' ? 'Aprovar edição' : 'Aprovar');
+                : (kind === 'edit' ? 'Aprovar edição' : (kind === 'split' ? 'Aprovar separação' : 'Aprovar'));
             var rejectLabel = kind === 'deletion'
                 ? 'Recusar exclusão'
-                : (kind === 'edit' ? 'Recusar edição' : 'Reprovar');
+                : (kind === 'edit' ? 'Recusar edição' : (kind === 'split' ? 'Recusar separação' : 'Reprovar'));
             buttons += '<button type="button" class="tralla-btn tralla-btn-primary" data-card-action="approve">'
                 + '<i class="ti ti-shield-check"></i> ' + approveLabel + '</button>';
             buttons += '<button type="button" class="tralla-btn tralla-btn-danger" data-card-action="reject">'
@@ -1400,6 +1403,12 @@
         var machines = isApproval && card.parent
             ? (card.parent.machines || [])
             : (card.machines || []);
+        if (isApproval && approvalKind(card) === 'split') {
+            var selectedIds = (card.split_machine_ids || []).map(Number);
+            machines = machines.filter(function (machine) {
+                return selectedIds.indexOf(Number(machine.id)) !== -1;
+            });
+        }
         var progress = machineProgress(machines);
         var permissions = card.permissions || {};
         var canEdit = !isApproval && !!permissions.edit_machines;
@@ -1482,6 +1491,17 @@
                 + '</div>';
         }
 
+        if (kind === 'split') {
+            return '<div class="tralla-approval-banner is-edit">'
+                + '<i class="ti ti-git-branch"></i>'
+                + '<div class="tralla-approval-content"><strong>Separação aguardando aprovação</strong>'
+                + parentLine
+                + '<small>' + Number((card.split_machine_ids || []).length)
+                + ' máquina(s) selecionada(s). Confira a lista abaixo antes de decidir.</small></div>'
+                + openParent
+                + '</div>';
+        }
+
         return '<div class="tralla-approval-banner is-finalization">'
             + '<i class="ti ti-shield-check"></i>'
             + '<div class="tralla-approval-content"><strong>Aguardando aprovação de finalização</strong>'
@@ -1498,11 +1518,12 @@
         }
 
         var kind = String(card.pending_approval_kind || 'maintenance');
-        var kindClass = kind === 'deletion' ? 'deletion' : (kind === 'edit' ? 'edit' : 'finalization');
+        var kindClass = kind === 'deletion' ? 'deletion' : (kind === 'edit' || kind === 'split' ? 'edit' : 'finalization');
         var label = kind === 'deletion'
             ? 'Exclusão pendente de aprovação'
-            : (kind === 'edit' ? 'Edição pendente de aprovação' : 'Finalização pendente de aprovação');
-        var icon = kind === 'deletion' ? 'ti-trash' : (kind === 'edit' ? 'ti-pencil' : 'ti-shield-check');
+            : (kind === 'edit' ? 'Edição pendente de aprovação'
+                : (kind === 'split' ? 'Separação pendente de aprovação' : 'Finalização pendente de aprovação'));
+        var icon = kind === 'deletion' ? 'ti-trash' : (kind === 'edit' ? 'ti-pencil' : (kind === 'split' ? 'ti-git-branch' : 'ti-shield-check'));
 
         return '<div class="tralla-approval-banner is-' + kindClass + '">'
             + '<i class="ti ' + icon + '"></i>'
@@ -1759,6 +1780,7 @@
         var kind = approvalKind(activeCard);
         var isDeletionApproval = kind === 'deletion';
         var isEditApproval = kind === 'edit';
+        var isSplitApproval = kind === 'split';
         var departingCard = Object.assign({}, activeCard);
 
         if (action === 'split') {
@@ -1814,6 +1836,13 @@
                         label: 'Motivo (opcional)',
                         confirmLabel: 'Recusar edição'
                     };
+                } else if (isSplitApproval) {
+                    rejectConfig = {
+                        title: 'Recusar separação',
+                        message: 'Nenhuma máquina será movida; o card de origem será liberado.',
+                        label: 'Motivo (opcional)',
+                        confirmLabel: 'Recusar separação'
+                    };
                 } else {
                     rejectConfig = {
                         title: 'Reprovar manutenção',
@@ -1828,7 +1857,8 @@
                         ? 'Descreva o motivo da recusa...'
                         : (isEditApproval
                             ? 'Descreva o motivo da recusa da edição...'
-                            : 'Descreva o motivo da reprovação...'),
+                            : (isSplitApproval ? 'Descreva o motivo da recusa da separação...'
+                                : 'Descreva o motivo da reprovação...')),
                     icon: 'ti-shield-x',
                     tone: 'danger'
                 }, rejectConfig));
@@ -1847,7 +1877,8 @@
                         ? 'Exclusão recusada. Card restaurado.'
                         : (isEditApproval
                             ? 'Edição recusada. Alterações descartadas.'
-                            : 'Manutenção reprovada. O card voltou para Em Andamento.'),
+                            : (isSplitApproval ? 'Separação recusada. Card liberado.'
+                                : 'Manutenção reprovada. O card voltou para Em Andamento.')),
                     'success'
                 );
                 await openCard(rejected.card.id);
@@ -1904,6 +1935,13 @@
                         icon: 'ti-shield-check',
                         confirmLabel: 'Aprovar edição'
                     };
+                } else if (isSplitApproval) {
+                    approveConfig = {
+                        title: 'Aprovar separação',
+                        message: 'Criar um novo card com as máquinas selecionadas?',
+                        icon: 'ti-git-branch',
+                        confirmLabel: 'Aprovar separação'
+                    };
                 } else {
                     approveConfig = {
                         title: 'Aprovar manutenção',
@@ -1951,8 +1989,13 @@
                 } else if (isEditApproval) {
                     toast('Edição aprovada e aplicada.', 'success');
                     await openCard(data.card.id);
+                } else if (isSplitApproval) {
+                    toast('Separação aprovada. Novo card criado.', 'success');
+                    await openCard(data.card.id);
                 } else {
-                    toast('Manutenção aprovada. Card liberado para retirada.', 'success');
+                    toast(data.card.family_ready
+                        ? 'Manutenção aprovada. Família reunida para retirada.'
+                        : 'Manutenção aprovada. Aguardando os demais cards da família.', 'success');
                     await openCard(data.card.id);
                 }
             } else if (action === 'withdraw') {
@@ -1989,13 +2032,13 @@
             + '<p>' + esc(card.code || ('#' + card.id)) + ' · ' + esc(card.name) + '</p>'
             + '</div>' + modalCloseButton() + '</div>'
             + '<div class="tralla-modal-body">'
-            + '<p class="tralla-muted">Selecione as máquinas que serão movidas para um novo card. O card atual mantém as demais.</p>'
+            + '<p class="tralla-muted">Selecione as máquinas e envie para aprovação. Após aprovada, a separação criará um novo card. Quando os dois forem finalizados e aprovados, as máquinas voltarão ao card de origem para a retirada.</p>'
             + '<div class="tralla-split-list">' + rows + '</div>'
             + '</div>'
             + '<div class="tralla-modal-actions">'
             + '<button type="button" class="tralla-btn tralla-btn-ghost" data-tralla-close>Cancelar</button>'
             + '<button type="submit" class="tralla-btn tralla-btn-primary">'
-            + '<i class="ti ti-git-branch"></i> Separar</button>'
+            + '<i class="ti ti-git-branch"></i> Solicitar separação</button>'
             + '</div></form>');
     }
 
@@ -2020,11 +2063,11 @@
         setBusy(submit, true);
         try {
             var data = await api('split_card', { id: activeCard.id, machine_ids: ids });
-            var child = data.child;
+            var approval = data.approval;
             applyState(data);
             closeModal();
-            toast('Card separado. Novo card ' + (child.code || ('#' + child.id)) + '.', 'success');
-            await openCard(child.id);
+            toast('Separação enviada para aprovação em ' + (approval.code || ('#' + approval.id)) + '.', 'success');
+            await openCard(data.card.id);
         } catch (error) {
             toast(error.message, 'error');
             setBusy(submit, false);
