@@ -1061,14 +1061,14 @@
             + '<span class="tralla-card-edit" aria-hidden="true"><i class="ti ti-pencil"></i></span>'
             + cardTop
             + '<h4 class="tralla-card-title">' + esc(card.name) + '</h4>'
-            + ((badges || tech || takeButton || termButton)
+            + ((badges || tech || takeButton)
                 ? '<div class="tralla-card-footer">'
                     + '<div class="tralla-card-badges">' + badges + '</div>'
                     + tech
                     + takeButton
-                    + termButton
                     + '</div>'
                 : '')
+            + termButton
             + '</article>';
     }
 

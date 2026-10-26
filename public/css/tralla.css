@@ -2577,13 +2577,16 @@ body[data-theme="dark"] .tralla-add-card:disabled:hover,
 
 .tralla-card-term {
     align-items: center;
+    background: var(--tr-primary-soft);
     border-radius: 6px;
     color: var(--tr-primary);
     display: inline-flex;
     font-size: 11px;
     font-weight: 700;
     gap: 4px;
-    padding: 4px 6px;
+    justify-content: center;
+    margin-top: 8px;
+    padding: 7px 8px;
     text-decoration: none;
 }
 
