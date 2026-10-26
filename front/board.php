@@ -13,17 +13,57 @@ $canUpdate = Session::haveRight('plugin_tralla', UPDATE);
 $showArchived = isset($_GET['archived']) && (int) $_GET['archived'] === 1;
 $boards = PluginTrallaBoard::getVisibleBoards($showArchived);
 
-Html::header('[URE] Tralla — Quadros', $_SERVER['PHP_SELF'], 'tools', 'PluginTrallaBoard');
+// Usuários exibidos no painel do topo (cards de manutenção por situação).
+$dashboardEmails = [
+    'marco.masson@apoiofde.sp.gov.br',
+    'aryan.ferrari@apoiofde.sp.gov.br',
+];
+$maintenanceBoardIds = [];
+foreach (PluginTrallaBoard::getVisibleBoards(true) as $visibleBoard) {
+    if ((string) $visibleBoard['type'] === 'maintenance') {
+        $maintenanceBoardIds[] = (int) $visibleBoard['id'];
+    }
+}
+$dashboard = PluginTrallaBoard::getUserMaintenanceSummary($dashboardEmails, $maintenanceBoardIds);
+
+Html::header('Tralla', $_SERVER['PHP_SELF'], 'tools', 'PluginTrallaBoard');
+echo "<script>document.title = 'Tralla';</script>";
 
 $root = (string) $CFG_GLPI['root_doc'];
 $pluginUrl = $root . '/plugins/tralla';
 ?>
 <div class="tralla-page tralla-boards-page">
+    <?php if ($dashboard !== []): ?>
+    <section class="tralla-user-dash" aria-label="Manutenções por usuário">
+        <?php foreach ($dashboard as $person): ?>
+            <article class="tralla-user-dash-card">
+                <header>
+                    <i class="ti ti-user-circle" aria-hidden="true"></i>
+                    <div>
+                        <strong><?= tralla_h($person['name']) ?></strong>
+                        <small><?= tralla_h($person['email']) ?></small>
+                    </div>
+                </header>
+                <?php if ((int) $person['users_id'] === 0): ?>
+                    <p class="tralla-user-dash-missing">Usuário não encontrado no GLPI.</p>
+                <?php else: ?>
+                    <dl>
+                        <div class="is-pending"><dt>Pendente</dt><dd><?= (int) $person['pending'] ?></dd></div>
+                        <div class="is-progress"><dt>Em andamento</dt><dd><?= (int) $person['in_progress'] ?></dd></div>
+                        <div class="is-withdrawal"><dt>Retirada</dt><dd><?= (int) $person['withdrawal'] ?></dd></div>
+                        <div class="is-done"><dt>Concluído</dt><dd><?= (int) $person['done'] ?></dd></div>
+                    </dl>
+                <?php endif; ?>
+            </article>
+        <?php endforeach; ?>
+    </section>
+    <?php endif; ?>
+
     <header class="tralla-page-head">
         <div class="tralla-brand">
             <img class="tralla-brand-logo" src="<?= tralla_h($pluginUrl) ?>/logo.png?v=<?= (int) @filemtime(GLPI_ROOT . '/plugins/tralla/public/logo.png') ?>" alt="">
             <div>
-                <h1>Quadros Tralla</h1>
+                <h1>Tralla</h1>
                 <p>Organize projetos e o fluxo de manutenção sem sair do GLPI.</p>
             </div>
         </div>

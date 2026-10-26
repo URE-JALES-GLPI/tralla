@@ -20,14 +20,14 @@ class PluginTrallaBoard extends CommonDBTM
 
     public static function getMenuName()
     {
-        return 'Quadros';
+        return 'Tralla';
     }
 
     public static function getMenuContent()
     {
         $menu = parent::getMenuContent();
         $menu['icon'] = 'ti ti-layout-kanban';
-        $menu['title'] = 'Quadros Tralla';
+        $menu['title'] = 'Tralla';
         $menu['page'] = tralla_web_dir() . '/front/board.php';
 
         return $menu;
@@ -394,6 +394,92 @@ class PluginTrallaBoard extends CommonDBTM
         }
 
         return $stats;
+    }
+
+    /**
+     * Resumo de cards de manutenção por usuário (painel do topo da lista de quadros).
+     *
+     * Pendente  = cards ainda não assumidos, contados para quem os criou;
+     * demais    = cards contados para o técnico que assumiu a manutenção.
+     *
+     * @param string[] $emails   E-mails dos usuários a exibir (na ordem desejada).
+     * @param int[]    $boardIds Quadros de manutenção visíveis ao usuário logado.
+     * @return array<int, array{email:string, users_id:int, name:string, pending:int, in_progress:int, withdrawal:int, done:int}>
+     */
+    public static function getUserMaintenanceSummary(array $emails, array $boardIds): array
+    {
+        global $DB;
+
+        $summary = [];
+        foreach ($emails as $email) {
+            $email = strtolower(trim((string) $email));
+            if ($email === '' || isset($summary[$email])) {
+                continue;
+            }
+
+            $usersId = 0;
+            foreach ($DB->request([
+                'SELECT' => ['users_id'],
+                'FROM'   => 'glpi_useremails',
+                'WHERE'  => ['email' => $email],
+                'LIMIT'  => 1,
+            ]) as $row) {
+                $usersId = (int) $row['users_id'];
+            }
+            if ($usersId === 0) {
+                foreach ($DB->request([
+                    'SELECT' => ['id'],
+                    'FROM'   => 'glpi_users',
+                    'WHERE'  => ['name' => $email],
+                    'LIMIT'  => 1,
+                ]) as $row) {
+                    $usersId = (int) $row['id'];
+                }
+            }
+
+            $item = [
+                'email'       => $email,
+                'users_id'    => $usersId,
+                'name'        => $usersId > 0 ? tralla_user_name($usersId) : $email,
+                'pending'     => 0,
+                'in_progress' => 0,
+                'withdrawal'  => 0,
+                'done'        => 0,
+            ];
+
+            if ($usersId > 0 && $boardIds !== []) {
+                $base = [
+                    'plugin_tralla_boards_id' => array_values(array_map('intval', $boardIds)),
+                    'stage'                   => 1,
+                    'is_deleted'              => 0,
+                ];
+
+                $item['pending'] = countElementsInTable('glpi_plugin_tralla_cards', $base + [
+                    'status'        => 'pending',
+                    'is_archived'   => 0,
+                    'technician_id' => 0,
+                    'users_id'      => $usersId,
+                ]);
+                $item['in_progress'] = countElementsInTable('glpi_plugin_tralla_cards', $base + [
+                    'status'        => 'in_progress',
+                    'is_archived'   => 0,
+                    'technician_id' => $usersId,
+                ]);
+                $item['withdrawal'] = countElementsInTable('glpi_plugin_tralla_cards', $base + [
+                    'status'        => 'withdrawal',
+                    'is_archived'   => 0,
+                    'technician_id' => $usersId,
+                ]);
+                $item['done'] = countElementsInTable('glpi_plugin_tralla_cards', $base + [
+                    'status'        => 'done',
+                    'technician_id' => $usersId,
+                ]);
+            }
+
+            $summary[$email] = $item;
+        }
+
+        return array_values($summary);
     }
 
     /**

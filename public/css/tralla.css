@@ -3898,3 +3898,79 @@ body.tralla-modal-open {
 .tralla-challenge-input {
     text-transform: uppercase;
 }
+
+/* Painel de manutenções por usuário (topo da lista de quadros) */
+.tralla-user-dash {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: var(--tr-space-4);
+    margin-bottom: var(--tr-space-5);
+}
+.tralla-user-dash-card {
+    background: var(--tr-surface);
+    border: 1px solid var(--tr-border);
+    border-radius: var(--tr-radius);
+    box-shadow: var(--tr-shadow-sm);
+    padding: var(--tr-space-4);
+    color: var(--tr-text);
+}
+.tralla-user-dash-card header {
+    display: flex;
+    align-items: center;
+    gap: var(--tr-space-3);
+    margin-bottom: var(--tr-space-3);
+}
+.tralla-user-dash-card header > i {
+    font-size: 28px;
+    color: var(--tr-primary);
+}
+.tralla-user-dash-card header strong {
+    display: block;
+    font-size: 15px;
+    line-height: 1.2;
+}
+.tralla-user-dash-card header small {
+    color: var(--tr-muted);
+    font-size: 12px;
+    word-break: break-all;
+}
+.tralla-user-dash-card dl {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--tr-space-2);
+    margin: 0;
+}
+.tralla-user-dash-card dl > div {
+    border-radius: var(--tr-radius-sm);
+    padding: var(--tr-space-2);
+    text-align: center;
+    background: var(--tr-surface-2);
+}
+.tralla-user-dash-card dt {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--tr-text-soft);
+    line-height: 1.2;
+}
+.tralla-user-dash-card dd {
+    margin: 2px 0 0;
+    font-size: 22px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+.tralla-user-dash-card .is-pending { background: var(--tr-warning-soft); }
+.tralla-user-dash-card .is-pending dd { color: var(--tr-warning); }
+.tralla-user-dash-card .is-progress { background: var(--tr-primary-soft); }
+.tralla-user-dash-card .is-progress dd { color: var(--tr-primary); }
+.tralla-user-dash-card .is-withdrawal { background: var(--tr-purple-soft); }
+.tralla-user-dash-card .is-withdrawal dd { color: var(--tr-purple); }
+.tralla-user-dash-card .is-done { background: var(--tr-success-soft); }
+.tralla-user-dash-card .is-done dd { color: var(--tr-success); }
+.tralla-user-dash-missing {
+    margin: 0;
+    color: var(--tr-muted);
+    font-size: 13px;
+}
+@media (max-width: 480px) {
+    .tralla-user-dash-card dl { grid-template-columns: repeat(2, 1fr); }
+}

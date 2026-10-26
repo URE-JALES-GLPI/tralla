@@ -130,7 +130,8 @@ $config = PluginTrallaConfig::getAll();
 $token = PluginTrallaConfig::assignatureToken();
 $notifications = PluginTrallaConfig::notificationEmails();
 
-Html::header('Configurações — [URE] Tralla', $_SERVER['PHP_SELF'], 'tools', 'PluginTrallaBoard');
+Html::header('Tralla', $_SERVER['PHP_SELF'], 'tools', 'PluginTrallaBoard');
+echo "<script>document.title = 'Tralla';</script>";
 ?>
 <div class="tralla-page tralla-config-page">
     <header class="tralla-page-head">

@@ -115,7 +115,8 @@ $bootstrap = [
 
 $background = tralla_valid_background((string) $board->fields['background']);
 
-Html::header($board->fields['name'] . ' — [URE] Tralla', $_SERVER['PHP_SELF'], 'tools', 'PluginTrallaBoard');
+Html::header('Tralla', $_SERVER['PHP_SELF'], 'tools', 'PluginTrallaBoard');
+echo "<script>document.title = 'Tralla';</script>";
 ?>
 <div class="tralla-page tralla-kanban-page tr-bg-<?= tralla_h($background) ?>" id="tralla-kanban">
     <header class="tralla-kanban-head">

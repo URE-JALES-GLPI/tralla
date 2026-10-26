@@ -22,7 +22,7 @@ O Tralla combina dois tipos de quadro:
 4. Em **Administração > Perfis**, conceda os direitos:
    - `plugin_tralla`: leitura, criação, atualização e exclusão para operadores.
    - `plugin_tralla_approve`: leitura para membros que aprovam no quadro.
-5. Acesse **Ferramentas > Quadros Tralla** para criar o primeiro quadro.
+5. Acesse **Ferramentas > Tralla** para criar o primeiro quadro.
 
 > A página de configuração do plugin exige o direito `plugin_tralla` de **atualização**.
 > O acesso aos quadros também respeita a entidade ativa do usuário e o vínculo com o quadro.
@@ -42,7 +42,7 @@ Modelos arquivados continuam visíveis em cards e relatórios antigos, mas não 
 
 ### 2. Criar um quadro normal
 
-1. Em **Ferramentas > Quadros Tralla**, clique em **Novo quadro**.
+1. Em **Ferramentas > Tralla**, clique em **Novo quadro**.
 2. Escolha o tipo **Normal**.
 3. O plugin cria as listas padrão **A Fazer**, **Em Progresso** e **Concluído**.
 4. Crie cards, arraste entre listas e edite o conteúdo pelo modal.
