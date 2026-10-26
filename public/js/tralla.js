@@ -3282,10 +3282,10 @@
                 ? '<fieldset class="tralla-card-workflow-choice tralla-call-release-choice" data-call-release-section hidden>'
                     + '<legend>Quando disponibilizar o chamado?</legend>'
                     + '<div class="tralla-card-workflow-options">'
-                    + '<label class="tralla-card-workflow-option"><input type="radio" name="release_mode" value="now" checked>'
-                    + '<span><i class="ti ti-lock-open"></i><strong>Disponibilizar agora</strong><small>O botão Pegar fica disponível imediatamente</small></span></label>'
-                    + '<label class="tralla-card-workflow-option"><input type="radio" name="release_mode" value="later">'
+                    + '<label class="tralla-card-workflow-option"><input type="radio" name="release_mode" value="later" checked>'
                     + '<span><i class="ti ti-lock"></i><strong>Disponibilizar depois</strong><small>Bloqueia o chamado e solicita aprovação para liberar</small></span></label>'
+                    + '<label class="tralla-card-workflow-option"><input type="radio" name="release_mode" value="now">'
+                    + '<span><i class="ti ti-lock-open"></i><strong>Disponibilizar agora</strong><small>O botão Pegar fica disponível imediatamente</small></span></label>'
                     + '</div></fieldset>'
                 : '')
             + '</div>'
