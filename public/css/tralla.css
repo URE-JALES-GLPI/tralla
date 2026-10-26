@@ -3533,18 +3533,6 @@ body.tralla-modal-open {
     font-weight: 600;
 }
 
-.tralla-combobox-option small {
-    color: var(--tr-muted);
-    font-size: 11px;
-    font-weight: 400;
-}
-
-.tralla-combobox-option:hover small,
-.tralla-combobox-option.is-active small {
-    color: inherit;
-    opacity: 0.8;
-}
-
 .tralla-combobox-empty {
     color: var(--tr-muted);
     font-size: 12px;

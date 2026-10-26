@@ -2935,14 +2935,10 @@
 
         list.innerHTML = matches.map(function (entity, index) {
             var name = String(entity.name || '');
-            var complete = String(entity.completename || '');
-            var path = complete !== '' && complete !== name
-                ? '<small>' + esc(complete) + '</small>'
-                : '';
             return '<button type="button" class="tralla-combobox-option" role="option"'
                 + ' id="' + attr(list.id) + '-entity-' + index + '" aria-selected="false"'
                 + ' data-entity-name="' + attr(name) + '">'
-                + '<span>' + esc(name) + '</span>' + path + '</button>';
+                + '<span>' + esc(name) + '</span></button>';
         }).join('');
         list.hidden = false;
     }
