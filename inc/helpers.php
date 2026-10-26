@@ -185,12 +185,12 @@ if (!function_exists('tralla_backgrounds')) {
     function tralla_backgrounds(): array
     {
         return [
-            'ocean'    => 'Oceano',
-            'aurora'   => 'Aurora',
-            'sunset'   => 'Pôr do sol',
-            'forest'   => 'Floresta',
-            'graphite' => 'Grafite',
-            'candy'    => 'Doce',
+            'ocean'       => 'Oceano',
+            'aurora'      => 'Aurora',
+            'sunset'      => 'Pôr do sol',
+            'forest'      => 'Floresta',
+            'graphite'    => 'Grafite',
+            'candy'       => 'Doce',
             'linux'       => 'Linux',
             'windows'     => 'Windows',
             'mac'         => 'Mac',
@@ -213,6 +213,27 @@ if (!function_exists('tralla_valid_background')) {
     function tralla_valid_background(string $background, string $default = 'ocean'): string
     {
         return array_key_exists($background, tralla_backgrounds()) ? $background : $default;
+    }
+}
+
+if (!function_exists('tralla_background_color')) {
+    function tralla_background_color(string $background): string
+    {
+        $colors = [
+            'ocean'       => '#0079bf',
+            'aurora'      => '#4338ca',
+            'sunset'      => '#c2410c',
+            'forest'      => '#15803d',
+            'graphite'    => '#374151',
+            'candy'       => '#be185d',
+            'linux'       => '#9a3412',
+            'windows'     => '#0369a1',
+            'mac'         => '#475569',
+            'tickets'     => '#155e75',
+            'maintenance' => '#92400e',
+        ];
+
+        return $colors[tralla_valid_background($background)];
     }
 }
 

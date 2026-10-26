@@ -2152,32 +2152,6 @@ body[data-theme="dark"] .tralla-add-card:disabled:hover,
     white-space: nowrap;
 }
 
-.tralla-board-create-color {
-    align-items: center;
-    display: flex;
-    gap: 10px;
-}
-
-.tralla-board-create-color input[type="color"] {
-    flex: 0 0 52px;
-    min-height: 36px;
-    padding: 3px;
-    width: 52px;
-}
-
-.tralla-board-create-color output {
-    background: var(--tr-surface-2);
-    border: 1px solid var(--tr-border);
-    border-radius: var(--tr-radius-sm);
-    color: var(--tr-text-soft);
-    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-    font-size: 12px;
-    font-weight: 600;
-    line-height: 1.35;
-    padding: 8px 10px;
-    text-transform: uppercase;
-}
-
 .tralla-board-create-body textarea {
     min-height: 84px;
 }

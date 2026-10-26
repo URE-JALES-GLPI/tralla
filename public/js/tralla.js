@@ -80,19 +80,6 @@
         });
     }
 
-    var boardColorInput = document.getElementById('tralla-board-color');
-    var boardColorValue = document.getElementById('tralla-board-color-value');
-
-    if (boardColorInput && boardColorValue) {
-        var syncBoardColorValue = function () {
-            boardColorValue.textContent = boardColorInput.value;
-        };
-
-        boardColorInput.addEventListener('input', syncBoardColorValue);
-        boardColorInput.addEventListener('change', syncBoardColorValue);
-        syncBoardColorValue();
-    }
-
     /* ------------------------------------------------------- dialogs */
 
     var activePluginDialog = null;

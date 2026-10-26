@@ -228,13 +228,6 @@ $backgrounds = tralla_backgrounds();
                             <?php endforeach; ?>
                         </div>
                     </fieldset>
-                    <div class="tralla-field">
-                        <label for="tralla-board-color">Cor de destaque</label>
-                        <div class="tralla-board-create-color">
-                            <input id="tralla-board-color" type="color" name="color" value="#0079bf">
-                            <output id="tralla-board-color-value" for="tralla-board-color">#0079bf</output>
-                        </div>
-                    </div>
                 </section>
 
                 <section class="tralla-board-create-section" aria-labelledby="tralla-board-create-organization-title">

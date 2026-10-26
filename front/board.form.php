@@ -17,7 +17,6 @@ if (isset($_POST['add'])) {
     $input = [
         'name'         => tralla_post_string('name'),
         'type'         => tralla_post_string('type', 'normal'),
-        'color'        => tralla_post_string('color', '#0079bf'),
         'background'   => tralla_post_string('background', 'ocean'),
         'comment'      => tralla_post_string('comment'),
         'entities_id'  => tralla_post_int('entities_id', (int) ($_SESSION['glpiactive_entity'] ?? 0)),
@@ -65,7 +64,6 @@ if (isset($_POST['update'])) {
     $input = [
         'id'          => $id,
         'name'        => tralla_post_string('name'),
-        'color'       => tralla_post_string('color', '#0079bf'),
         'background'  => tralla_post_string('background', 'ocean'),
         'comment'     => tralla_post_string('comment'),
     ];
@@ -76,10 +74,7 @@ if (isset($_POST['update'])) {
         unset($input['is_archived']);
     }
 
-    if (!$board->check($id, UPDATE)) {
-        Session::addMessageAfterRedirect('Sem permissão para editar este quadro.', false, ERROR);
-        Html::redirect($pluginUrl . '/front/board.form.php?id=' . $id . '&tab=general');
-    }
+    $board->check($id, UPDATE);
 
     $board->update($input);
     Html::redirect($pluginUrl . '/front/board.form.php?id=' . $id . '&tab=general');
@@ -94,10 +89,7 @@ if (isset($_POST['delete'])) {
         Html::redirect($pluginUrl . '/front/board.form.php?id=' . $id . '&tab=general');
     }
 
-    if (!$board->check($id, DELETE)) {
-        Session::addMessageAfterRedirect('Sem permissão para excluir este quadro.', false, ERROR);
-        Html::redirect($pluginUrl . '/front/board.form.php?id=' . $id . '&tab=general');
-    }
+    $board->check($id, DELETE);
 
     $board->delete(['id' => $id], 1);
     Html::redirect($pluginUrl . '/front/board.php');
@@ -196,22 +188,15 @@ echo "<script>document.title = 'Tralla';</script>";
                 <input id="tralla-edit-name" type="text" name="name" maxlength="255" required
                        value="<?= tralla_h($board->fields['name']) ?>" <?= $canUpdate ? '' : 'disabled' ?>>
             </div>
-            <div class="tralla-form-row">
-                <div class="tralla-field">
-                    <label for="tralla-edit-background">Tema</label>
-                    <select id="tralla-edit-background" name="background" <?= $canUpdate ? '' : 'disabled' ?>>
-                        <?php foreach (tralla_backgrounds() as $value => $label): ?>
-                            <option value="<?= tralla_h($value) ?>" <?= $board->fields['background'] === $value ? 'selected' : '' ?>>
-                                <?= tralla_h($label) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="tralla-field">
-                    <label for="tralla-edit-color">Cor de destaque</label>
-                    <input id="tralla-edit-color" type="color" name="color"
-                           value="<?= tralla_h($board->fields['color']) ?>" <?= $canUpdate ? '' : 'disabled' ?>>
-                </div>
+            <div class="tralla-field">
+                <label for="tralla-edit-background">Tema</label>
+                <select id="tralla-edit-background" name="background" <?= $canUpdate ? '' : 'disabled' ?>>
+                    <?php foreach (tralla_backgrounds() as $value => $label): ?>
+                        <option value="<?= tralla_h($value) ?>" <?= $board->fields['background'] === $value ? 'selected' : '' ?>>
+                            <?= tralla_h($label) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
             </div>
             <div class="tralla-field">
                 <label for="tralla-edit-comment">Descrição</label>

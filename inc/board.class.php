@@ -105,8 +105,8 @@ class PluginTrallaBoard extends CommonDBTM
 
         $type = (string) ($input['type'] ?? 'normal');
         $input['type'] = array_key_exists($type, self::getTypeChoices()) ? $type : 'normal';
-        $input['color'] = tralla_valid_color((string) ($input['color'] ?? '#0079bf'));
         $input['background'] = tralla_valid_background((string) ($input['background'] ?? 'ocean'));
+        $input['color'] = tralla_background_color($input['background']);
         $input['comment'] = trim(strip_tags((string) ($input['comment'] ?? '')));
         $input['is_archived'] = !empty($input['is_archived']) ? 1 : 0;
         $input['is_recursive'] = !empty($input['is_recursive']) ? 1 : 0;
@@ -133,11 +133,11 @@ class PluginTrallaBoard extends CommonDBTM
             }
         }
 
-        if (array_key_exists('color', $input)) {
-            $input['color'] = tralla_valid_color((string) $input['color']);
-        }
         if (array_key_exists('background', $input)) {
             $input['background'] = tralla_valid_background((string) $input['background']);
+            $input['color'] = tralla_background_color($input['background']);
+        } else {
+            unset($input['color']);
         }
         if (array_key_exists('comment', $input)) {
             $input['comment'] = trim(strip_tags((string) $input['comment']));
