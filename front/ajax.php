@@ -5,7 +5,7 @@ require_once GLPI_ROOT . '/plugins/tralla/inc/compat.php';
 require_once GLPI_ROOT . '/plugins/tralla/inc/helpers.php';
 require_once GLPI_ROOT . '/plugins/tralla/inc/boardgroup.class.php';
 
-global $CFG_GLPI;
+global $CFG_GLPI, $DB;
 
 Session::checkRight('plugin_tralla', READ);
 tralla_check_csrf($_POST);
