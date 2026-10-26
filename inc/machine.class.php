@@ -151,9 +151,7 @@ class PluginTrallaMachine extends CommonDBTM
         }
 
         $allowed['date_mod'] = tralla_now();
-        $DB->update('glpi_plugin_tralla_machines', $allowed, ['id' => $id]);
-
-        return true;
+        return $DB->update('glpi_plugin_tralla_machines', $allowed, ['id' => $id]) !== false;
     }
 
     public static function deleteMachine(int $id): bool

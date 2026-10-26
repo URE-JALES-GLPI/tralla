@@ -1364,7 +1364,7 @@
         };
     }
 
-    function renderMachine(machine, canEdit, permissions, sequence) {
+    function renderMachine(machine, canEdit, permissions, sequence, canBulkSelect) {
         var id = Number(machine.id);
         var title = machineDisplayTitle(machine, sequence);
         var disabled = canEdit ? '' : ' disabled';
@@ -1375,6 +1375,8 @@
             + '<span data-machine-title-text>' + esc(title) + '</span>'
             + '<small>' + esc(machine.model_name || 'Modelo não informado') + '</small>'
             + '</div>'
+            + (canBulkSelect ? '<label class="tralla-machine-select"><input type="checkbox" data-select-machine="' + id
+                + '" aria-label="Selecionar ' + attr(title) + '"><span>Selecionar</span></label>' : '')
             + '<span class="tralla-pill ' + (machine.is_filled ? 'done' : 'pending') + '">'
             + (machine.is_filled ? 'Preenchida' : 'Pendente') + '</span>'
             + '</div>'
@@ -1401,6 +1403,28 @@
         var progress = machineProgress(machines);
         var permissions = card.permissions || {};
         var canEdit = !isApproval && !!permissions.edit_machines;
+        var bulkTools = canEdit && machines.length > 1
+            ? '<div class="tralla-bulk-toolbar">'
+                + '<label class="tralla-machine-select"><input type="checkbox" data-select-all-machines>'
+                + '<span>Selecionar todas</span></label>'
+                + '<span data-bulk-count>0 selecionadas</span>'
+                + '</div>'
+                + '<div class="tralla-bulk-editor" data-bulk-editor hidden>'
+                + '<strong>Editar máquinas selecionadas</strong>'
+                + '<p>Marque somente os campos que deseja alterar. O relatório será substituído nas máquinas selecionadas.</p>'
+                + '<div class="tralla-bulk-fields">'
+                + '<div class="tralla-field"><label class="tralla-check"><input type="checkbox" data-bulk-use="status"> Alterar status</label>'
+                + '<select data-bulk-value="status" disabled><option value="__select">Selecione...</option>'
+                + machineStatusOptions('') + '</select></div>'
+                + '<div class="tralla-field tralla-bulk-report"><label class="tralla-check"><input type="checkbox" data-bulk-use="report"> Alterar relatório técnico</label>'
+                + '<textarea data-bulk-value="report" maxlength="200000" rows="3" disabled placeholder="Novo relatório para as máquinas selecionadas"></textarea></div>'
+                + '<div class="tralla-field"><label class="tralla-check"><input type="checkbox" data-bulk-use="service_done"> Alterar Serviço realizado</label>'
+                + '<select data-bulk-value="service_done" disabled><option value="1">Sim</option><option value="0">Não</option></select></div>'
+                + '<div class="tralla-field"><label class="tralla-check"><input type="checkbox" data-bulk-use="needs_inventory"> Alterar Necessita inventariar</label>'
+                + '<select data-bulk-value="needs_inventory" disabled><option value="1">Sim</option><option value="0">Não</option></select></div>'
+                + '</div><button type="button" class="tralla-btn tralla-btn-primary" data-bulk-apply>'
+                + '<i class="ti ti-device-floppy"></i> Aplicar às selecionadas</button></div>'
+            : '';
 
         return '<section class="tralla-detail-section">'
             + '<h3><i class="ti ti-device-desktop"></i> Máquinas</h3>'
@@ -1409,9 +1433,10 @@
             + '<span data-progress-bar style="width:' + progress.percent + '%"></span></div>'
             + '<span data-progress-label>' + progress.filled + '/' + progress.total + '</span>'
             + '</div>'
+            + bulkTools
             + (machines.length
                 ? machines.map(function (machine, index) {
-                    return renderMachine(machine, canEdit, permissions, index + 1);
+                    return renderMachine(machine, canEdit, permissions, index + 1, !!bulkTools);
                 }).join('')
                 : '<p class="tralla-empty-mini">Nenhuma máquina cadastrada.</p>')
             + '</section>';
@@ -2441,6 +2466,93 @@
         }
     }
 
+    function updateBulkSelection() {
+        var all = Array.prototype.slice.call(modalRoot.querySelectorAll('[data-select-machine]'));
+        var selected = all.filter(function (checkbox) { return checkbox.checked; });
+        var selectAll = modalRoot.querySelector('[data-select-all-machines]');
+        var count = modalRoot.querySelector('[data-bulk-count]');
+        var editor = modalRoot.querySelector('[data-bulk-editor]');
+
+        if (selectAll) {
+            selectAll.checked = all.length > 0 && selected.length === all.length;
+            selectAll.indeterminate = selected.length > 0 && selected.length < all.length;
+        }
+        if (count) {
+            count.textContent = selected.length + (selected.length === 1 ? ' selecionada' : ' selecionadas');
+        }
+        if (editor) {
+            editor.hidden = selected.length === 0;
+        }
+        all.forEach(function (checkbox) {
+            checkbox.closest('.tralla-machine').classList.toggle('is-selected', checkbox.checked);
+        });
+    }
+
+    async function applyBulkMachines(button) {
+        if (!activeCard || !activeCard.permissions || !activeCard.permissions.edit_machines) {
+            return;
+        }
+        var cardId = Number(activeCard.id);
+        var machineIds = Array.prototype.slice.call(modalRoot.querySelectorAll('[data-select-machine]:checked'))
+            .map(function (checkbox) { return Number(checkbox.dataset.selectMachine); });
+        if (!machineIds.length) {
+            toast('Selecione as máquinas que deseja editar.', 'error');
+            return;
+        }
+
+        var changes = {};
+        Array.prototype.forEach.call(modalRoot.querySelectorAll('[data-bulk-use]:checked'), function (checkbox) {
+            var field = checkbox.dataset.bulkUse;
+            var input = modalRoot.querySelector('[data-bulk-value="' + field + '"]');
+            if (input) {
+                changes[field] = input.value;
+            }
+        });
+        if (!Object.keys(changes).length) {
+            toast('Marque ao menos um campo para alterar.', 'error');
+            return;
+        }
+        if (changes.status === '__select') {
+            toast('Selecione o novo status.', 'error');
+            return;
+        }
+
+        var confirmed = await confirmDialog({
+            title: 'Aplicar edição em massa',
+            message: 'Atualizar ' + machineIds.length + (machineIds.length === 1 ? ' máquina' : ' máquinas')
+                + ' deste card?' + (Object.prototype.hasOwnProperty.call(changes, 'report')
+                    ? ' O relatório atual das selecionadas será substituído.' : ''),
+            confirmLabel: 'Aplicar alterações',
+            icon: 'ti-device-floppy'
+        });
+        if (!confirmed || !activeCard || Number(activeCard.id) !== cardId) {
+            return;
+        }
+
+        setBusy(button, true);
+        try {
+            Array.prototype.forEach.call(modalRoot.querySelectorAll('[data-machine-id]'), flushMachineSave);
+            await machineSaveQueue;
+            if (!activeCard || Number(activeCard.id) !== cardId) {
+                return;
+            }
+            var data = await api('machine_bulk_update', Object.assign({
+                card_id: cardId,
+                machine_ids: machineIds
+            }, changes));
+            applyState(data);
+            if (activeCard && Number(activeCard.id) === cardId) {
+                activeCard = data.card;
+                renderCardModal(data.card);
+            }
+            shouldRefreshBoard = false;
+            toast('Máquinas atualizadas.', 'success');
+        } catch (error) {
+            setBusy(button, false);
+            toast(error.message, 'error');
+        }
+    }
+
     /* ------------------------------------------------------------- models */
 
     function modelOptions(selected) {
@@ -3224,6 +3336,12 @@
             return;
         }
 
+        var bulkApplyButton = event.target.closest('[data-bulk-apply]');
+        if (bulkApplyButton) {
+            applyBulkMachines(bulkApplyButton);
+            return;
+        }
+
         var actionButton = event.target.closest('[data-card-action]');
         if (actionButton) {
             handleCardAction(actionButton.dataset.cardAction, actionButton);
@@ -3375,6 +3493,29 @@
     });
 
     modalRoot.addEventListener('change', async function (event) {
+        if (event.target.matches('[data-select-all-machines]')) {
+            var checked = event.target.checked;
+            Array.prototype.forEach.call(modalRoot.querySelectorAll('[data-select-machine]'), function (checkbox) {
+                checkbox.checked = checked;
+            });
+            updateBulkSelection();
+            return;
+        }
+        if (event.target.matches('[data-select-machine]')) {
+            updateBulkSelection();
+            return;
+        }
+        if (event.target.matches('[data-bulk-use]')) {
+            var bulkInput = modalRoot.querySelector('[data-bulk-value="' + event.target.dataset.bulkUse + '"]');
+            if (bulkInput) {
+                bulkInput.disabled = !event.target.checked;
+                if (event.target.checked) {
+                    bulkInput.focus();
+                }
+            }
+            return;
+        }
+
         var createRow = event.target.closest('[data-create-machine]');
         if (createRow) {
             updateCreateMachineSummary(createRow);

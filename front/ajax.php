@@ -314,6 +314,25 @@ try {
             $result = PluginTrallaCard::updateMachine($machineId, $data, $userId, $isAdmin);
             tralla_json(['ok' => true, 'data' => $result]);
 
+        case 'machine_bulk_update':
+            tralla_ajax_require(UPDATE);
+            $cardId = tralla_post_int('card_id');
+            $machineIds = json_decode((string) ($_POST['machine_ids'] ?? ''), true);
+            if (!is_array($machineIds) || !array_is_list($machineIds)) {
+                throw new RuntimeException('Seleção de máquinas inválida.');
+            }
+            $changes = [];
+            foreach (['status', 'report', 'service_done', 'needs_inventory'] as $field) {
+                if (array_key_exists($field, $_POST)) {
+                    $changes[$field] = $_POST[$field];
+                }
+            }
+            $detail = PluginTrallaCard::bulkUpdateMachines($cardId, $machineIds, $changes, $userId, $isAdmin);
+            tralla_json(['ok' => true, 'data' => [
+                'card' => $detail,
+                'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id']),
+            ]]);
+
         case 'machine_add':
             tralla_ajax_require(UPDATE);
             $cardId = tralla_post_int('card_id');

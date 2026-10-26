@@ -2335,17 +2335,106 @@ body[data-theme="dark"] .tralla-add-card:disabled:hover,
     padding: 12px;
 }
 
+.tralla-machine.is-selected {
+    box-shadow: 0 0 0 2px var(--tr-primary), var(--tr-card-shadow);
+}
+
+.tralla-machine-select {
+    align-items: center;
+    color: var(--tr-text-soft);
+    cursor: pointer;
+    display: inline-flex;
+    flex: 0 0 auto;
+    font-size: 11px;
+    font-weight: 600;
+    gap: 5px;
+}
+
+.tralla-machine-select input {
+    accent-color: var(--tr-primary);
+    height: 16px;
+    margin: 0;
+    width: 16px;
+}
+
+.tralla-bulk-toolbar {
+    align-items: center;
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    margin: 0 0 12px;
+}
+
+.tralla-bulk-toolbar [data-bulk-count] {
+    color: var(--tr-muted);
+    font-size: 11px;
+}
+
+.tralla-bulk-editor {
+    background: var(--tr-surface);
+    border: 1px solid var(--tr-border);
+    border-radius: 9px;
+    margin: 0 0 14px;
+    padding: 14px;
+}
+
+.tralla-bulk-editor[hidden] {
+    display: none;
+}
+
+.tralla-bulk-editor > strong {
+    color: var(--tr-text);
+    display: block;
+    font-size: 13px;
+    margin-bottom: 3px;
+}
+
+.tralla-bulk-editor > p {
+    color: var(--tr-muted);
+    font-size: 11px;
+    line-height: 1.4;
+    margin: 0 0 12px;
+}
+
+.tralla-bulk-fields {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-bottom: 12px;
+}
+
+.tralla-bulk-fields .tralla-bulk-report {
+    grid-column: 1 / -1;
+}
+
+.tralla-bulk-fields .tralla-check {
+    margin-bottom: 5px;
+}
+
+.tralla-bulk-fields textarea {
+    min-height: 80px;
+}
+
+@media (max-width: 680px) {
+    .tralla-bulk-fields {
+        grid-template-columns: 1fr;
+    }
+}
+
 .tralla-machine-head {
     align-items: flex-start;
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     justify-content: space-between;
     margin-bottom: 9px;
 }
 
 .tralla-machine-title {
+    flex: 1 1 180px;
     font-size: 13px;
     font-weight: 700;
+    min-width: 0;
 }
 
 .tralla-machine-title small {

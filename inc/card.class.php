@@ -777,6 +777,80 @@ class PluginTrallaCard extends CommonDBTM
         ];
     }
 
+    public static function bulkUpdateMachines(int $cardId, array $machineIds, array $changes, int $userId = 0, bool $isAdmin = false): array
+    {
+        global $DB;
+
+        $ids = [];
+        foreach ($machineIds as $id) {
+            if (!is_int($id) || $id <= 0) {
+                throw new RuntimeException('Seleção de máquinas inválida.');
+            }
+            $ids[$id] = $id;
+        }
+        if ($ids === []) {
+            throw new RuntimeException('Selecione ao menos uma máquina.');
+        }
+        $allowed = ['status', 'report', 'service_done', 'needs_inventory'];
+        if ($changes === [] || array_diff(array_keys($changes), $allowed) !== []) {
+            throw new RuntimeException('Selecione os campos que deseja alterar.');
+        }
+        foreach ($changes as $value) {
+            if (!is_scalar($value)) {
+                throw new RuntimeException('Valor inválido para a edição em massa.');
+            }
+        }
+        if (array_key_exists('status', $changes)
+            && (string) $changes['status'] !== ''
+            && !array_key_exists((string) $changes['status'], tralla_machine_status_choices())) {
+            throw new RuntimeException('Status inválido.');
+        }
+        foreach (['service_done', 'needs_inventory'] as $field) {
+            if (array_key_exists($field, $changes) && !in_array((string) $changes[$field], ['0', '1'], true)) {
+                throw new RuntimeException('Valor inválido para ' . $field . '.');
+            }
+        }
+        if (array_key_exists('report', $changes)) {
+            $changes['report'] = tralla_normalize_report($changes['report']);
+        }
+
+        $userId = $userId ?: (int) Session::getLoginUserID();
+        $DB->beginTransaction();
+        try {
+            self::lockCardRow($cardId);
+            $card = self::getCard($cardId);
+            if ($card === null) {
+                throw new RuntimeException('Card não encontrado.');
+            }
+            self::assertBoardAccess($card);
+            $boardType = self::getBoardType((int) $card['plugin_tralla_boards_id']);
+            $permissions = self::permissionsFor($card, $boardType, $userId, $isAdmin);
+            if ($boardType !== 'maintenance' || empty($permissions['edit_machines'])) {
+                throw new RuntimeException('Somente o técnico responsável pode editar as máquinas deste card.');
+            }
+
+            foreach ($ids as $id) {
+                $machine = PluginTrallaMachine::getMachine($id);
+                if ($machine === null || (int) $machine['plugin_tralla_cards_id'] !== $cardId) {
+                    throw new RuntimeException('A seleção contém uma máquina que não pertence a este card.');
+                }
+            }
+            foreach ($ids as $id) {
+                if (!PluginTrallaMachine::updateMachine($id, $changes)) {
+                    throw new RuntimeException('Não foi possível atualizar todas as máquinas.');
+                }
+            }
+            $DB->update('glpi_plugin_tralla_cards', ['date_mod' => tralla_now()], ['id' => $cardId]);
+            PluginTrallaHistory::log($cardId, $userId, 'machine_updated', count($ids) . ' máquina(s) atualizada(s) em massa.');
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
+        }
+
+        return self::getCardDetail($cardId, $userId);
+    }
+
     public static function addMachine(int $cardId, array $data, int $userId = 0, bool $isAdmin = false): array
     {
         global $DB;
