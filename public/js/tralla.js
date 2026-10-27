@@ -231,7 +231,7 @@
                 activePluginDialog.cancel();
             }
 
-            var mode = config.mode === 'prompt' ? 'prompt' : 'confirm';
+            var mode = config.mode === 'prompt' ? 'prompt' : (config.mode === 'info' ? 'info' : 'confirm');
             var tone = config.tone === 'danger' ? 'danger' : 'primary';
             var icon = config.icon || (tone === 'danger' ? 'ti-alert-triangle' : 'ti-info-circle');
             var title = config.title || 'Confirmar';
@@ -272,9 +272,10 @@
                 + '<p class="tralla-dialog-message" id="' + uid + '-message">' + dialogEscape(message) + '</p>'
                 + '</div></div>'
                 + fieldHtml
+                + (mode === 'info' ? (config.detailsHtml || '') : '')
                 + '<p class="tralla-dialog-error" hidden></p>'
                 + '<div class="tralla-dialog-actions">'
-                + '<button type="button" class="tralla-btn tralla-btn-ghost" data-dialog-cancel>' + dialogEscape(cancelLabel) + '</button>'
+                + (mode === 'info' ? '' : '<button type="button" class="tralla-btn tralla-btn-ghost" data-dialog-cancel>' + dialogEscape(cancelLabel) + '</button>')
                 + '<button type="button" class="tralla-btn ' + (tone === 'danger' ? 'tralla-btn-danger' : 'tralla-btn-primary') + '" data-dialog-confirm>'
                 + dialogEscape(confirmLabel) + '</button>'
                 + '</div></div>';
@@ -1524,32 +1525,82 @@
         return '<div class="tralla-card"><h3>Detalhes</h3><div class="tralla-meta-list">' + rows + '</div></div>';
     }
 
+    function finalizeRequirements(card) {
+        var requirements = { general: [], machines: [] };
+        var machines = Array.isArray(card.machines) ? card.machines : [];
+        if (card.is_locked) {
+            requirements.general.push('Aguarde o desbloqueio deste card.');
+        }
+        if (card.workflow_type === 'call' && machines.length === 0) {
+            if (!String(card.service_report || '').trim()) {
+                requirements.general.push('Registre e salve o relatório do atendimento.');
+            }
+        } else if (machines.length === 0) {
+            requirements.general.push('Adicione ao menos uma máquina ao card.');
+        } else {
+            machines.forEach(function (machine, index) {
+                var missing = [];
+                if (['done', 'not_repairable', 'pending'].indexOf(machine.status) < 0) {
+                    missing.push('Escolher o status');
+                } else if (card.workflow_type === 'call' && machine.status === 'pending') {
+                    missing.push('Escolher Concluído ou Inservível; Chamados não aceitam Pendente');
+                }
+                if (!String(machine.report || '').trim()) { missing.push('Preencher o relatório técnico'); }
+                if (!Number(machine.service_done)) { missing.push('Marcar Serviço realizado'); }
+                if (missing.length) {
+                    requirements.machines.push({ title: machineDisplayTitle(machine, index + 1), missing: missing });
+                }
+            });
+            if (!machines.some(function (machine) {
+                return machine.status === 'done' || machine.status === 'not_repairable';
+            })) {
+                requirements.general.push('Deixe ao menos uma máquina com status Concluído ou Inservível.');
+            }
+        }
+        if (!(card.permissions || {}).edit_machines && (requirements.general.length || requirements.machines.length)) {
+            requirements.general.push(card.workflow_type === 'call' && machines.length === 0
+                ? 'Somente o técnico responsável pode registrar o relatório do atendimento.'
+                : 'Somente o técnico responsável pode completar os dados das máquinas.');
+        } else if (!requirements.general.length && !requirements.machines.length && !(card.permissions || {}).finalize) {
+            requirements.general.push('Seu perfil não tem permissão para finalizar este card.');
+        }
+        return requirements;
+    }
+
     function finalizeBlockedReason(card) {
-        if (card.is_locked) { return 'O card está bloqueado enquanto aguarda outra ação.'; }
-        if (!card.permissions || !card.permissions.edit_machines) {
-            return 'Somente o técnico responsável pode finalizar este card.';
+        var requirements = finalizeRequirements(card);
+        return requirements.general[0]
+            || (requirements.machines[0] && (requirements.machines[0].title + ': ' + requirements.machines[0].missing[0] + '.'))
+            || 'Este card ainda não pode ser finalizado.';
+    }
+
+    function showFinalizeRequirements(card) {
+        var requirements = finalizeRequirements(card);
+        var total = requirements.general.length + requirements.machines.reduce(function (count, machine) {
+            return count + machine.missing.length;
+        }, 0);
+        var html = '<div class="tralla-finalize-requirements">'
+            + '<strong>' + total + ' pendência' + (total === 1 ? '' : 's') + ' para resolver</strong>';
+        if (requirements.general.length) {
+            html += '<ul>' + requirements.general.map(function (item) {
+                return '<li>' + esc(item) + '</li>';
+            }).join('') + '</ul>';
         }
-        var machines = card.machines || [];
-        if (card.workflow_type === 'call' && !machines.length) {
-            return 'Registre e salve o relatório do atendimento para finalizar o chamado.';
-        }
-        if (!machines.length) { return 'Adicione ao menos uma máquina ao card.'; }
-        if (machines.some(function (machine) { return !String(machine.report || '').trim(); })) {
-            return 'Preencha o relatório técnico de todas as máquinas.';
-        }
-        if (machines.some(function (machine) { return !Number(machine.service_done); })) {
-            return 'Marque Serviço realizado em todas as máquinas.';
-        }
-        if (machines.some(function (machine) {
-            return ['done', 'not_repairable', 'pending'].indexOf(machine.status) < 0;
-        })) { return 'Escolha o status de todas as máquinas.'; }
-        if (!machines.some(function (machine) {
-            return machine.status === 'done' || machine.status === 'not_repairable';
-        })) { return 'Ao menos uma máquina deve estar Concluída ou Inservível.'; }
-        if (card.workflow_type === 'call' && machines.some(function (machine) { return machine.status === 'pending'; })) {
-            return 'Chamados não podem ser finalizados com máquinas pendentes.';
-        }
-        return 'Este card ainda não pode ser finalizado.';
+        requirements.machines.forEach(function (machine) {
+            html += '<section><h3><i class="ti ti-device-desktop" aria-hidden="true"></i> '
+                + esc(machine.title) + '</h3><ul>' + machine.missing.map(function (item) {
+                    return '<li>' + esc(item) + '</li>';
+                }).join('') + '</ul></section>';
+        });
+        html += '</div>';
+        return openPluginDialog({
+            mode: 'info',
+            title: 'O que falta para finalizar?',
+            message: 'Complete os itens abaixo para liberar o botão Finalizar.',
+            confirmLabel: 'Entendi',
+            icon: 'ti-list-check',
+            detailsHtml: html
+        });
     }
 
     function renderSideActions(card) {
@@ -1574,10 +1625,9 @@
                     + '<i class="ti ti-checkup-list"></i> ' + finalizeLabel + '</button>';
             } else {
                 note = finalizeBlockedReason(card);
-                buttons += '<span class="tralla-disabled-action" title="' + attr(note) + '" tabindex="0" aria-label="'
-                    + attr(finalizeLabel + ': ' + note) + '">'
-                    + '<button type="button" class="tralla-btn tralla-btn-primary" disabled aria-hidden="true">'
-                    + '<i class="ti ti-checkup-list"></i> ' + finalizeLabel + '</button></span>';
+                buttons += '<button type="button" class="tralla-btn tralla-btn-primary tralla-finalize-blocked"'
+                    + ' data-finalize-requirements aria-disabled="true" title="' + attr(note) + '">'
+                    + '<i class="ti ti-checkup-list"></i> ' + finalizeLabel + '</button>';
             }
         }
 
@@ -4361,6 +4411,12 @@
     modalRoot.addEventListener('click', function (event) {
         if (event.target.closest('[data-tralla-close]')) {
             closeModal();
+            return;
+        }
+
+        if (event.target.closest('[data-finalize-requirements]')) {
+            event.preventDefault();
+            if (activeCard) { showFinalizeRequirements(activeCard); }
             return;
         }
 

@@ -4263,9 +4263,29 @@ body.tralla-modal-open {
 }
 .tralla-btn-sign:hover { background: #fde047; }
 
-.tralla-disabled-action { display: flex; width: 100%; }
-.tralla-disabled-action .tralla-btn { cursor: not-allowed; opacity: .55; pointer-events: none; width: 100%; }
-.tralla-disabled-action:focus-visible { border-radius: 6px; outline: 2px solid var(--tr-primary); outline-offset: 2px; }
+.tralla-finalize-blocked {
+    cursor: help;
+    opacity: .55;
+}
+.tralla-finalize-blocked:hover,
+.tralla-finalize-blocked:focus-visible { opacity: .8; }
+
+.tralla-dialog:has(.tralla-finalize-requirements) { max-width: 520px; }
+.tralla-finalize-requirements {
+    border-top: 1px solid var(--tr-border);
+    color: var(--tr-text);
+    font-size: 13px;
+    margin: 16px 20px 0;
+    max-height: min(52vh, 450px);
+    overflow-y: auto;
+    padding: 14px 4px 0 0;
+}
+.tralla-finalize-requirements > strong { display: block; margin-bottom: 10px; }
+.tralla-finalize-requirements section { border-top: 1px solid var(--tr-border); margin-top: 12px; padding-top: 12px; }
+.tralla-finalize-requirements h3 { font-size: 13px; margin: 0; }
+.tralla-finalize-requirements h3 .ti { color: var(--tr-primary); }
+.tralla-finalize-requirements ul { margin: 8px 0 0; padding-left: 22px; }
+.tralla-finalize-requirements li { line-height: 1.45; margin: 5px 0; }
 
 .tralla-card-label-approval-final {
     background: var(--tr-primary);
