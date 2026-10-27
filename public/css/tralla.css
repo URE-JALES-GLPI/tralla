@@ -3239,15 +3239,20 @@ body[data-theme="dark"] .tralla-add-card:disabled:hover,
     align-items: end;
     display: grid;
     gap: 10px;
-    grid-template-columns: minmax(160px, 1.4fr) repeat(2, minmax(130px, 1fr)) auto;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     margin-bottom: 16px;
 }
+
+.tralla-history-filters .tralla-field { min-width: 0; }
+.tralla-history-machine-filter { grid-column: span 2; }
 
 .tralla-history-filter-actions {
     align-items: end;
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
+    grid-column: 1 / -1;
+    justify-content: flex-end;
 }
 
 .tralla-history-pagination {
@@ -3781,6 +3786,8 @@ body.tralla-modal-open {
         grid-template-columns: 1fr 1fr;
     }
 
+    .tralla-history-machine-filter { grid-column: span 2; }
+
     .tralla-history-filter-actions {
         grid-column: 1 / -1;
     }
@@ -3975,6 +3982,8 @@ body.tralla-modal-open {
     .tralla-history-filters {
         grid-template-columns: 1fr;
     }
+
+    .tralla-history-machine-filter { grid-column: auto; }
 
     .tralla-history-filter-actions {
         grid-column: auto;

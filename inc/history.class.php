@@ -55,6 +55,93 @@ class PluginTrallaHistory extends CommonDBTM
         return $history;
     }
 
+    private static function boardFilterOptions(int $boardId): array
+    {
+        global $DB;
+
+        $users = [];
+        foreach (PluginTrallaBoardUser::getMembers($boardId) as $member) {
+            if ((int) ($member['is_deleted'] ?? 0) === 1) {
+                continue;
+            }
+            $name = trim((string) ($member['realname'] ?? '') . ' ' . (string) ($member['firstname'] ?? ''));
+            $users[] = [
+                'id' => (int) $member['users_id'],
+                'name' => $name !== '' ? $name : (string) ($member['name'] ?? ''),
+            ];
+        }
+
+        $machineRows = [];
+        $modelIds = [];
+        foreach ($DB->request([
+            'SELECT' => [
+                'm.id AS machine_id',
+                'm.plugin_tralla_cards_id AS card_id',
+                'm.plugin_tralla_machine_models_id AS model_id',
+                'm.label AS machine_label',
+                'm.serial AS machine_serial',
+            ],
+            'FROM' => 'glpi_plugin_tralla_machines AS m',
+            'INNER JOIN' => [
+                'glpi_plugin_tralla_cards AS c' => [
+                    'ON' => ['m' => 'plugin_tralla_cards_id', 'c' => 'id'],
+                ],
+            ],
+            'WHERE' => ['c.plugin_tralla_boards_id' => $boardId],
+            'ORDER' => 'm.id ASC',
+        ]) as $row) {
+            $machineRows[] = $row;
+            $modelId = (int) $row['model_id'];
+            if ($modelId > 0) {
+                $modelIds[$modelId] = $modelId;
+            }
+        }
+        $modelNames = PluginTrallaMachineModel::getModelNames(array_values($modelIds));
+        $models = [];
+        foreach ($modelNames as $id => $name) {
+            $models[] = ['id' => (int) $id, 'name' => $name];
+        }
+        usort($models, static fn(array $a, array $b): int => strcasecmp($a['name'], $b['name']));
+
+        $machines = [];
+        foreach ($machineRows as $row) {
+            $id = (int) $row['machine_id'];
+            $modelName = (string) ($modelNames[(int) $row['model_id']] ?? 'Máquina');
+            $label = trim((string) ($row['machine_label'] ?? ''));
+            $serial = trim((string) ($row['machine_serial'] ?? ''));
+            $display = $modelName . ($label !== '' ? ' · ' . $label : '')
+                . ($serial !== '' ? ' · ' . $serial : '') . ' (#' . $id . ')';
+            $machines[] = [
+                'id' => $id,
+                'card_id' => (int) $row['card_id'],
+                'model_id' => (int) $row['model_id'],
+                'name' => $display,
+            ];
+        }
+        usort($machines, static fn(array $a, array $b): int => strcasecmp($a['name'], $b['name']));
+
+        $actions = [];
+        foreach ($DB->request([
+            'SELECT' => ['h.action AS action'],
+            'FROM' => 'glpi_plugin_tralla_history AS h',
+            'INNER JOIN' => [
+                'glpi_plugin_tralla_cards AS c' => [
+                    'ON' => ['h' => 'plugin_tralla_cards_id', 'c' => 'id'],
+                ],
+            ],
+            'WHERE' => ['c.plugin_tralla_boards_id' => $boardId],
+            'GROUPBY' => ['h.action'],
+        ]) as $row) {
+            $action = (string) ($row['action'] ?? '');
+            if ($action !== '') {
+                $actions[] = ['value' => $action, 'label' => self::getActionLabel($action)];
+            }
+        }
+        usort($actions, static fn(array $a, array $b): int => strcasecmp($a['label'], $b['label']));
+
+        return ['users' => $users, 'machines' => $machines, 'models' => $models, 'actions' => $actions];
+    }
+
     public static function getForBoard(int $boardId, array $filters): array
     {
         global $DB;
@@ -79,6 +166,25 @@ class PluginTrallaHistory extends CommonDBTM
         );
         if (($dates['ok'] ?? false) !== true) {
             throw new RuntimeException((string) ($dates['error'] ?? 'Data inválida.'));
+        }
+
+        $options = self::boardFilterOptions($boardId);
+        $userId = trim((string) ($filters['users_id'] ?? ''));
+        $machineId = trim((string) ($filters['machine_id'] ?? ''));
+        $modelId = trim((string) ($filters['model_id'] ?? ''));
+        $action = trim((string) ($filters['action'] ?? ''));
+        foreach ([
+            ['value' => $userId, 'options' => $options['users'], 'label' => 'Usuário'],
+            ['value' => $machineId, 'options' => $options['machines'], 'label' => 'Máquina'],
+            ['value' => $modelId, 'options' => $options['models'], 'label' => 'Modelo'],
+        ] as $selection) {
+            if ($selection['value'] !== '' && (!ctype_digit($selection['value'])
+                || !in_array((int) $selection['value'], array_column($selection['options'], 'id'), true))) {
+                throw new RuntimeException($selection['label'] . ' não disponível neste quadro.');
+            }
+        }
+        if ($action !== '' && !in_array($action, array_column($options['actions'], 'value'), true)) {
+            throw new RuntimeException('Tipo de atualização não disponível neste quadro.');
         }
 
         $page = (int) ($filters['page'] ?? 1);
@@ -112,6 +218,27 @@ class PluginTrallaHistory extends CommonDBTM
         }
         if ((string) $dates['to'] !== '') {
             $where[] = ['h.date_creation' => ['<=', (string) $dates['to']]];
+        }
+        if ($userId !== '') {
+            $where['h.users_id'] = (int) $userId;
+        }
+        if ($action !== '') {
+            $where['h.action'] = $action;
+        }
+        if ($machineId !== '' || $modelId !== '') {
+            $ownerIds = [];
+            foreach ($options['machines'] as $machine) {
+                if (($machineId === '' || (int) $machine['id'] === (int) $machineId)
+                    && ($modelId === '' || (int) $machine['model_id'] === (int) $modelId)) {
+                    $ownerIds[(int) $machine['card_id']] = (int) $machine['card_id'];
+                }
+            }
+            $where[] = $ownerIds === []
+                ? ['c.id' => -1]
+                : ['OR' => [
+                    'c.id' => array_values($ownerIds),
+                    'c.parent_cards_id' => array_values($ownerIds),
+                ]];
         }
 
         $joins = [
@@ -217,6 +344,14 @@ class PluginTrallaHistory extends CommonDBTM
             'total' => $total,
             'page'  => $page,
             'pages' => $pages,
+            'options' => [
+                'users' => $options['users'],
+                'machines' => array_map(static fn(array $machine): array => [
+                    'id' => $machine['id'], 'name' => $machine['name'],
+                ], $options['machines']),
+                'models' => $options['models'],
+                'actions' => $options['actions'],
+            ],
         ];
     }
 
@@ -382,6 +517,10 @@ class PluginTrallaHistory extends CommonDBTM
             'card_deletion_restored'  => 'Card restaurado',
             'card_moved'            => 'Card movido',
             'card_taken'            => 'Card pego pelo técnico',
+            'call_release_requested' => 'Liberação do chamado solicitada',
+            'call_released'         => 'Chamado liberado',
+            'call_release_rejected' => 'Liberação do chamado recusada',
+            'call_report_updated'   => 'Relatório do chamado atualizado',
             'machine_added'         => 'Máquina adicionada',
             'machine_updated'       => 'Máquina atualizada',
             'machine_deleted'       => 'Máquina removida',

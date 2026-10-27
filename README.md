@@ -179,7 +179,7 @@ A aba **Excluídos** mostra somente exclusões concluídas. Solicitações pende
 
 O botão **Histórico** fica disponível para todos os membros do quadro e abre um modal com os eventos de todos os cards, inclusive excluídos.
 
-- Filtre por ID do card (`123`, `#123`, `123/1` ou `123/2`), data inicial e data final.
+- Filtre por ID do card (`123`, `#123`, `123/1` ou `123/2`), usuário do quadro, máquina, modelo, tipo de atualização, data inicial e data final. Os filtros podem ser combinados; máquina e modelo incluem o histórico do card de aprovação vinculado.
 - A tabela mostra data/hora, card, ação, usuário e detalhes.
 - Os resultados são paginados, com 50 eventos por página.
 - **Limpar** remove os filtros e volta à primeira página.

@@ -573,7 +573,9 @@
     var saveTimers = {};
     var machineSaveQueue = Promise.resolve();
     var inlineComposerListId = null;
-    var historyFilters = { card_id: '', date_from: '', date_to: '' };
+    var historyFilters = {
+        card_id: '', date_from: '', date_to: '', users_id: '', machine_id: '', model_id: '', history_action: ''
+    };
     var historyPage = 1;
     var historyPages = 1;
     var searchQuery = '';
@@ -2926,8 +2928,18 @@
         }
     }
 
+    function historyFilterOptions(items, selected, placeholder) {
+        return '<option value="">' + esc(placeholder) + '</option>'
+            + (items || []).map(function (item) {
+                var value = String(item.value !== undefined ? item.value : item.id);
+                return '<option value="' + attr(value) + '"' + (value === String(selected) ? ' selected' : '') + '>'
+                    + esc(item.label !== undefined ? item.label : item.name) + '</option>';
+            }).join('');
+    }
+
     function renderHistoryModal(data) {
         var rows = Array.isArray(data.rows) ? data.rows : [];
+        var options = data.options || {};
         var page = Math.max(1, Number(data.page) || 1);
         var pages = Math.max(1, Number(data.pages) || 0);
         var table;
@@ -2958,6 +2970,18 @@
             + '<div class="tralla-field"><label for="tralla-history-card">Card</label>'
             + '<input id="tralla-history-card" type="text" name="card_id" value="' + attr(historyFilters.card_id) + '"'
             + ' placeholder="ID, #ID ou ID/etapa"></div>'
+            + '<div class="tralla-field"><label for="tralla-history-user">Usuário do quadro</label>'
+            + '<select id="tralla-history-user" name="users_id">'
+            + historyFilterOptions(options.users, historyFilters.users_id, 'Todos os usuários') + '</select></div>'
+            + '<div class="tralla-field tralla-history-machine-filter"><label for="tralla-history-machine">Máquina</label>'
+            + '<select id="tralla-history-machine" name="machine_id">'
+            + historyFilterOptions(options.machines, historyFilters.machine_id, 'Todas as máquinas') + '</select></div>'
+            + '<div class="tralla-field"><label for="tralla-history-model">Modelo</label>'
+            + '<select id="tralla-history-model" name="model_id">'
+            + historyFilterOptions(options.models, historyFilters.model_id, 'Todos os modelos') + '</select></div>'
+            + '<div class="tralla-field"><label for="tralla-history-action">Tipo de atualização</label>'
+            + '<select id="tralla-history-action" name="history_action">'
+            + historyFilterOptions(options.actions, historyFilters.history_action, 'Todas as ações') + '</select></div>'
             + '<div class="tralla-field"><label for="tralla-history-date-from">Data inicial</label>'
             + '<input id="tralla-history-date-from" type="date" name="date_from" value="' + attr(historyFilters.date_from) + '"></div>'
             + '<div class="tralla-field"><label for="tralla-history-date-to">Data final</label>'
@@ -2992,6 +3016,10 @@
                 card_id: historyFilters.card_id,
                 date_from: historyFilters.date_from,
                 date_to: historyFilters.date_to,
+                users_id: historyFilters.users_id,
+                machine_id: historyFilters.machine_id,
+                model_id: historyFilters.model_id,
+                history_action: historyFilters.history_action,
                 page: historyPage
             });
             historyPages = Math.max(1, Number(data.pages) || 0);
@@ -4371,7 +4399,9 @@
         }
 
         if (event.target.closest('[data-history-clear]')) {
-            historyFilters = { card_id: '', date_from: '', date_to: '' };
+            historyFilters = {
+                card_id: '', date_from: '', date_to: '', users_id: '', machine_id: '', model_id: '', history_action: ''
+            };
             historyPage = 1;
             openHistoryModal();
             return;
@@ -4450,7 +4480,11 @@
             historyFilters = {
                 card_id: cardInput ? cardInput.value.trim() : '',
                 date_from: dateFromInput ? dateFromInput.value : '',
-                date_to: dateToInput ? dateToInput.value : ''
+                date_to: dateToInput ? dateToInput.value : '',
+                users_id: form.querySelector('[name="users_id"]').value,
+                machine_id: form.querySelector('[name="machine_id"]').value,
+                model_id: form.querySelector('[name="model_id"]').value,
+                history_action: form.querySelector('[name="history_action"]').value
             };
             historyPage = 1;
             openHistoryModal();
