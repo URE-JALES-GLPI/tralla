@@ -79,6 +79,7 @@ $bootstrap = [
     }, $models),
     'machine_quantity_max' => PluginTrallaCard::MAX_MACHINE_QUANTITY,
     'labels' => [
+        'priorities'       => tralla_priority_choices_for_js(),
         'categories'       => tralla_category_labels(),
         'statuses'         => tralla_status_labels(),
         'machine_statuses' => tralla_machine_status_labels(),

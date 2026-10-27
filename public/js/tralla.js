@@ -1272,7 +1272,7 @@
         if (showProgress) {
             badges += progressMarkup(progress, Number(progress.total || machineCount), Number(progress.filled || 0));
         }
-        badges += machineBadge + lock;
+        badges += machineBadge + lock + slaBadges(card);
 
         var takeButton = !departing && card.permissions && card.permissions.update_take
             ? '<button type="button" class="tralla-card-take" data-update-take="' + cardId + '" title="Fazer esta atualização">'
@@ -1522,7 +1522,136 @@
         rows += metaRow('Retirada em', formatDate(card.date_withdrawn));
         rows += metaRow('Motivo da reprovação', card.rejection_reason);
 
-        return '<div class="tralla-card"><h3>Detalhes</h3><div class="tralla-meta-list">' + rows + '</div></div>';
+        return renderSlaBlock(card)
+            + '<div class="tralla-card"><h3>Detalhes</h3><div class="tralla-meta-list">' + rows + '</div></div>';
+    }
+
+    /* ---------------------------------------------------------- prioridade / SLA */
+
+    function priorityInfo(key) {
+        var list = Array.isArray(labels.priorities) ? labels.priorities : [];
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].key === key) {
+                return list[i];
+            }
+        }
+        return {};
+    }
+
+    function slaStateLabel(state) {
+        return {
+            waiting: 'Aguardando liberação',
+            running: 'No prazo',
+            overdue: 'Atrasado',
+            met: 'Cumprido',
+            late_met: 'Cumprido com atraso'
+        }[state] || '';
+    }
+
+    function slaBadges(card) {
+        var sla = card && card.sla;
+        if (!sla || !sla.priority) {
+            return '';
+        }
+        var html = '<span class="tralla-card-badge tralla-priority-badge is-' + attr(String(sla.priority).toLowerCase()) + '"'
+            + ' title="Prioridade ' + attr(sla.label) + '">' + esc(sla.priority) + '</span>';
+        if (sla.next) {
+            html += '<span class="tralla-card-badge tralla-sla-badge is-' + attr(sla.next.state) + '"'
+                + ' title="' + attr(sla.next.title + ': até ' + formatDate(sla.next.deadline) + ' (' + slaStateLabel(sla.next.state) + ')') + '">'
+                + '<i class="ti ' + (sla.next.state === 'overdue' ? 'ti-alarm' : 'ti-clock') + '" aria-hidden="true"></i>'
+                + '<span>' + esc(sla.next.state === 'overdue' ? 'Atrasado' : 'até ' + formatDate(sla.next.deadline)) + '</span></span>';
+        }
+        return html;
+    }
+
+    function renderSlaBlock(card) {
+        var sla = card && card.sla;
+        if (!sla || !sla.priority) {
+            return '';
+        }
+        var rows = (sla.steps || []).map(function (step) {
+            var when = step.met_at
+                ? 'Em ' + formatDate(step.met_at)
+                : (step.deadline ? 'Até ' + formatDate(step.deadline) : step.span);
+            return '<div class="tralla-sla-row is-' + attr(step.state) + '">'
+                + '<div><strong>' + esc(step.title) + '</strong><small>Prazo: ' + esc(step.span) + '</small></div>'
+                + '<div class="tralla-sla-when"><span>' + esc(when) + '</span>'
+                + '<em>' + esc(slaStateLabel(step.state)) + '</em></div></div>';
+        }).join('');
+        return '<div class="tralla-card tralla-sla-card"><h3>Prioridade e SLA</h3>'
+            + '<div class="tralla-sla-priority is-' + attr(String(sla.priority).toLowerCase()) + '">' + esc(sla.label) + '</div>'
+            + (sla.start ? '<small class="tralla-sla-start">Contando desde ' + esc(formatDate(sla.start)) + '</small>' : '')
+            + '<div class="tralla-sla-rows">' + rows + '</div></div>';
+    }
+
+    function priorityDialog(card) {
+        var list = Array.isArray(labels.priorities) ? labels.priorities : [];
+        return new Promise(function (resolve) {
+            var uid = 'tralla-priority-' + Date.now();
+            var previousFocus = document.activeElement;
+            var layer = document.createElement('div');
+            layer.className = 'tralla-dialog-layer';
+            layer.innerHTML = '<div class="tralla-dialog-backdrop" data-dialog-backdrop></div>'
+                + '<div class="tralla-modal tralla-dialog tralla-dialog-primary tralla-confirm-dialog tralla-priority-dialog" role="dialog" aria-modal="true"'
+                + ' aria-labelledby="' + uid + '-title">'
+                + '<div class="tralla-dialog-head">'
+                + '<span class="tralla-dialog-icon" aria-hidden="true"><i class="ti ti-flag"></i></span>'
+                + '<div class="tralla-dialog-copy">'
+                + '<span class="tralla-confirm-eyebrow">Aprovação</span>'
+                + '<h2 class="tralla-dialog-title" id="' + uid + '-title">Definir prioridade e liberar</h2>'
+                + '<p class="tralla-dialog-message">Escolha a prioridade. Ao liberar, o card fica disponível para Pegar e os prazos começam a contar.</p>'
+                + '</div></div>'
+                + (card ? '<div class="tralla-confirm-card"><span>Card</span><strong><span class="tralla-confirm-code">'
+                    + esc(card.code || ('#' + card.id)) + '</span> ' + esc(card.name) + '</strong></div>' : '')
+                + '<div class="tralla-priority-options" role="radiogroup" aria-label="Prioridade">'
+                + list.map(function (item) {
+                    return '<label class="tralla-priority-option is-' + attr(String(item.key).toLowerCase()) + '">'
+                        + '<input type="radio" name="' + uid + '-priority" value="' + attr(item.key) + '">'
+                        + '<span class="tralla-priority-tag">' + esc(item.key) + '</span>'
+                        + '<span class="tralla-priority-text"><strong>' + esc(item.name) + '</strong>'
+                        + '<small>1º atendimento: ' + esc(item.first) + ' · Paliativa: ' + esc(item.palliative)
+                        + ' · Definitiva: ' + esc(item.definitive) + '</small></span></label>';
+                }).join('')
+                + '</div>'
+                + '<div class="tralla-dialog-actions">'
+                + '<button type="button" class="tralla-btn tralla-btn-ghost" data-dialog-cancel>Cancelar</button>'
+                + '<button type="button" class="tralla-btn tralla-btn-primary" data-dialog-confirm disabled>'
+                + '<i class="ti ti-lock-open" aria-hidden="true"></i> Liberar com esta prioridade</button>'
+                + '</div></div>';
+            document.body.appendChild(layer);
+            document.body.classList.add('tralla-dialog-open');
+            var confirmEl = layer.querySelector('[data-dialog-confirm]');
+            var finished = false;
+            function selected() {
+                var checked = layer.querySelector('input[type="radio"]:checked');
+                return checked ? checked.value : '';
+            }
+            function finish(value) {
+                if (finished) { return; }
+                finished = true;
+                document.removeEventListener('keydown', onKeydown, true);
+                layer.remove();
+                if (!document.querySelector('.tralla-dialog-layer')) {
+                    document.body.classList.remove('tralla-dialog-open');
+                }
+                if (previousFocus && document.contains(previousFocus)) { previousFocus.focus(); }
+                resolve(value);
+            }
+            function onKeydown(event) {
+                if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); finish(''); }
+            }
+            layer.querySelectorAll('input[type="radio"]').forEach(function (radio) {
+                radio.addEventListener('change', function () { confirmEl.disabled = selected() === ''; });
+            });
+            confirmEl.addEventListener('click', function () { if (selected()) { finish(selected()); } });
+            layer.querySelector('[data-dialog-backdrop]').addEventListener('click', function () { finish(''); });
+            layer.querySelector('[data-dialog-cancel]').addEventListener('click', function () { finish(''); });
+            document.addEventListener('keydown', onKeydown, true);
+            window.setTimeout(function () {
+                var first = layer.querySelector('input[type="radio"]');
+                if (first) { first.focus(); }
+            }, 30);
+        });
     }
 
     function finalizeRequirements(card) {
@@ -1641,7 +1770,7 @@
             var approveLabel = kind === 'deletion'
                 ? 'Aprovar exclusão'
                 : (kind === 'edit' ? 'Aprovar edição' : (kind === 'split' ? 'Aprovar separação'
-                    : (kind === 'call_release' ? 'Liberar chamado' : 'Aprovar')));
+                    : (kind === 'call_release' ? 'Definir prioridade e liberar' : 'Aprovar')));
             var rejectLabel = kind === 'deletion'
                 ? 'Recusar exclusão'
                 : (kind === 'edit' ? 'Recusar edição' : (kind === 'split' ? 'Recusar separação'
@@ -1875,9 +2004,9 @@
         if (kind === 'call_release') {
             return '<div class="tralla-approval-banner is-call-release">'
                 + '<i class="ti ti-lock-open"></i>'
-                + '<div class="tralla-approval-content"><strong>Chamado aguardando liberação</strong>'
+                + '<div class="tralla-approval-content"><strong>Aguardando prioridade e liberação</strong>'
                 + parentLine
-                + '<small>Ao liberar, o chamado ficará disponível para o técnico clicar em Pegar.</small></div>'
+                + '<small>Defina a prioridade (P1 a P5). Ao liberar, o card fica disponível para o técnico clicar em Pegar e os prazos de SLA começam a contar.</small></div>'
                 + openParent
                 + '</div>';
         }
@@ -2471,6 +2600,7 @@
         var isEditApproval = kind === 'edit';
         var isSplitApproval = kind === 'split';
         var isCallReleaseApproval = kind === 'call_release';
+        var chosenPriority = '';
         var departingCard = Object.assign({}, activeCard);
 
         if (action === 'split') {
@@ -2550,7 +2680,7 @@
                 } else if (isCallReleaseApproval) {
                     rejectConfig = {
                         title: 'Não liberar chamado',
-                        message: 'O chamado continuará bloqueado. Um SuperAdmin poderá solicitar a liberação novamente.',
+                        message: 'O card continuará bloqueado. Quem o criou ou um SuperAdmin poderá solicitar a liberação novamente.',
                         label: 'Motivo (opcional)',
                         confirmLabel: 'Não liberar'
                     };
@@ -2594,7 +2724,7 @@
                         : (isEditApproval
                             ? 'Edição recusada. Alterações descartadas.'
                             : (isSplitApproval ? 'Separação recusada. Card liberado.'
-                                : isCallReleaseApproval ? 'Liberação recusada. Chamado continua bloqueado.'
+                                : isCallReleaseApproval ? 'Liberação recusada. O card continua bloqueado.'
                                 : (departingCard.workflow_type === 'call'
                                     ? 'Chamado reprovado. O card voltou para Em Andamento.'
                                     : 'Manutenção reprovada. O card voltou para Em Andamento.'))),
@@ -2660,12 +2790,7 @@
                         confirmLabel: 'Aprovar separação'
                     };
                 } else if (isCallReleaseApproval) {
-                    approveConfig = {
-                        title: 'Liberar chamado',
-                        message: 'O chamado ficará disponível para um técnico clicar em Pegar. Deseja liberar?',
-                        icon: 'ti-lock-open',
-                        confirmLabel: 'Liberar chamado'
-                    };
+                    approveConfig = null;
                 } else {
                     approveConfig = {
                         title: 'Aprovar manutenção',
@@ -2674,9 +2799,16 @@
                         confirmLabel: 'Aprovar'
                     };
                 }
-                var approveConfirmed = await checkboxConfirmation(approveConfig);
-                if (!approveConfirmed) {
-                    return;
+                if (isCallReleaseApproval) {
+                    chosenPriority = await priorityDialog(activeCard);
+                    if (!chosenPriority) {
+                        return;
+                    }
+                } else {
+                    var approveConfirmed = await checkboxConfirmation(approveConfig);
+                    if (!approveConfirmed) {
+                        return;
+                    }
                 }
             }
 
@@ -2705,7 +2837,7 @@
                     : 'Manutenção finalizada e enviada para aprovação.', 'success');
                 await openCard(data.approval ? data.approval.id : cardId);
             } else if (action === 'approve') {
-                data = await api('approve_card', { id: cardId });
+                data = await api('approve_card', { id: cardId, priority: chosenPriority });
                 applyState(data);
                 scheduleDepartingCard(departingCard, 'approved');
                 if (isDeletionApproval) {
@@ -2718,7 +2850,7 @@
                     toast('Separação aprovada. Novo card criado.', 'success');
                     await openCard(data.card.id);
                 } else if (isCallReleaseApproval) {
-                    toast('Chamado liberado. Um técnico já pode clicar em Pegar.', 'success');
+                    toast('Card liberado como ' + (priorityInfo(chosenPriority).label || chosenPriority) + '. Um técnico já pode clicar em Pegar.', 'success');
                     await openCard(data.card.id);
                 } else {
                     toast(departingCard.workflow_type === 'call'
@@ -3934,11 +4066,26 @@
                     + '<legend>Quando disponibilizar o chamado?</legend>'
                     + '<div class="tralla-card-workflow-options">'
                     + '<label class="tralla-card-workflow-option"><input type="radio" name="release_mode" value="later" checked>'
-                    + '<span><i class="ti ti-lock"></i><strong>Disponibilizar depois</strong><small>Bloqueia o chamado e solicita aprovação para liberar</small></span></label>'
+                    + '<span><i class="ti ti-lock"></i><strong>Disponibilizar depois</strong><small>Bloqueia o chamado e envia para Manutenção Aprovação, onde a prioridade é definida</small></span></label>'
                     + '<label class="tralla-card-workflow-option"><input type="radio" name="release_mode" value="now">'
-                    + '<span><i class="ti ti-lock-open"></i><strong>Disponibilizar agora</strong><small>O botão Pegar fica disponível imediatamente</small></span></label>'
+                    + '<span><i class="ti ti-lock-open"></i><strong>Disponibilizar agora</strong><small>Somente chamados P1 (Alta). O botão Pegar fica disponível imediatamente</small></span></label>'
+                    + '</div>'
+                    + '<div class="tralla-p1-confirm" data-p1-confirm hidden role="alert">'
+                    + '<div class="tralla-p1-confirm-head"><i class="ti ti-alert-triangle" aria-hidden="true"></i>'
+                    + '<strong>ATENÇÃO: este chamado será tratado como P1 · PRIORIDADE ALTA</strong></div>'
+                    + '<p>Disponibilizar agora pula a aprovação e define a prioridade <b>P1 (ALTA)</b> automaticamente. '
+                    + 'Os prazos começam a contar agora: <b>1º atendimento em ' + esc(priorityInfo('P1').first || '30 min') + '</b>, '
+                    + '<b>resposta paliativa em ' + esc(priorityInfo('P1').palliative || '4 h') + '</b> e '
+                    + '<b>resposta definitiva em ' + esc(priorityInfo('P1').definitive || '8 h') + '</b>.</p>'
+                    + '<p>Use somente para situações críticas, que param o atendimento. Se não for urgente, escolha <b>Disponibilizar depois</b>.</p>'
+                    + '<label class="tralla-p1-confirm-check"><input type="checkbox" name="confirm_p1" value="1">'
+                    + '<span>Tenho certeza de que este chamado é <b>NÍVEL P1 (ALTO)</b></span></label>'
                     + '</div></fieldset>'
                 : '')
+            + (isMaintenance ? '<p class="tralla-create-approval-note" data-approval-note>'
+                + '<i class="ti ti-info-circle" aria-hidden="true"></i>'
+                + '<span>O card será criado <b>bloqueado</b> em Manutenção Pendente e enviado para <b>Manutenção Aprovação</b>, '
+                + 'onde o aprovador define a prioridade (P1 a P5) e os prazos de SLA.</span></p>' : '')
             + '</div>'
             + '<div class="tralla-modal-actions">'
             + '<button type="button" class="tralla-btn tralla-btn-ghost" data-tralla-close>Cancelar</button>'
@@ -3962,6 +4109,23 @@
                 subcategorySelect.disabled = !choices.length;
             });
         }
+        function syncReleaseUi() {
+            var typeField = createForm.querySelector('[name="workflow_type"]:checked');
+            var call = !!typeField && typeField.value === 'call';
+            var releaseSection = createForm.querySelector('[data-call-release-section]');
+            var modeField = createForm.querySelector('[name="release_mode"]:checked');
+            var now = call && !!releaseSection && !!modeField && modeField.value === 'now';
+            var p1Box = createForm.querySelector('[data-p1-confirm]');
+            if (p1Box) {
+                p1Box.hidden = !now;
+                if (!now) {
+                    var p1Check = p1Box.querySelector('[name="confirm_p1"]');
+                    if (p1Check) { p1Check.checked = false; }
+                }
+            }
+            var note = createForm.querySelector('[data-approval-note]');
+            if (note) { note.hidden = now; }
+        }
         createForm.querySelectorAll('[name="workflow_type"]').forEach(function (radio) {
             radio.addEventListener('change', function () {
                 var call = radio.value === 'call' && radio.checked;
@@ -3970,8 +4134,20 @@
                 createForm.querySelector('[data-create-call-section]').hidden = !call;
                 var releaseSection = createForm.querySelector('[data-call-release-section]');
                 if (releaseSection) { releaseSection.hidden = !call; }
+                syncReleaseUi();
             });
         });
+        createForm.querySelectorAll('[name="release_mode"]').forEach(function (radio) {
+            radio.addEventListener('change', syncReleaseUi);
+        });
+        var p1CheckField = createForm.querySelector('[name="confirm_p1"]');
+        if (p1CheckField) {
+            p1CheckField.addEventListener('change', function () {
+                var box = p1CheckField.closest('[data-p1-confirm]');
+                if (box) { box.classList.toggle('is-confirmed', p1CheckField.checked); box.classList.remove('is-invalid'); }
+            });
+        }
+        syncReleaseUi();
         if (hasEntities) {
             setupEntityCombobox('tralla-create-name', 'tralla-create-name-list');
         }
@@ -3994,7 +4170,18 @@
         var workflowType = form.querySelector('[name="workflow_type"]:checked')
             ? form.querySelector('[name="workflow_type"]:checked').value : 'maintenance';
         var releaseModeField = form.querySelector('[name="release_mode"]:checked');
-        var releaseMode = workflowType === 'call' && releaseModeField ? releaseModeField.value : 'now';
+        var releaseMode = workflowType === 'call' && releaseModeField ? releaseModeField.value : 'later';
+        var confirmP1Field = form.querySelector('[name="confirm_p1"]');
+        var confirmP1 = !!(confirmP1Field && confirmP1Field.checked);
+        if (!inline && isMaintenance && releaseMode === 'now' && !confirmP1) {
+            toast('Para disponibilizar agora, marque a confirmação de que o chamado é P1 (ALTO).', 'error');
+            if (confirmP1Field) {
+                var p1Box = confirmP1Field.closest('[data-p1-confirm]');
+                if (p1Box) { p1Box.classList.add('is-invalid'); }
+                confirmP1Field.focus();
+            }
+            return;
+        }
         var descriptionField = form.querySelector('[name="description"]');
         var description = descriptionField ? descriptionField.value.trim() : '';
         var categoryField = form.querySelector('[name="call_category"]');
@@ -4064,6 +4251,7 @@
                 source: 'manual',
                 workflow_type: workflowType,
                 release_mode: releaseMode,
+                confirm_p1: confirmP1 ? 1 : 0,
                 machines: machines
             });
 
@@ -4077,7 +4265,11 @@
 
             closeModal();
             applyState(data);
-            toast(releaseMode === 'later' ? 'Chamado criado bloqueado e enviado para aprovação.' : 'Card criado.', 'success');
+            toast(isMaintenance
+                ? (releaseMode === 'now'
+                    ? 'Chamado P1 (Alta) criado e disponível para Pegar.'
+                    : 'Card criado bloqueado e enviado para Manutenção Aprovação.')
+                : 'Card criado.', 'success');
             await openCard(data.card.id);
         } catch (error) {
             toast(error.message, 'error');

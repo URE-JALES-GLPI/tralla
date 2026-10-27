@@ -200,14 +200,14 @@ class PluginTrallaCard extends CommonDBTM
                 $card['status_label'] = $card['approval_kind_label'];
             } else {
                 $card['status_label'] = tralla_status_label((string) $card['status']);
-                if ((string) ($card['workflow_type'] ?? '') === 'call'
-                    && (string) $card['status'] === 'pending' && !empty($card['is_locked'])) {
+                if ((string) $card['status'] === 'pending' && !empty($card['is_locked'])) {
                     $card['status_label'] = (int) ($card['approval_cards_id'] ?? 0) > 0
                         ? 'Aguardando liberação' : 'Liberação recusada';
                 }
                 $card['pending_approval_kind'] = $pendingApprovalKinds[(int) $card['id']] ?? '';
             }
             $card['source_label'] = tralla_source_label((string) $card['source']);
+            $card['sla'] = $boardType === 'maintenance' ? tralla_card_sla($card) : null;
             $card['technician_name'] = tralla_user_name((int) $card['technician_id']);
             $card['technician_picture_url'] = tralla_user_picture_url((int) $card['technician_id']);
             $card['creator_name'] = tralla_user_name((int) $card['users_id']);
@@ -285,7 +285,7 @@ class PluginTrallaCard extends CommonDBTM
         $card['category'] = (string) ($list['category'] ?? '');
         $card['code'] = tralla_display_code($card, $boardType);
         $card['status_label'] = tralla_status_label((string) $card['status']);
-        if ((int) $card['stage'] === 1 && (string) ($card['workflow_type'] ?? '') === 'call'
+        if ((int) $card['stage'] === 1
             && (string) $card['status'] === 'pending' && !empty($card['is_locked'])) {
             $card['status_label'] = (int) ($card['approval_cards_id'] ?? 0) > 0
                 ? 'Aguardando liberação' : 'Liberação recusada';
@@ -298,6 +298,7 @@ class PluginTrallaCard extends CommonDBTM
             $card['status_label'] = $card['approval_kind_label'];
         }
         $card['source_label'] = tralla_source_label((string) $card['source']);
+        $card['sla'] = $boardType === 'maintenance' ? tralla_card_sla($card) : null;
         $card['technician_name'] = tralla_user_name((int) $card['technician_id']);
         $card['technician_picture_url'] = tralla_user_picture_url((int) $card['technician_id']);
         $card['creator_name'] = tralla_user_name((int) $card['users_id']);
@@ -501,9 +502,9 @@ class PluginTrallaCard extends CommonDBTM
             && !$locked
             && $canUpdate;
 
-        $canRequestCallRelease = PluginTrallaBoardUser::getRole($boardId, $userId) === 'superadmin'
+        $canRequestCallRelease = (PluginTrallaBoardUser::getRole($boardId, $userId) === 'superadmin'
+                || (int) ($card['users_id'] ?? 0) === $userId)
             && $boardType === 'maintenance'
-            && $isCall
             && $stage === 1
             && $status === 'pending'
             && $locked
@@ -626,12 +627,19 @@ class PluginTrallaCard extends CommonDBTM
             if ($list === null) {
                 throw new RuntimeException('O quadro não possui a lista "Manutenção Pendente".');
             }
-            $deferCall = $workflowType === 'call' && (string) ($data['release_mode'] ?? 'now') === 'later';
+            // Fluxo com prioridade: todo card nasce bloqueado em Pendente e vai para
+            // Manutenção Aprovação, onde o aprovador define a prioridade (SLA).
+            // Exceção: chamado criado por SuperAdmin com "Disponibilizar agora",
+            // confirmado explicitamente como P1 (Alta).
+            $isSuperAdmin = PluginTrallaBoardUser::getRole($boards_id, $userId) === 'superadmin';
+            $releaseNow = $workflowType === 'call' && $isSuperAdmin
+                && (string) ($data['release_mode'] ?? 'later') === 'now';
+            if ($releaseNow && empty($data['confirm_p1'])) {
+                throw new RuntimeException('Para disponibilizar agora, confirme que o chamado é P1 (Alta).');
+            }
+            $deferCall = !$releaseNow;
             $approvalList = null;
             if ($deferCall) {
-                if (PluginTrallaBoardUser::getRole($boards_id, $userId) !== 'superadmin') {
-                    throw new RuntimeException('Somente quem tem o papel SuperAdmin neste quadro pode disponibilizar chamados depois.');
-                }
                 $approvalList = PluginTrallaBoard::findListByCategory($boards_id, 'maintenance_approval');
                 if ($approvalList === null) {
                     throw new RuntimeException('O quadro não possui a lista "Manutenção Aprovação".');
@@ -706,6 +714,8 @@ class PluginTrallaCard extends CommonDBTM
                 'status'                  => 'pending',
                 'workflow_type'           => $workflowType,
                 'is_locked'               => $deferCall ? 1 : 0,
+                'priority'                => $releaseNow ? 'P1' : '',
+                'date_sla_start'          => $releaseNow ? $now : null,
                 'is_archived'             => 0,
                 'source'                  => $source,
                 'machines_total'          => count($machines),
@@ -733,7 +743,10 @@ class PluginTrallaCard extends CommonDBTM
             if ($deferCall) {
                 $approvalId = self::createCallReleaseApproval($cardId, $boards_id, $approvalList, $userId, $now);
                 $DB->update('glpi_plugin_tralla_cards', ['approval_cards_id' => $approvalId], ['id' => $cardId]);
-                PluginTrallaHistory::log($cardId, $userId, 'call_release_requested', 'Chamado criado bloqueado; aguardando liberação.');
+                PluginTrallaHistory::log($cardId, $userId, 'call_release_requested',
+                    ($workflowType === 'call' ? 'Chamado' : 'Card') . ' criado bloqueado; aguardando aprovação e definição de prioridade.');
+            } else {
+                PluginTrallaHistory::log($cardId, $userId, 'priority_set', 'Disponibilizado na criação como P1 (Alta), confirmado por quem criou.');
             }
 
             PluginTrallaHistory::log($cardId, $userId, 'card_created',
@@ -811,7 +824,7 @@ class PluginTrallaCard extends CommonDBTM
             'code_root_cards_id' => $cardId,
             'family_seq' => $sequence,
             'approval_kind' => 'call_release',
-            'workflow_type' => 'call',
+            'workflow_type' => (string) ($card['workflow_type'] ?? 'maintenance'),
             'status' => 'waiting_approval',
             'is_locked' => 0,
             'is_archived' => 0,
@@ -820,7 +833,7 @@ class PluginTrallaCard extends CommonDBTM
             'date_mod' => $now,
         ]);
         $approvalId = (int) $DB->insertId();
-        PluginTrallaHistory::log($approvalId, $userId, 'approval_created', 'Aguardando liberação do chamado.');
+        PluginTrallaHistory::log($approvalId, $userId, 'approval_created', 'Aguardando aprovação e definição de prioridade.');
         return $approvalId;
     }
 
@@ -834,8 +847,9 @@ class PluginTrallaCard extends CommonDBTM
         }
         self::assertBoardAccess($card);
         $boardId = (int) $card['plugin_tralla_boards_id'];
-        if (PluginTrallaBoardUser::getRole($boardId, $userId) !== 'superadmin') {
-            throw new RuntimeException('Somente quem tem o papel SuperAdmin neste quadro pode solicitar a liberação.');
+        if (PluginTrallaBoardUser::getRole($boardId, $userId) !== 'superadmin'
+            && (int) ($card['users_id'] ?? 0) !== $userId) {
+            throw new RuntimeException('Somente quem criou o card ou um SuperAdmin do quadro pode solicitar a liberação.');
         }
         $approvalList = PluginTrallaBoard::findListByCategory($boardId, 'maintenance_approval');
         if ($approvalList === null) {
@@ -846,7 +860,7 @@ class PluginTrallaCard extends CommonDBTM
         try {
             self::lockCardRow($cardId);
             $card = self::getCard($cardId);
-            if ($card === null || (string) ($card['workflow_type'] ?? '') !== 'call'
+            if ($card === null
                 || (int) $card['stage'] !== 1 || (string) $card['status'] !== 'pending'
                 || empty($card['is_locked']) || !empty($card['is_archived'])
                 || (int) ($card['approval_cards_id'] ?? 0) !== 0) {
@@ -1292,6 +1306,8 @@ class PluginTrallaCard extends CommonDBTM
                     'family_seq'              => $pendingSeq,
                     'split_from_cards_id'     => $id,
                     'approval_kind'           => 'maintenance',
+                    'priority'                => (string) ($card['priority'] ?? ''),
+                    'date_sla_start'          => $card['date_sla_start'] ?? null,
                     'status'                  => 'pending',
                     'workflow_type'           => (string) ($card['workflow_type'] ?? 'maintenance'),
                     'is_locked'               => 0,
@@ -1389,7 +1405,7 @@ class PluginTrallaCard extends CommonDBTM
         ];
     }
 
-    public static function decide(int $approvalId, bool $approve, string $reason = '', int $userId = 0, bool $isAdmin = false): array
+    public static function decide(int $approvalId, bool $approve, string $reason = '', int $userId = 0, bool $isAdmin = false, string $priority = ''): array
     {
         global $DB;
 
@@ -1412,7 +1428,7 @@ class PluginTrallaCard extends CommonDBTM
             return self::decideSplit($approvalId, $approve, $reason, $userId, $isAdmin);
         }
         if ($kind === 'call_release') {
-            return self::decideCallRelease($approvalId, $approve, $reason, $userId);
+            return self::decideCallRelease($approvalId, $approve, $reason, $userId, $priority);
         }
         if (!tralla_can_transition($approval, $approve ? 'approve' : 'reject', 'maintenance')) {
             throw new RuntimeException('Este card não está aguardando aprovação.');
@@ -1547,9 +1563,13 @@ class PluginTrallaCard extends CommonDBTM
         return $detail;
     }
 
-    private static function decideCallRelease(int $approvalId, bool $approve, string $reason, int $userId): array
+    private static function decideCallRelease(int $approvalId, bool $approve, string $reason, int $userId, string $priority = ''): array
     {
         global $DB;
+        $priority = strtoupper(trim($priority));
+        if ($approve && !tralla_valid_priority($priority)) {
+            throw new RuntimeException('Escolha a prioridade (P1 a P5) para liberar o card.');
+        }
         $approval = self::getCard($approvalId);
         if ($approval === null || (int) $approval['stage'] !== 2
             || (string) ($approval['approval_kind'] ?? '') !== 'call_release'
@@ -1579,7 +1599,6 @@ class PluginTrallaCard extends CommonDBTM
                 || !empty($approval['is_archived'])
                 || (int) $approval['parent_cards_id'] !== $parentId
                 || (int) $approval['plugin_tralla_boards_id'] !== $boardId
-                || (string) ($parent['workflow_type'] ?? '') !== 'call'
                 || (int) $parent['stage'] !== 1
                 || (string) $parent['status'] !== 'pending'
                 || empty($parent['is_locked']) || !empty($parent['is_archived'])
@@ -1595,6 +1614,8 @@ class PluginTrallaCard extends CommonDBTM
             $DB->update('glpi_plugin_tralla_cards', [
                 'approval_cards_id' => 0,
                 'is_locked' => $approve ? 0 : 1,
+                'priority' => $approve ? $priority : (string) ($parent['priority'] ?? ''),
+                'date_sla_start' => $approve ? $now : ($parent['date_sla_start'] ?? null),
                 'users_id_approver' => $userId,
                 'date_approved' => $approve ? $now : null,
                 'rejection_reason' => !$approve && $reason !== '' ? $reason : null,
@@ -1607,9 +1628,10 @@ class PluginTrallaCard extends CommonDBTM
                 'rejection_reason' => !$approve && $reason !== '' ? $reason : null,
                 'date_mod' => $now,
             ], ['id' => $approvalId]);
+            $what = (string) ($parent['workflow_type'] ?? '') === 'call' ? 'Chamado' : 'Card';
             $message = $approve
-                ? 'Chamado liberado para ser assumido por um técnico.'
-                : 'Liberação do chamado recusada.' . ($reason !== '' ? ' Motivo: ' . $reason : '');
+                ? $what . ' liberado com prioridade ' . (tralla_priorities()[$priority]['label'] ?? $priority) . '; já pode ser assumido por um técnico.'
+                : 'Liberação recusada.' . ($reason !== '' ? ' Motivo: ' . $reason : '');
             PluginTrallaHistory::log($parentId, $userId, $approve ? 'call_released' : 'call_release_rejected', $message);
             PluginTrallaHistory::log($approvalId, $userId, $approve ? 'approval_approved' : 'approval_rejected', $message);
             $DB->commit();
@@ -2248,6 +2270,8 @@ class PluginTrallaCard extends CommonDBTM
                     'family_seq' => $seq,
                     'split_from_cards_id' => $parentId,
                     'approval_kind' => 'maintenance',
+                    'priority' => (string) ($parent['priority'] ?? ''),
+                    'date_sla_start' => $parent['date_sla_start'] ?? null,
                     'status' => 'in_progress',
                     'is_locked' => 0,
                     'is_archived' => 0,

@@ -307,7 +307,7 @@ if (!function_exists('tralla_approval_kind_labels')) {
             'deletion'    => 'Aprovação de exclusão',
             'edit'        => 'Aprovação de edição',
             'split'       => 'Aprovação de separação',
-            'call_release' => 'Liberação de chamado',
+            'call_release' => 'Liberação e prioridade',
         ];
     }
 }
@@ -765,5 +765,161 @@ if (!function_exists('tralla_board_state')) {
         }));
 
         return ['lists' => $lists, 'cards' => $cards];
+    }
+}
+
+/* ------------------------------------------------------------------ prioridade e SLA */
+
+if (!function_exists('tralla_priorities')) {
+    /**
+     * Prioridades e SLAs dos cards de manutenção.
+     * Prazos em horas ('h') são corridos; em dias ('bd') são dias úteis (seg–sex).
+     */
+    function tralla_priorities(): array
+    {
+        return [
+            'P1' => ['label' => 'P1 · Alta',      'name' => 'Alta',       'color' => '#d93025',
+                'first' => ['h' => 0.5], 'palliative' => ['h' => 4],    'definitive' => ['h' => 8]],
+            'P2' => ['label' => 'P2 · Média',     'name' => 'Média',      'color' => '#f29900',
+                'first' => ['h' => 4],   'palliative' => ['bd' => 1],   'definitive' => ['bd' => 3]],
+            'P3' => ['label' => 'P3 · Baixa',     'name' => 'Baixa',      'color' => '#2e7d32',
+                'first' => ['h' => 8],   'palliative' => ['bd' => 2],   'definitive' => ['bd' => 4]],
+            'P4' => ['label' => 'P4 · Mínima',    'name' => 'Mínima',     'color' => '#5f6368',
+                'first' => ['bd' => 5],  'palliative' => ['bd' => 15],  'definitive' => ['bd' => 15]],
+            'P5' => ['label' => 'P5 · Inventário', 'name' => 'Inventário', 'color' => '#1a4fa0',
+                'first' => ['bd' => 14], 'palliative' => ['bd' => 60],  'definitive' => ['bd' => 60]],
+        ];
+    }
+}
+
+if (!function_exists('tralla_valid_priority')) {
+    function tralla_valid_priority(string $priority): bool
+    {
+        return array_key_exists($priority, tralla_priorities());
+    }
+}
+
+if (!function_exists('tralla_sla_span_label')) {
+    function tralla_sla_span_label(array $span): string
+    {
+        if (isset($span['h'])) {
+            $hours = (float) $span['h'];
+            if ($hours < 1) {
+                return (int) round($hours * 60) . ' min';
+            }
+            return rtrim(rtrim(number_format($hours, 1, ',', ''), '0'), ',') . ' h';
+        }
+        $days = (int) ($span['bd'] ?? 0);
+        return $days . ($days === 1 ? ' dia útil' : ' dias úteis');
+    }
+}
+
+if (!function_exists('tralla_sla_deadline')) {
+    function tralla_sla_deadline(string $start, array $span): string
+    {
+        $time = strtotime($start);
+        if ($time === false) {
+            return '';
+        }
+        if (isset($span['h'])) {
+            return date('Y-m-d H:i:s', $time + (int) round((float) $span['h'] * 3600));
+        }
+        $days = (int) ($span['bd'] ?? 0);
+        $date = new DateTime(date('Y-m-d H:i:s', $time));
+        while ($days > 0) {
+            $date->modify('+1 day');
+            if ((int) $date->format('N') <= 5) {
+                $days--;
+            }
+        }
+        return $date->format('Y-m-d H:i:s');
+    }
+}
+
+if (!function_exists('tralla_card_sla')) {
+    /**
+     * SLA de um card principal (etapa 1) de manutenção/chamado.
+     * 1º atendimento = técnico clicou em Pegar; resposta paliativa = técnico finalizou
+     * (enviou para aprovação); resposta definitiva = finalização aprovada.
+     */
+    function tralla_card_sla(array $card): ?array
+    {
+        $priority = (string) ($card['priority'] ?? '');
+        $start = (string) ($card['date_sla_start'] ?? '');
+        $priorities = tralla_priorities();
+        if ($priority === '' || !isset($priorities[$priority]) || (int) ($card['stage'] ?? 1) !== 1) {
+            return null;
+        }
+        $spec = $priorities[$priority];
+        $status = (string) ($card['status'] ?? '');
+        $finishedDefinitive = in_array($status, ['withdrawal', 'done'], true);
+        $metAt = [
+            'first'      => (string) ($card['date_taken'] ?? ''),
+            'palliative' => (string) ($card['date_finalized'] ?? ''),
+            'definitive' => $finishedDefinitive ? (string) ($card['date_approved'] ?? '') : '',
+        ];
+        if ($finishedDefinitive && $metAt['palliative'] === '') {
+            $metAt['palliative'] = $metAt['definitive'];
+        }
+        $titles = [
+            'first'      => '1º atendimento',
+            'palliative' => 'Resposta paliativa',
+            'definitive' => 'Resposta definitiva',
+        ];
+        $now = tralla_now();
+        $steps = [];
+        $next = null;
+        foreach ($titles as $key => $title) {
+            $deadline = $start !== '' ? tralla_sla_deadline($start, $spec[$key]) : '';
+            $met = $metAt[$key] !== '' ? $metAt[$key] : '';
+            if ($start === '') {
+                $state = 'waiting';
+            } elseif ($met !== '') {
+                $state = strtotime($met) <= strtotime($deadline) ? 'met' : 'late_met';
+            } else {
+                $state = strtotime($now) > strtotime($deadline) ? 'overdue' : 'running';
+            }
+            $step = [
+                'key'      => $key,
+                'title'    => $title,
+                'span'     => tralla_sla_span_label($spec[$key]),
+                'deadline' => $deadline,
+                'met_at'   => $met,
+                'state'    => $state,
+            ];
+            if ($next === null && in_array($state, ['running', 'overdue'], true)) {
+                $next = $step;
+            }
+            $steps[] = $step;
+        }
+
+        return [
+            'priority' => $priority,
+            'label'    => $spec['label'],
+            'name'     => $spec['name'],
+            'color'    => $spec['color'],
+            'start'    => $start,
+            'steps'    => $steps,
+            'next'     => $next,
+        ];
+    }
+}
+
+if (!function_exists('tralla_priority_choices_for_js')) {
+    function tralla_priority_choices_for_js(): array
+    {
+        $out = [];
+        foreach (tralla_priorities() as $key => $spec) {
+            $out[] = [
+                'key'        => $key,
+                'label'      => $spec['label'],
+                'name'       => $spec['name'],
+                'color'      => $spec['color'],
+                'first'      => tralla_sla_span_label($spec['first']),
+                'palliative' => tralla_sla_span_label($spec['palliative']),
+                'definitive' => tralla_sla_span_label($spec['definitive']),
+            ];
+        }
+        return $out;
     }
 }

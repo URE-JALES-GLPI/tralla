@@ -82,9 +82,9 @@ class PluginTrallaBoard extends CommonDBTM
     {
         if ($type === 'maintenance') {
             return [
+                ['name' => 'Manutenção Aprovação', 'category' => 'maintenance_approval', 'color' => tralla_category_color('maintenance_approval')],
                 ['name' => 'Manutenção Pendente', 'category' => 'maintenance_pending', 'color' => tralla_category_color('maintenance_pending')],
                 ['name' => 'Manutenção Em Andamento', 'category' => 'maintenance_in_progress', 'color' => tralla_category_color('maintenance_in_progress')],
-                ['name' => 'Manutenção Aprovação', 'category' => 'maintenance_approval', 'color' => tralla_category_color('maintenance_approval')],
                 ['name' => 'Manutenção Retirada', 'category' => 'maintenance_withdrawal', 'color' => tralla_category_color('maintenance_withdrawal')],
                 ['name' => 'Manutenção Concluído', 'category' => 'maintenance_done', 'color' => tralla_category_color('maintenance_done')],
             ];

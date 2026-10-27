@@ -4814,3 +4814,88 @@ body.tralla-modal-open {
 @media (max-width: 480px) {
     .tralla-user-dash-card dl { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ---------------------------------------------------------------- prioridade / SLA (1.6.0) */
+.tralla-page, .tralla-modal, .tralla-dialog {
+    --tr-p1: #d93025; --tr-p2: #e37400; --tr-p3: #2e7d32; --tr-p4: #5f6368; --tr-p5: #1a4fa0;
+}
+.tralla-priority-badge {
+    font-weight: 800; color: #fff !important; border: 0 !important; letter-spacing: .02em;
+}
+.tralla-priority-badge.is-p1, .tralla-priority-option.is-p1 .tralla-priority-tag, .tralla-sla-priority.is-p1 { background: var(--tr-p1); }
+.tralla-priority-badge.is-p2, .tralla-priority-option.is-p2 .tralla-priority-tag, .tralla-sla-priority.is-p2 { background: var(--tr-p2); }
+.tralla-priority-badge.is-p3, .tralla-priority-option.is-p3 .tralla-priority-tag, .tralla-sla-priority.is-p3 { background: var(--tr-p3); }
+.tralla-priority-badge.is-p4, .tralla-priority-option.is-p4 .tralla-priority-tag, .tralla-sla-priority.is-p4 { background: var(--tr-p4); }
+.tralla-priority-badge.is-p5, .tralla-priority-option.is-p5 .tralla-priority-tag, .tralla-sla-priority.is-p5 { background: var(--tr-p5); }
+.tralla-sla-badge.is-overdue { background: var(--tr-danger-soft); color: var(--tr-danger); border-color: var(--tr-danger); font-weight: 700; }
+.tralla-sla-badge.is-running { background: var(--tr-primary-soft); color: var(--tr-primary-strong); }
+
+/* Confirmação P1 no modal "Novo card" */
+.tralla-p1-confirm {
+    margin-top: var(--tr-space-3);
+    padding: var(--tr-space-3) var(--tr-space-4);
+    border: 2px solid var(--tr-danger);
+    border-radius: var(--tr-radius);
+    background: var(--tr-danger-soft);
+    color: var(--tr-text-soft);
+}
+.tralla-p1-confirm[hidden] { display: none; }
+.tralla-p1-confirm-head { display: flex; align-items: center; gap: var(--tr-space-2); color: var(--tr-danger); font-size: 15px; }
+.tralla-p1-confirm-head .ti { font-size: 22px; }
+.tralla-p1-confirm p { margin: var(--tr-space-2) 0 0; font-size: 13px; line-height: 1.45; }
+.tralla-p1-confirm-check {
+    display: flex; align-items: center; gap: var(--tr-space-3);
+    margin-top: var(--tr-space-3); padding: var(--tr-space-3);
+    border: 1px dashed var(--tr-danger); border-radius: var(--tr-radius-sm);
+    background: var(--tr-card-bg); cursor: pointer; font-size: 14px; color: var(--tr-danger);
+}
+.tralla-p1-confirm-check input { width: 20px; height: 20px; flex: none; accent-color: var(--tr-danger); cursor: pointer; }
+.tralla-p1-confirm.is-confirmed .tralla-p1-confirm-check { border-style: solid; }
+.tralla-p1-confirm.is-invalid { animation: tralla-p1-shake .35s ease; box-shadow: 0 0 0 4px color-mix(in srgb, var(--tr-danger) 25%, transparent); }
+@keyframes tralla-p1-shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+.tralla-create-approval-note {
+    display: flex; gap: var(--tr-space-2); align-items: flex-start;
+    margin: var(--tr-space-3) 0 0; padding: var(--tr-space-3);
+    border-radius: var(--tr-radius-sm); background: var(--tr-primary-soft);
+    color: var(--tr-text-soft); font-size: 13px; line-height: 1.45;
+}
+.tralla-create-approval-note[hidden] { display: none; }
+.tralla-create-approval-note .ti { color: var(--tr-primary); font-size: 18px; flex: none; }
+
+/* Diálogo de prioridade */
+.tralla-priority-options { display: grid; gap: var(--tr-space-2); margin: var(--tr-space-3) 0; }
+.tralla-priority-option {
+    display: flex; align-items: center; gap: var(--tr-space-3);
+    padding: var(--tr-space-2) var(--tr-space-3);
+    border: 1px solid var(--tr-border); border-radius: var(--tr-radius-sm);
+    background: var(--tr-card-bg); cursor: pointer;
+}
+.tralla-priority-option:hover { border-color: var(--tr-border-strong); }
+.tralla-priority-option:has(input:checked) { border-color: var(--tr-primary); box-shadow: 0 0 0 2px var(--tr-primary-soft); }
+.tralla-priority-option input { flex: none; }
+.tralla-priority-tag { flex: none; min-width: 34px; padding: 4px 6px; border-radius: 6px; color: #fff; font-weight: 800; text-align: center; }
+.tralla-priority-text { display: flex; flex-direction: column; min-width: 0; }
+.tralla-priority-text small { color: var(--tr-muted); }
+
+/* Bloco "Prioridade e SLA" no detalhe */
+.tralla-sla-card .tralla-sla-priority {
+    display: inline-block; padding: 4px 10px; border-radius: 999px; color: #fff; font-weight: 800; font-size: 13px;
+}
+.tralla-sla-start { display: block; margin-top: var(--tr-space-1); color: var(--tr-muted); }
+.tralla-sla-rows { display: grid; gap: var(--tr-space-2); margin-top: var(--tr-space-3); }
+.tralla-sla-row {
+    display: flex; justify-content: space-between; gap: var(--tr-space-2);
+    padding: var(--tr-space-2) var(--tr-space-3); border-radius: var(--tr-radius-sm);
+    border-left: 4px solid var(--tr-border-strong); background: var(--tr-list-bg); font-size: 13px;
+}
+.tralla-sla-row div { display: flex; flex-direction: column; min-width: 0; }
+.tralla-sla-row small { color: var(--tr-muted); }
+.tralla-sla-when { text-align: right; }
+.tralla-sla-when em { font-style: normal; font-weight: 700; font-size: 12px; }
+.tralla-sla-row.is-running { border-left-color: var(--tr-primary); }
+.tralla-sla-row.is-overdue { border-left-color: var(--tr-danger); background: var(--tr-danger-soft); }
+.tralla-sla-row.is-overdue em { color: var(--tr-danger); }
+.tralla-sla-row.is-met { border-left-color: var(--tr-success); }
+.tralla-sla-row.is-met em { color: var(--tr-success); }
+.tralla-sla-row.is-late_met { border-left-color: var(--tr-warning); }
+.tralla-sla-row.is-late_met em { color: var(--tr-warning); }

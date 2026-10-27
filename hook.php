@@ -187,6 +187,8 @@ function plugin_tralla_install(): bool
         'deletion_previous_lists_id'  => "INT {$sign} NOT NULL DEFAULT 0",
         'deletion_previous_status'    => "VARCHAR(30)  NOT NULL DEFAULT ''",
         'deletion_previous_is_locked' => 'TINYINT(1)   NOT NULL DEFAULT 0',
+        'priority'                    => "VARCHAR(2)   NOT NULL DEFAULT '' COMMENT 'P1..P5'",
+        'date_sla_start'              => 'DATETIME     DEFAULT NULL',
     ];
     $added_is_deleted = false;
     $added_approval_kind = false;
@@ -465,6 +467,46 @@ function plugin_tralla_install(): bool
                 'date_mod'      => $now,
             ]);
         }
+    }
+
+    // 1.6.0: em quadros de manutenção, "Manutenção Aprovação" fica à esquerda
+    // de "Manutenção Pendente". Roda uma única vez (marcador em configs).
+    $reorderFlag = $DB->request([
+        'SELECT' => ['id'],
+        'FROM'   => 'glpi_plugin_tralla_configs',
+        'WHERE'  => ['config_key' => 'lists_order_approval_first'],
+        'LIMIT'  => 1,
+    ])->current();
+    if (!$reorderFlag) {
+        foreach ($DB->request([
+            'SELECT' => ['id'],
+            'FROM'   => 'glpi_plugin_tralla_boards',
+            'WHERE'  => ['type' => 'maintenance'],
+        ]) as $maintenanceBoard) {
+            $boardLists = [];
+            foreach ($DB->request([
+                'SELECT' => ['id', 'category', 'rank'],
+                'FROM'   => 'glpi_plugin_tralla_lists',
+                'WHERE'  => [
+                    'plugin_tralla_boards_id' => (int) $maintenanceBoard['id'],
+                    'category' => ['maintenance_pending', 'maintenance_approval'],
+                ],
+            ]) as $boardList) {
+                $boardLists[(string) $boardList['category']] = $boardList;
+            }
+            if (isset($boardLists['maintenance_pending'], $boardLists['maintenance_approval'])
+                && (float) $boardLists['maintenance_approval']['rank'] > (float) $boardLists['maintenance_pending']['rank']) {
+                $DB->update('glpi_plugin_tralla_lists', [
+                    'rank' => (float) $boardLists['maintenance_pending']['rank'] - 0.5,
+                ], ['id' => (int) $boardLists['maintenance_approval']['id']]);
+            }
+        }
+        $DB->insert('glpi_plugin_tralla_configs', [
+            'config_key'    => 'lists_order_approval_first',
+            'config_value'  => '1',
+            'date_creation' => $now,
+            'date_mod'      => $now,
+        ]);
     }
 
     require_once __DIR__ . '/inc/profile.class.php';
