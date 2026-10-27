@@ -308,9 +308,9 @@ if (!function_exists('tralla_restore_is_locked')) {
 }
 
 if (!function_exists('tralla_role_can_view')) {
-    function tralla_role_can_view(bool $isMember, bool $isSuperAdmin, bool $hasEntityAccess, bool $hasRead): bool
+    function tralla_role_can_view(bool $isMember, bool $hasEntityAccess, bool $hasRead): bool
     {
-        return $hasRead && $hasEntityAccess && ($isMember || $isSuperAdmin);
+        return $hasRead && $hasEntityAccess && $isMember;
     }
 }
 

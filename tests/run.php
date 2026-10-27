@@ -52,16 +52,16 @@ check('restore normal status fallback', tralla_restore_status(['deletion_previou
 check('restore maintenance status fallback', tralla_restore_status(['deletion_previous_status' => ''], 'maintenance') === 'maintenance_pending');
 check('restore previous status', tralla_restore_status(['deletion_previous_status' => 'in_progress'], 'normal') === 'in_progress');
 
-check('member sees board', tralla_role_can_view(true, false, true, true));
-check('purge without entity cannot see', !tralla_role_can_view(false, true, false, true));
-check('no member no purge cannot see', !tralla_role_can_view(false, false, true, true));
+check('member sees board', tralla_role_can_view(true, true, true));
+check('GLPI purge without membership cannot see', !tralla_role_can_view(false, true, true));
+check('no member cannot see', !tralla_role_can_view(false, true, true));
 check('member cannot manage board', !tralla_can_manage_members('member', true));
 check('admin cannot manage members', !tralla_can_manage_members('admin', true));
 check('superadmin manages members', tralla_can_manage_members('superadmin', true));
 check('superadmin can govern', tralla_can_manage_members('superadmin', true));
 check('admin cannot govern', !tralla_can_manage_members('admin', true));
-check('view requires entity', !tralla_role_can_view(true, false, false, true));
-check('view requires read', !tralla_role_can_view(true, false, true, false));
+check('view requires entity', !tralla_role_can_view(true, false, true));
+check('view requires read', !tralla_role_can_view(true, true, false));
 check('admin can restore with update', tralla_can_restore('admin', true));
 check('admin cannot restore without update', !tralla_can_restore('admin', false));
 check('member cannot restore', !tralla_can_restore('member', true));

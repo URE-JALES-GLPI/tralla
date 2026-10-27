@@ -148,7 +148,7 @@ class PluginTrallaCard extends CommonDBTM
         }
 
         $userId = (int) Session::getLoginUserID();
-        $isAdmin = Session::haveRight(self::$rightname, PURGE);
+        $isAdmin = PluginTrallaBoard::roleFor($boards_id) === 'superadmin';
 
         $familyBusy = [];
         $pendingApprovalKinds = [];
@@ -278,7 +278,7 @@ class PluginTrallaCard extends CommonDBTM
         if ($userId <= 0) {
             $userId = (int) Session::getLoginUserID();
         }
-        $isAdmin = Session::haveRight(self::$rightname, PURGE);
+        $isAdmin = PluginTrallaBoard::roleFor((int) $card['plugin_tralla_boards_id']) === 'superadmin';
 
         $card['board_type'] = $boardType;
         $card['list_name'] = (string) ($list['name'] ?? '');
@@ -427,7 +427,8 @@ class PluginTrallaCard extends CommonDBTM
     public static function permissionsFor(array $card, string $boardType, int $userId, bool $isAdmin): array
     {
         $boardId = (int) ($card['plugin_tralla_boards_id'] ?? 0);
-        $role = $isAdmin ? 'superadmin' : PluginTrallaBoard::roleFor($boardId, $userId);
+        $role = PluginTrallaBoard::roleFor($boardId, $userId);
+        $isAdmin = $role === 'superadmin';
         $isMember = $role !== '';
         $status = (string) ($card['status'] ?? '');
         $isCall = (string) ($card['workflow_type'] ?? 'maintenance') === 'call';

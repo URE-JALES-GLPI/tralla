@@ -248,10 +248,6 @@ class PluginTrallaBoard extends CommonDBTM
             return '';
         }
 
-        if (Session::haveRight(self::$rightname, PURGE)) {
-            return 'superadmin';
-        }
-
         return PluginTrallaBoardUser::getRole($boardId, $userId);
     }
 
@@ -274,7 +270,6 @@ class PluginTrallaBoard extends CommonDBTM
 
         return tralla_role_can_view(
             $role !== '',
-            $role === 'superadmin',
             $hasEntity,
             Session::haveRight(self::$rightname, READ)
         );
@@ -321,22 +316,20 @@ class PluginTrallaBoard extends CommonDBTM
             $where['is_archived'] = 0;
         }
 
-        if (!Session::haveRight(self::$rightname, PURGE)) {
-            $membershipIds = [];
-            foreach ($DB->request([
-                'SELECT' => ['plugin_tralla_boards_id'],
-                'FROM'   => 'glpi_plugin_tralla_boards_users',
-                'WHERE'  => ['users_id' => (int) Session::getLoginUserID()],
-            ]) as $membership) {
-                $membershipIds[] = (int) $membership['plugin_tralla_boards_id'];
-            }
-
-            if ($membershipIds === []) {
-                return [];
-            }
-
-            $where['id'] = $membershipIds;
+        $membershipIds = [];
+        foreach ($DB->request([
+            'SELECT' => ['plugin_tralla_boards_id'],
+            'FROM'   => 'glpi_plugin_tralla_boards_users',
+            'WHERE'  => ['users_id' => (int) Session::getLoginUserID()],
+        ]) as $membership) {
+            $membershipIds[] = (int) $membership['plugin_tralla_boards_id'];
         }
+
+        if ($membershipIds === []) {
+            return [];
+        }
+
+        $where['id'] = $membershipIds;
 
         $boards = [];
         foreach ($DB->request([

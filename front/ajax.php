@@ -31,7 +31,7 @@ if (!function_exists('tralla_ajax_state')) {
 
 $action = tralla_post_string('action', tralla_post_string('action_get', ''));
 $userId = (int) Session::getLoginUserID();
-$isAdmin = Session::haveRight('plugin_tralla', PURGE);
+$isAdmin = false; // A permissão especial vem do papel no próprio quadro.
 
 try {
     switch ($action) {
