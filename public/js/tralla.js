@@ -2389,22 +2389,36 @@
         options = options || {};
         return new Promise(function (resolve) {
             var uid = 'tralla-confirm-' + Date.now();
+            var previousFocus = document.activeElement;
+            var machineCount = options.card ? (options.card.machines || []).length : 0;
             var layer = document.createElement('div');
             layer.className = 'tralla-dialog-layer';
             layer.innerHTML = '<div class="tralla-dialog-backdrop" data-dialog-backdrop></div>'
-                + '<div class="tralla-modal tralla-dialog tralla-dialog-primary" role="alertdialog" aria-modal="true">'
+                + '<div class="tralla-modal tralla-dialog tralla-dialog-primary tralla-confirm-dialog" role="alertdialog" aria-modal="true"'
+                + ' aria-labelledby="' + uid + '-title" aria-describedby="' + uid + '-message">'
                 + '<div class="tralla-dialog-head">'
-                + '<span class="tralla-dialog-icon" aria-hidden="true"><i class="ti ti-shield-check"></i></span>'
+                + '<span class="tralla-dialog-icon" aria-hidden="true"><i class="ti ' + attr(options.icon || 'ti-shield-check') + '"></i></span>'
                 + '<div class="tralla-dialog-copy">'
+                + '<span class="tralla-confirm-eyebrow">Confirmação da ação</span>'
                 + '<h2 class="tralla-dialog-title" id="' + uid + '-title">' + esc(options.title || 'Confirmar ação') + '</h2>'
-                + '<p class="tralla-dialog-message">' + esc(options.message || 'Deseja confirmar esta ação?') + '</p>'
+                + '<p class="tralla-dialog-message" id="' + uid + '-message">' + esc(options.message || 'Deseja confirmar esta ação?') + '</p>'
                 + '</div></div>'
+                + (options.card ? '<div class="tralla-confirm-card">'
+                    + '<span>Card selecionado</span>'
+                    + '<strong><span class="tralla-confirm-code">' + esc(options.card.code || ('#' + options.card.id)) + '</span> '
+                    + esc(options.card.name) + '</strong>'
+                    + '<small>' + esc(options.card.workflow_type === 'call' ? 'Chamado' : 'Manutenção')
+                    + (machineCount ? ' · ' + machineCount + (machineCount === 1 ? ' máquina' : ' máquinas') : '')
+                    + '</small></div>' : '')
+                + (options.impact ? '<p class="tralla-confirm-impact"><i class="ti ti-arrow-right" aria-hidden="true"></i><span>'
+                    + esc(options.impact) + '</span></p>' : '')
                 + '<label class="tralla-confirm-checkbox" for="' + uid + '-check">'
-                + '<input id="' + uid + '-check" type="checkbox"> Confirmo esta ação</label>'
+                + '<input id="' + uid + '-check" type="checkbox">'
+                + '<span><strong>Confirmo esta ação</strong><small>Revisei as informações acima.</small></span></label>'
                 + '<div class="tralla-dialog-actions">'
                 + '<button type="button" class="tralla-btn tralla-btn-ghost" data-dialog-cancel>Cancelar</button>'
                 + '<button type="button" class="tralla-btn tralla-btn-primary" data-dialog-confirm disabled>'
-                + esc(options.confirmLabel || 'Confirmar') + '</button>'
+                + '<i class="ti ti-check" aria-hidden="true"></i> ' + esc(options.confirmLabel || 'Confirmar') + '</button>'
                 + '</div></div>';
             document.body.appendChild(layer);
             document.body.classList.add('tralla-dialog-open');
@@ -2414,18 +2428,33 @@
             function finish(ok) {
                 if (finished) return;
                 finished = true;
+                document.removeEventListener('keydown', onKeydown, true);
                 document.body.classList.remove('tralla-dialog-open');
                 layer.remove();
+                if (previousFocus && document.contains(previousFocus)) { previousFocus.focus(); }
                 resolve(ok);
             }
             inputEl.addEventListener('change', function () { confirmEl.disabled = !inputEl.checked; });
             confirmEl.addEventListener('click', function () { if (inputEl.checked) finish(true); });
             layer.querySelector('[data-dialog-backdrop]').addEventListener('click', function () { finish(false); });
             layer.querySelector('[data-dialog-cancel]').addEventListener('click', function () { finish(false); });
-            inputEl.addEventListener('keydown', function (e) {
-                if (e.key === 'Enter' && inputEl.checked) { e.preventDefault(); finish(true); }
-                if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
-            });
+            function onKeydown(event) {
+                if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); finish(false); }
+                if (event.key === 'Enter' && inputEl.checked
+                    && (document.activeElement === inputEl || document.activeElement === confirmEl)) {
+                    event.preventDefault(); finish(true);
+                }
+                if (event.key === 'Tab') {
+                    var items = [inputEl, layer.querySelector('[data-dialog-cancel]'), confirmEl]
+                        .filter(function (item) { return item && !item.disabled; });
+                    if (event.shiftKey && document.activeElement === items[0]) {
+                        event.preventDefault(); items[items.length - 1].focus();
+                    } else if (!event.shiftKey && document.activeElement === items[items.length - 1]) {
+                        event.preventDefault(); items[0].focus();
+                    }
+                }
+            }
+            document.addEventListener('keydown', onKeydown, true);
             window.setTimeout(function () { if (inputEl) inputEl.focus(); }, 30);
         });
     }
@@ -2593,10 +2622,12 @@
                 }).length;
                 var finalizeConfirmed = await checkboxConfirmation({
                     title: activeCard.workflow_type === 'call' ? 'Finalizar chamado' : 'Finalizar manutenção',
-                    message: activeCard.workflow_type === 'call'
-                        ? 'Finalizar o chamado e enviar para aprovação?' : pendingCount > 0
-                        ? 'Enviar as máquinas concluídas ou inservíveis para aprovação e reunir ' + pendingCount + ' pendente(s) em um novo card?'
-                        : 'Finalizar a manutenção e enviar para aprovação?',
+                    message: 'Confira as informações antes de enviar este card para aprovação.',
+                    card: activeCard,
+                    impact: activeCard.workflow_type === 'call'
+                        ? 'Após a aprovação, o chamado irá para Concluído.' : pendingCount > 0
+                        ? 'As máquinas concluídas ou inservíveis seguirão para aprovação. As ' + pendingCount + ' pendente(s) serão reunidas em um novo card.'
+                        : 'Após a aprovação, a manutenção seguirá para Retirada.',
                     icon: 'ti-checkup-list',
                     confirmLabel: 'Finalizar'
                 });

@@ -4607,6 +4607,37 @@ body.tralla-modal-open {
 }
 .tralla-confirm-checkbox input { cursor: pointer; height: 18px; width: 18px; }
 
+.tralla-confirm-dialog { max-width: 500px; }
+.tralla-confirm-dialog .tralla-dialog-head { gap: 14px; padding: 25px 24px 0; }
+.tralla-confirm-dialog .tralla-dialog-icon { border-radius: 13px; flex-basis: 42px; height: 42px; }
+.tralla-confirm-dialog .tralla-dialog-icon .ti { font-size: 22px; }
+.tralla-confirm-dialog .tralla-dialog-title { font-size: 20px; font-weight: 750; }
+.tralla-confirm-dialog .tralla-dialog-message { margin-top: 7px; }
+.tralla-confirm-eyebrow { color: var(--tr-primary); display: block; font-size: 10px; font-weight: 800; letter-spacing: .1em; margin-bottom: 5px; text-transform: uppercase; }
+.tralla-confirm-card { background: var(--tr-surface-2); border: 1px solid var(--tr-border); border-radius: 10px; display: flex; flex-direction: column; gap: 6px; margin: 21px 24px 0; padding: 14px 16px; }
+.tralla-confirm-card > span { color: var(--tr-muted); font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.tralla-confirm-card strong { color: var(--tr-text); font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+.tralla-confirm-code { background: var(--tr-primary-soft); border-radius: 5px; color: var(--tr-primary); display: inline-block; font-size: 11px; margin-right: 4px; padding: 3px 6px; white-space: nowrap; }
+.tralla-confirm-card small { color: var(--tr-muted); font-size: 11px; }
+.tralla-confirm-dialog .tralla-confirm-impact { align-items: flex-start; color: var(--tr-text); display: flex; font-size: 12px; gap: 9px; line-height: 1.5; margin: 15px 24px 0; }
+.tralla-confirm-impact .ti { color: var(--tr-primary); flex: 0 0 auto; font-size: 17px; }
+.tralla-confirm-dialog .tralla-confirm-checkbox { border-radius: 10px; gap: 12px; margin: 20px 24px 24px; padding: 13px 14px; }
+.tralla-confirm-dialog .tralla-confirm-checkbox:has(input:checked) { background: var(--tr-primary-soft); border-color: var(--tr-primary); }
+.tralla-confirm-dialog .tralla-confirm-checkbox input { accent-color: var(--tr-primary); flex: 0 0 auto; }
+.tralla-confirm-dialog .tralla-confirm-checkbox span { display: flex; flex-direction: column; gap: 2px; }
+.tralla-confirm-dialog .tralla-confirm-checkbox strong { color: var(--tr-text); font-size: 13px; }
+.tralla-confirm-dialog .tralla-confirm-checkbox small { color: var(--tr-muted); font-size: 11px; font-weight: 400; }
+.tralla-confirm-dialog .tralla-dialog-actions { background: var(--tr-surface-2); border-top: 1px solid var(--tr-border); padding: 16px 24px 20px; }
+.tralla-confirm-dialog .tralla-dialog-actions .tralla-btn { min-height: 39px; }
+.tralla-confirm-dialog .tralla-dialog-actions [data-dialog-confirm] { min-width: 124px; }
+@media (max-width: 520px) {
+    .tralla-confirm-dialog .tralla-dialog-head { padding: 21px 18px 0; }
+    .tralla-confirm-card { margin-left: 18px; margin-right: 18px; }
+    .tralla-confirm-dialog .tralla-confirm-impact { margin-left: 18px; margin-right: 18px; }
+    .tralla-confirm-dialog .tralla-confirm-checkbox { margin-left: 18px; margin-right: 18px; }
+    .tralla-confirm-dialog .tralla-dialog-actions { padding-left: 18px; padding-right: 18px; }
+}
+
 /* Painel de manutenções por usuário (topo da lista de quadros) */
 .tralla-user-dash {
     display: grid;
