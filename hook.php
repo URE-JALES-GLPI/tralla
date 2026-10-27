@@ -469,6 +469,12 @@ function plugin_tralla_install(): bool
         }
     }
 
+    // 1.6.0: máquinas sem status passam a "Em andamento" (opção "Não preenchido" removida).
+    if ($DB->tableExists('glpi_plugin_tralla_machines')) {
+        $DB->update('glpi_plugin_tralla_machines', ['status' => 'in_progress'], ['status' => '']);
+        $DB->update('glpi_plugin_tralla_machines', ['service_done' => 0], ['status' => 'in_progress', 'service_done' => 1]);
+    }
+
     // 1.6.0: em quadros de manutenção, "Manutenção Aprovação" fica à esquerda
     // de "Manutenção Pendente". Roda uma única vez (marcador em configs).
     $reorderFlag = $DB->request([

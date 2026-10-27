@@ -1710,10 +1710,10 @@
         } else {
             machines.forEach(function (machine, index) {
                 var missing = [];
-                if (['done', 'not_repairable', 'pending'].indexOf(machine.status) < 0) {
-                    missing.push('Escolher o status');
+                if (['done', 'not_repairable', 'warranty', 'pending'].indexOf(machine.status) < 0) {
+                    missing.push('Escolher o status (Pendente, Concluído, Inservível ou Garantia)');
                 } else if (card.workflow_type === 'call' && machine.status === 'pending') {
-                    missing.push('Escolher Concluído ou Inservível; Chamados não aceitam Pendente');
+                    missing.push('Escolher Concluído, Inservível ou Garantia; Chamados não aceitam Pendente');
                 }
                 if (!String(machine.report || '').trim()) { missing.push('Preencher o relatório técnico'); }
                 if (!Number(machine.service_done)) { missing.push('Marcar Serviço realizado'); }
@@ -1722,9 +1722,9 @@
                 }
             });
             if (!machines.some(function (machine) {
-                return machine.status === 'done' || machine.status === 'not_repairable';
+                return machine.status === 'done' || machine.status === 'not_repairable' || machine.status === 'warranty';
             })) {
-                requirements.general.push('Deixe ao menos uma máquina com status Concluído ou Inservível.');
+                requirements.general.push('Deixe ao menos uma máquina com status Concluído, Inservível ou Garantia.');
             }
         }
         if (!(card.permissions || {}).edit_machines && (requirements.general.length || requirements.machines.length)) {
@@ -1866,26 +1866,55 @@
 
     function renderHistory(card) {
         if (!Array.isArray(card.history) || !card.history.length) {
-        return '<section class="tralla-detail-section"><h3><i class="ti ti-history"></i> Hist�rico</h3>'
-            + '<p class="tralla-empty-mini">Sem hist�rico registrado.</p></section>';
+        return '<section class="tralla-detail-section"><h3><i class="ti ti-history"></i> Histórico</h3>'
+            + '<p class="tralla-empty-mini">Sem histórico registrado.</p></section>';
         }
 
-        return '<section class="tralla-detail-section"><h3><i class="ti ti-history"></i> Hist�rico</h3>'
+        return '<section class="tralla-detail-section"><h3><i class="ti ti-history"></i> Histórico</h3>'
             + '<div class="tralla-history">'
             + card.history.map(function (entry) {
                 return '<div class="tralla-history-item">'
                     + '<div class="tralla-history-dot"><span class="tralla-avatar">' + esc(initials(entry.user_name || 'Sistema')) + '</span></div>'
                     + '<div class="tralla-history-body">'
                     + '<strong>' + esc(entry.action_label || entry.action) + '</strong>'
-                    + '<small>' + esc(entry.user_name || 'Sistema') + ' � ' + esc(entry.date_formatted || formatDate(entry.date_creation)) + '</small>'
+                    + '<small>' + esc(entry.user_name || 'Sistema') + ' · ' + esc(entry.date_formatted || formatDate(entry.date_creation)) + '</small>'
                     + (entry.details ? '<p>' + esc(entry.details) + '</p>' : '')
                     + '</div></div>';
             }).join('')
             + '</div></section>';
     }
 
+    var serviceDoneStatuses = { pending: true, done: true, not_repairable: true, warranty: true };
+
+    function serviceDoneAllowed(status) {
+        return !!serviceDoneStatuses[String(status || 'in_progress')];
+    }
+
+    function serviceDoneCheck(attrName, machine, extra) {
+        var allowed = serviceDoneAllowed(machine.status);
+        return '<label class="tralla-check" data-service-done-wrap' + (allowed ? '' : ' hidden') + '>'
+            + '<input type="checkbox" ' + attrName + '="service_done" value="1"'
+            + (allowed && Number(machine.service_done) ? ' checked' : '') + (extra || '') + '> Serviço realizado</label>';
+    }
+
+    // Ao trocar o status, mostra/esconde "Serviço realizado" antes do salvamento automático.
+    document.addEventListener('change', function (event) {
+        var select = event.target.closest('[data-machine-field="status"], [data-edit-field="status"]');
+        if (!select) { return; }
+        var row = select.closest('[data-machine-id], [data-edit-machine], [data-edit-new-machine]');
+        var wrap = row ? row.querySelector('[data-service-done-wrap]') : null;
+        if (!wrap) { return; }
+        var allowed = serviceDoneAllowed(select.value);
+        wrap.hidden = !allowed;
+        if (!allowed) {
+            var box = wrap.querySelector('input[type="checkbox"]');
+            if (box) { box.checked = false; }
+        }
+    }, true);
+
     function machineStatusOptions(selected) {
-        var options = '<option value="">Não preenchido</option>';
+        selected = selected || 'in_progress';
+        var options = '';
         Object.keys(labels.machine_choices || {}).forEach(function (value) {
             options += '<option value="' + attr(value) + '"' + (value === selected ? ' selected' : '') + '>'
                 + esc(labels.machine_choices[value]) + '</option>';
@@ -1898,7 +1927,7 @@
         var filled = machines.filter(function (machine) {
             var report = String(machine.report || '').trim();
             return machine.is_filled
-                || (report !== '' && !!machine.service_done && (machine.status === 'done' || machine.status === 'not_repairable' || machine.status === 'pending'));
+                || (report !== '' && !!machine.service_done && (machine.status === 'done' || machine.status === 'not_repairable' || machine.status === 'warranty' || machine.status === 'pending'));
         }).length;
         return {
             total: total,
@@ -1931,8 +1960,7 @@
             + '<textarea class="tralla-machine-report" data-machine-field="report" maxlength="200000"'
             + disabled + ' placeholder="Descreva o diagnóstico e o serviço executado...">' + esc(machine.report || '') + '</textarea></div>'
             + '<div class="tralla-machine-flags">'
-            + '<label class="tralla-check"><input type="checkbox" data-machine-field="service_done" value="1"'
-            + (Number(machine.service_done) ? ' checked' : '') + disabled + '> Serviço realizado</label>'
+            + serviceDoneCheck('data-machine-field', machine, disabled)
             + '<label class="tralla-check"><input type="checkbox" data-machine-field="needs_inventory" value="1"'
             + (Number(machine.needs_inventory) ? ' checked' : '') + disabled + '> Necessita inventariar</label>'
             + '</div></div>';
@@ -3085,8 +3113,7 @@
             + '<textarea data-edit-field="report" maxlength="200000" placeholder="Descreva o diagnóstico e o serviço executado...">'
             + esc(machine.report || '') + '</textarea></div>'
             + '<div class="tralla-machine-flags">'
-            + '<label class="tralla-check"><input type="checkbox" data-edit-field="service_done" value="1"'
-            + (Number(machine.service_done) ? ' checked' : '') + '> Serviço realizado</label>'
+            + serviceDoneCheck('data-edit-field', machine, '')
             + '<label class="tralla-check"><input type="checkbox" data-edit-field="needs_inventory" value="1"'
             + (Number(machine.needs_inventory) ? ' checked' : '') + '> Necessita inventariar</label>'
             + '</div></div>';
@@ -3473,7 +3500,7 @@
                     });
                 }
                 local.is_filled = String(local.report || '').trim() !== ''
-                    && !!local.service_done && (local.status === 'done' || local.status === 'not_repairable' || local.status === 'pending');
+                    && !!local.service_done && (local.status === 'done' || local.status === 'not_repairable' || local.status === 'warranty' || local.status === 'pending');
             }
             var pill = machineEl.querySelector('.tralla-pill');
             if (pill) {

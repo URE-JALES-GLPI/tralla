@@ -49,6 +49,9 @@ class PluginTrallaMachine extends CommonDBTM
                     $row['model_name'] = (string) $model['name'];
                 }
             }
+            if ((string) $row['status'] === '') {
+                $row['status'] = 'in_progress';
+            }
             $row['status_label'] = tralla_machine_status_label((string) $row['status']);
             $row['is_filled'] = tralla_machine_is_filled($row);
             $machines[] = $row;
@@ -101,8 +104,10 @@ class PluginTrallaMachine extends CommonDBTM
             'label'                           => tralla_normalize_label($data['label'] ?? ''),
             'serial'                          => tralla_normalize_label($data['serial'] ?? ''),
             'report'                          => '',
-            'status'                          => (string) ($data['status'] ?? ''),
-            'service_done'                    => !empty($data['service_done']) ? 1 : 0,
+            'status'                          => array_key_exists((string) ($data['status'] ?? ''), tralla_machine_status_choices())
+                ? (string) $data['status'] : 'in_progress',
+            'service_done'                    => !empty($data['service_done'])
+                && tralla_machine_service_done_allowed((string) ($data['status'] ?? 'in_progress')) ? 1 : 0,
             'needs_inventory'                 => !empty($data['needs_inventory']) ? 1 : 0,
             'inventory_items_id'              => (int) ($data['inventory_items_id'] ?? 0),
             'rank'                            => $rank,
@@ -125,7 +130,7 @@ class PluginTrallaMachine extends CommonDBTM
         }
         if (array_key_exists('status', $data)) {
             $status = (string) $data['status'];
-            $allowed['status'] = array_key_exists($status, tralla_machine_status_choices()) ? $status : '';
+            $allowed['status'] = array_key_exists($status, tralla_machine_status_choices()) ? $status : 'in_progress';
         }
         if (array_key_exists('service_done', $data)) {
             $allowed['service_done'] = !empty($data['service_done']) ? 1 : 0;
@@ -144,6 +149,23 @@ class PluginTrallaMachine extends CommonDBTM
         }
         if (array_key_exists('inventory_items_id', $data)) {
             $allowed['inventory_items_id'] = max(0, (int) $data['inventory_items_id']);
+        }
+
+        // "Serviço realizado" só vale para Pendente, Concluído ou Inservível.
+        if (array_key_exists('status', $allowed) || array_key_exists('service_done', $allowed)) {
+            $finalStatus = $allowed['status'] ?? null;
+            if ($finalStatus === null) {
+                $current = $DB->request([
+                    'SELECT' => ['status'],
+                    'FROM'   => 'glpi_plugin_tralla_machines',
+                    'WHERE'  => ['id' => $id],
+                    'LIMIT'  => 1,
+                ])->current();
+                $finalStatus = (string) ($current['status'] ?? 'in_progress');
+            }
+            if (!tralla_machine_service_done_allowed($finalStatus)) {
+                $allowed['service_done'] = 0;
+            }
         }
 
         if ($allowed === []) {
