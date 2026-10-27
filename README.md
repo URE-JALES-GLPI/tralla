@@ -99,7 +99,7 @@ Pendente --Pegar--> Em Andamento --Finalizar--> Aprovação (/2)
 
 Ao criar o quadro, o Tralla cria quatro listas fixas: **Atualização Futura**, **Atualização Pendente**, **Atualização Em Andamento** e **Atualização Concluído**. É possível criar cards nas duas primeiras. Em Futura, o criador ou um administrador do quadro move o card manualmente para Pendente. Em Pendente, **Fazer** atribui o card a quem clicou e o leva para Em Andamento.
 
-O card pode ser de **Descrição** (texto, anexos e solução) ou **Checklist** (itens marcáveis, até 10 arquivos de 100 MB por item e observação final opcional). Os textos são salvos automaticamente enquanto se digita. O responsável finaliza após registrar uma solução no card de Descrição ou marcar todos os itens no card de Checklist. O card segue diretamente para Concluído.
+O card pode ser de **Descrição** (texto, anexos e solução) ou **Checklist** (itens marcáveis, até 10 arquivos de 100 MB por item e observação final opcional). Na criação da checklist, cada item já aceita a seleção de arquivos; o envio começa após o card ser criado e mostra o progresso. Se algum envio falhar, o card permanece criado e os arquivos podem ser reenviados nele. Os textos são salvos automaticamente enquanto se digita. O responsável finaliza após registrar uma solução no card de Descrição ou marcar todos os itens no card de Checklist. O card segue diretamente para Concluído.
 
 ## Membros e papéis
 

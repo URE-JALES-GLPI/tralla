@@ -1210,6 +1210,44 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 .tralla-update-add-item { display: flex; gap: 8px; margin-top: 12px; }
 .tralla-update-add-item input { flex: 1; min-width: 0; }
 #tralla-update-create-items { display: grid; gap: 7px; margin-bottom: 10px; }
+.tralla-update-create-item {
+    align-items: center;
+    background: var(--tr-surface-2);
+    border: 1px solid var(--tr-border);
+    border-radius: 8px;
+    display: grid;
+    gap: 6px 8px;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    padding: 8px;
+}
+.tralla-update-create-title { min-width: 0; }
+.tralla-update-create-attach {
+    align-items: center;
+    background: var(--tr-surface);
+    border: 1px solid var(--tr-border);
+    border-radius: 7px;
+    color: var(--tr-primary);
+    cursor: pointer;
+    display: inline-flex;
+    gap: 5px;
+    padding: 8px 10px;
+    position: relative;
+    white-space: nowrap;
+}
+.tralla-update-create-attach:hover { border-color: var(--tr-primary); }
+.tralla-update-create-attach:focus-within { outline: 2px solid var(--tr-primary); outline-offset: 2px; }
+.tralla-update-create-attach input[type="file"] {
+    height: 1px;
+    opacity: 0;
+    overflow: hidden;
+    position: absolute;
+    width: 1px;
+}
+.tralla-update-create-file-count {
+    color: var(--tr-muted);
+    grid-column: 1 / -1;
+    overflow-wrap: anywhere;
+}
 .tralla-call-release-choice { margin-top: 16px; }
 .tralla-call-release-choice input[value="later"]:checked + span {
     background: #fff4e5;

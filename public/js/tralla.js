@@ -2050,6 +2050,31 @@
         }
     }
 
+    async function uploadFileChunks(cardId, itemId, files, onProgress, onFileComplete) {
+        var chunkSize = 1048576;
+        var total = files.reduce(function (sum, file) { return sum + file.size; }, 0);
+        var sent = 0;
+        for (var f = 0; f < files.length; f++) {
+            var file = files[f];
+            var random = crypto.getRandomValues(new Uint8Array(16));
+            var uploadId = Array.prototype.map.call(random, function (byte) {
+                return byte.toString(16).padStart(2, '0');
+            }).join('');
+            var count = Math.ceil(file.size / chunkSize);
+            for (var index = 0; index < count; index++) {
+                var start = index * chunkSize;
+                var chunk = file.slice(start, Math.min(start + chunkSize, file.size));
+                await api('call_file_chunk', {
+                    id: cardId, upload_id: uploadId, index: index, count: count,
+                    file_size: file.size, file_name: file.name, file: chunk, item_id: itemId
+                });
+                sent += chunk.size;
+                if (onProgress) { onProgress(file.name, Math.round(sent / total * 100)); }
+            }
+            if (onFileComplete) { onFileComplete(); }
+        }
+    }
+
     async function uploadCallFiles(form) {
         if (!activeCard || !['call', 'update'].includes(activeCard.workflow_type)) { return; }
         var cardId = Number(activeCard.id);
@@ -2073,32 +2098,13 @@
         }
         var button = form.querySelector('button[type="submit"]');
         var progress = form.querySelector('.tralla-call-file-progress');
-        var chunkSize = 1048576;
-        var total = files.reduce(function (sum, file) { return sum + file.size; }, 0);
-        var sent = 0;
         var uploaded = 0;
         setBusy(button, true);
         progress.hidden = false;
         try {
-            for (var f = 0; f < files.length; f++) {
-                var file = files[f];
-                var random = crypto.getRandomValues(new Uint8Array(16));
-                var uploadId = Array.prototype.map.call(random, function (byte) {
-                    return byte.toString(16).padStart(2, '0');
-                }).join('');
-                var count = Math.ceil(file.size / chunkSize);
-                for (var index = 0; index < count; index++) {
-                    var start = index * chunkSize;
-                    var chunk = file.slice(start, Math.min(start + chunkSize, file.size));
-                    await api('call_file_chunk', {
-                        id: cardId, upload_id: uploadId, index: index, count: count,
-                        file_size: file.size, file_name: file.name, file: chunk, item_id: itemId
-                    });
-                    sent += chunk.size;
-                    progress.textContent = 'Enviando ' + file.name + ' · ' + Math.round(sent / total * 100) + '%';
-                }
-                uploaded++;
-            }
+            await uploadFileChunks(cardId, itemId, files, function (name, percent) {
+                progress.textContent = 'Enviando ' + name + ' · ' + percent + '%';
+            }, function () { uploaded++; });
             await refreshState();
             await openCard(cardId);
             toast(uploaded === 1 ? 'Arquivo vinculado.' : uploaded + ' arquivos vinculados.', 'success');
@@ -3459,6 +3465,18 @@
             + '</div></form>';
     }
 
+    function createUpdateItemRow(first) {
+        return '<div class="tralla-update-create-item">'
+            + '<input class="tralla-update-create-title" type="text" maxlength="500" placeholder="'
+            + (first ? 'Primeiro item' : 'Novo item') + '">'
+            + '<label class="tralla-update-create-attach" title="Anexar até 10 arquivos de 100 MB">'
+            + '<i class="ti ti-paperclip" aria-hidden="true"></i><span>Anexar</span>'
+            + '<input type="file" multiple data-update-create-files></label>'
+            + (first ? '' : '<button type="button" class="tralla-icon-btn" data-update-remove-create-item'
+                + ' aria-label="Remover item" title="Remover item"><i class="ti ti-x"></i></button>')
+            + '<small class="tralla-update-create-file-count">Nenhum arquivo selecionado</small></div>';
+    }
+
     function openCreateUpdateCard(list) {
         if (addCardBlockedCategories[list.category]) { return; }
         showModal('<form id="tralla-create-update-form" class="tralla-form" data-list-id="'
@@ -3479,10 +3497,11 @@
             + '<textarea id="tralla-update-description" name="description" rows="7" maxlength="200000"'
             + ' placeholder="Descreva a situação ou o que precisa ser atualizado..."></textarea></div>'
             + '<div class="tralla-field" data-update-checklist hidden><label>Itens da checklist</label>'
-            + '<div id="tralla-update-create-items"><input type="text" maxlength="500" placeholder="Primeiro item"></div>'
+            + '<div id="tralla-update-create-items">' + createUpdateItemRow(true) + '</div>'
             + '<button type="button" class="tralla-btn tralla-btn-ghost" data-update-add-create-item>'
             + '<i class="ti ti-plus"></i> Adicionar item</button>'
-            + '<small>Você poderá adicionar outros itens e anexar até 10 arquivos por item após criar o card.</small></div>'
+            + '<small>Até 10 arquivos de 100 MB por item. Você também poderá adicionar arquivos depois.</small></div>'
+            + '<div class="tralla-call-file-progress" data-update-create-progress role="status" hidden></div>'
             + '</div><div class="tralla-modal-actions">'
             + '<button type="button" class="tralla-btn tralla-btn-ghost" data-tralla-close>Cancelar</button>'
             + '<button type="submit" class="tralla-btn tralla-btn-primary">Criar card</button></div></form>');
@@ -3491,25 +3510,69 @@
     async function submitCreateUpdate(form) {
         var name = form.querySelector('[name="name"]').value.trim();
         var mode = form.querySelector('[name="mode"]:checked').value;
-        var items = Array.prototype.map.call(form.querySelectorAll('#tralla-update-create-items input'),
-            function (input) { return input.value.trim(); }).filter(Boolean);
+        var rows = Array.prototype.map.call(form.querySelectorAll('.tralla-update-create-item'), function (row) {
+            var files = Array.prototype.slice.call(row.querySelector('[data-update-create-files]').files || []);
+            return { title: row.querySelector('.tralla-update-create-title').value.trim(), files: files };
+        });
+        var items = rows.filter(function (row) { return row.title; });
         if (!name) { toast('Informe o título da atualização.', 'error'); return; }
+        if (mode === 'checklist' && rows.some(function (row) { return !row.title && row.files.length; })) {
+            toast('Dê um nome a cada item que contém arquivos.', 'error'); return;
+        }
+        if (mode === 'checklist' && items.some(function (row) { return row.files.length > 10; })) {
+            toast('Cada item aceita até 10 arquivos.', 'error'); return;
+        }
+        if (mode === 'checklist' && items.some(function (row) {
+            return row.files.some(function (file) { return file.size < 1 || file.size > 104857600; });
+        })) { toast('Cada arquivo deve ter até 100 MB e não pode estar vazio.', 'error'); return; }
         var button = form.querySelector('button[type="submit"]');
+        var progress = form.querySelector('[data-update-create-progress]');
         setBusy(button, true);
+        var createdCardId = 0;
+        var uploadError = null;
         try {
             var data = await api('update_create', {
                 boards_id: state.board.id, list_id: Number(form.dataset.listId), name: name,
                 mode: mode, description: form.querySelector('[name="description"]').value,
-                items: mode === 'checklist' ? items : []
+                items: mode === 'checklist' ? items.map(function (row) { return row.title; }) : []
             });
-            closeModal();
+            createdCardId = Number(data.card.id);
             applyState(data);
-            toast('Atualização criada.', 'success');
-            await openCard(data.card.id);
+            if (mode === 'checklist' && items.some(function (row) { return row.files.length; })) {
+                var savedItems = data.card.update_items || [];
+                if (savedItems.length !== items.length) {
+                    throw new Error('O card foi criado, mas não foi possível associar os arquivos aos itens.');
+                }
+                progress.hidden = false;
+                for (var i = 0; i < items.length; i++) {
+                    if (!items[i].files.length) { continue; }
+                    var itemTitle = items[i].title;
+                    await uploadFileChunks(createdCardId, Number(savedItems[i].id), items[i].files,
+                        function (fileName, percent) {
+                            progress.textContent = 'Item ' + (i + 1) + '/' + items.length + ': '
+                                + itemTitle + ' · ' + fileName + ' · ' + percent + '%';
+                        });
+                }
+            }
         } catch (error) {
-            toast(error.message, 'error');
-            setBusy(button, false);
+            if (!createdCardId) {
+                toast(error.message, 'error');
+                setBusy(button, false);
+                return;
+            }
+            uploadError = error;
         }
+        closeModal();
+        try {
+            await refreshState();
+            await openCard(createdCardId);
+        } catch (error) {
+            toast('Card criado. Atualize a página para ver todos os arquivos: ' + error.message, 'error');
+            return;
+        }
+        toast(uploadError
+            ? 'Card criado, mas nem todos os arquivos foram enviados: ' + uploadError.message
+            : 'Atualização criada.', uploadError ? 'error' : 'success');
     }
 
     var updateTextTimers = {};
@@ -4155,9 +4218,14 @@
         if (event.target.closest('[data-update-add-create-item]')) {
             var itemList = modalRoot.querySelector('#tralla-update-create-items');
             if (itemList) {
-                itemList.insertAdjacentHTML('beforeend', '<input type="text" maxlength="500" placeholder="Novo item">');
-                itemList.lastElementChild.focus();
+                itemList.insertAdjacentHTML('beforeend', createUpdateItemRow(false));
+                itemList.lastElementChild.querySelector('.tralla-update-create-title').focus();
             }
+            return;
+        }
+        var removeCreateItem = event.target.closest('[data-update-remove-create-item]');
+        if (removeCreateItem) {
+            removeCreateItem.closest('.tralla-update-create-item').remove();
             return;
         }
         var renameItemButton = event.target.closest('[data-update-rename]');
@@ -4373,6 +4441,25 @@
     });
 
     modalRoot.addEventListener('change', async function (event) {
+        if (event.target.matches('[data-update-create-files]')) {
+            var fileInput = event.target;
+            var selected = Array.prototype.slice.call(fileInput.files || []);
+            var countLabel = fileInput.closest('.tralla-update-create-item')
+                .querySelector('.tralla-update-create-file-count');
+            if (selected.length > 10 || selected.some(function (file) {
+                return file.size < 1 || file.size > 104857600;
+            })) {
+                fileInput.value = '';
+                countLabel.textContent = 'Nenhum arquivo selecionado';
+                toast('Selecione até 10 arquivos por item, com até 100 MB cada.', 'error');
+                return;
+            }
+            countLabel.textContent = selected.length
+                ? selected.length + (selected.length === 1 ? ' arquivo selecionado: ' : ' arquivos selecionados: ')
+                    + selected.map(function (file) { return file.name; }).join(', ')
+                : 'Nenhum arquivo selecionado';
+            return;
+        }
         if (event.target.matches('#tralla-create-update-form [name="mode"]')) {
             var createUpdateForm = event.target.closest('form');
             var checklistMode = event.target.value === 'checklist';
