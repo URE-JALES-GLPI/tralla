@@ -574,7 +574,7 @@
     var machineSaveQueue = Promise.resolve();
     var inlineComposerListId = null;
     var historyFilters = {
-        card_id: '', date_from: '', date_to: '', users_id: '', machine_id: '', model_id: '', history_action: ''
+        card_id: '', date_from: '', date_to: '', users_id: '', machine_query: '', model_id: '', history_action: ''
     };
     var historyPage = 1;
     var historyPages = 1;
@@ -2974,8 +2974,8 @@
             + '<select id="tralla-history-user" name="users_id">'
             + historyFilterOptions(options.users, historyFilters.users_id, 'Todos os usuários') + '</select></div>'
             + '<div class="tralla-field tralla-history-machine-filter"><label for="tralla-history-machine">Máquina</label>'
-            + '<select id="tralla-history-machine" name="machine_id">'
-            + historyFilterOptions(options.machines, historyFilters.machine_id, 'Todas as máquinas') + '</select></div>'
+            + '<input id="tralla-history-machine" type="text" name="machine_query" maxlength="255"'
+            + ' value="' + attr(historyFilters.machine_query) + '" placeholder="Nome, série ou ID da máquina"></div>'
             + '<div class="tralla-field"><label for="tralla-history-model">Modelo</label>'
             + '<select id="tralla-history-model" name="model_id">'
             + historyFilterOptions(options.models, historyFilters.model_id, 'Todos os modelos') + '</select></div>'
@@ -3017,7 +3017,7 @@
                 date_from: historyFilters.date_from,
                 date_to: historyFilters.date_to,
                 users_id: historyFilters.users_id,
-                machine_id: historyFilters.machine_id,
+                machine_query: historyFilters.machine_query,
                 model_id: historyFilters.model_id,
                 history_action: historyFilters.history_action,
                 page: historyPage
@@ -4400,7 +4400,7 @@
 
         if (event.target.closest('[data-history-clear]')) {
             historyFilters = {
-                card_id: '', date_from: '', date_to: '', users_id: '', machine_id: '', model_id: '', history_action: ''
+                card_id: '', date_from: '', date_to: '', users_id: '', machine_query: '', model_id: '', history_action: ''
             };
             historyPage = 1;
             openHistoryModal();
@@ -4482,7 +4482,7 @@
                 date_from: dateFromInput ? dateFromInput.value : '',
                 date_to: dateToInput ? dateToInput.value : '',
                 users_id: form.querySelector('[name="users_id"]').value,
-                machine_id: form.querySelector('[name="machine_id"]').value,
+                machine_query: form.querySelector('[name="machine_query"]').value.trim(),
                 model_id: form.querySelector('[name="model_id"]').value,
                 history_action: form.querySelector('[name="history_action"]').value
             };

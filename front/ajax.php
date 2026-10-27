@@ -422,7 +422,7 @@ try {
                 'date_from' => tralla_post_string('date_from'),
                 'date_to'   => tralla_post_string('date_to'),
                 'users_id'  => tralla_post_string('users_id'),
-                'machine_id' => tralla_post_string('machine_id'),
+                'machine_query' => tralla_post_string('machine_query'),
                 'model_id'  => tralla_post_string('model_id'),
                 'action'    => tralla_post_string('history_action'),
                 'page'      => tralla_post_int('page', 1),

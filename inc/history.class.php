@@ -170,12 +170,14 @@ class PluginTrallaHistory extends CommonDBTM
 
         $options = self::boardFilterOptions($boardId);
         $userId = trim((string) ($filters['users_id'] ?? ''));
-        $machineId = trim((string) ($filters['machine_id'] ?? ''));
+        $machineQuery = trim((string) ($filters['machine_query'] ?? ''));
         $modelId = trim((string) ($filters['model_id'] ?? ''));
         $action = trim((string) ($filters['action'] ?? ''));
+        if (mb_strlen($machineQuery) > 255) {
+            throw new RuntimeException('A busca por máquina é muito longa.');
+        }
         foreach ([
             ['value' => $userId, 'options' => $options['users'], 'label' => 'Usuário'],
-            ['value' => $machineId, 'options' => $options['machines'], 'label' => 'Máquina'],
             ['value' => $modelId, 'options' => $options['models'], 'label' => 'Modelo'],
         ] as $selection) {
             if ($selection['value'] !== '' && (!ctype_digit($selection['value'])
@@ -225,10 +227,10 @@ class PluginTrallaHistory extends CommonDBTM
         if ($action !== '') {
             $where['h.action'] = $action;
         }
-        if ($machineId !== '' || $modelId !== '') {
+        if ($machineQuery !== '' || $modelId !== '') {
             $ownerIds = [];
             foreach ($options['machines'] as $machine) {
-                if (($machineId === '' || (int) $machine['id'] === (int) $machineId)
+                if (($machineQuery === '' || mb_stripos($machine['name'], $machineQuery) !== false)
                     && ($modelId === '' || (int) $machine['model_id'] === (int) $modelId)) {
                     $ownerIds[(int) $machine['card_id']] = (int) $machine['card_id'];
                 }
@@ -346,9 +348,6 @@ class PluginTrallaHistory extends CommonDBTM
             'pages' => $pages,
             'options' => [
                 'users' => $options['users'],
-                'machines' => array_map(static fn(array $machine): array => [
-                    'id' => $machine['id'], 'name' => $machine['name'],
-                ], $options['machines']),
                 'models' => $options['models'],
                 'actions' => $options['actions'],
             ],
