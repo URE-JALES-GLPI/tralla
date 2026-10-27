@@ -3803,8 +3803,11 @@
             + '<span><i class="ti ti-headset"></i><strong>Chamado</strong><small>Situação, atendimento e aprovação</small></span></label>'
             + '</div>'
             + '</fieldset>'
+            + '<section class="tralla-create-basics">'
+            + '<h3><i class="ti ti-list-details"></i> Dados do atendimento</h3>'
             + nameField
             + categoryFields
+            + '</section>'
             + machinesSection
             + '<section class="tralla-detail-section tralla-create-call-description" data-create-call-section hidden>'
             + '<div class="tralla-field"><label for="tralla-create-description">Descrição da situação *</label>'

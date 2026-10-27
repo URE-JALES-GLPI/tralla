@@ -1165,6 +1165,88 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 .tralla-card-workflow-option input:focus-visible + span { outline: 3px solid var(--tr-primary); outline-offset: 2px; }
 .tralla-card-workflow-option input[value="call"]:checked + span { background: #f3efff; border-color: #8b5cf6; color: #3b1c66; }
 .tralla-card-workflow-option input[value="call"]:checked + span small { color: #6547a3; }
+#tralla-create-card-form .tralla-modal-body { padding-top: 20px; }
+#tralla-create-card-form .tralla-card-workflow-choice { margin-bottom: 18px; }
+#tralla-create-card-form .tralla-card-workflow-choice legend {
+    color: var(--tr-text);
+    font-size: 14px;
+    margin-bottom: 12px;
+}
+#tralla-create-card-form .tralla-card-workflow-option > span {
+    border-radius: 12px;
+    min-height: 86px;
+    padding: 14px 46px 14px 15px;
+    position: relative;
+    transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+#tralla-create-card-form .tralla-card-workflow-option:hover > span {
+    border-color: var(--tr-primary);
+    transform: translateY(-1px);
+}
+#tralla-create-card-form .tralla-card-workflow-option input:checked + span {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--tr-primary) 12%, transparent);
+}
+#tralla-create-card-form .tralla-card-workflow-option > span::after {
+    align-items: center;
+    border: 1px solid var(--tr-border-strong);
+    border-radius: 50%;
+    content: '';
+    display: flex;
+    height: 19px;
+    justify-content: center;
+    position: absolute;
+    right: 14px;
+    top: 14px;
+    width: 19px;
+}
+#tralla-create-card-form .tralla-card-workflow-option input:checked + span::after {
+    background: var(--tr-primary);
+    border-color: var(--tr-primary);
+    color: #fff;
+    content: '✓';
+    font-size: 12px;
+    font-weight: 800;
+}
+#tralla-create-card-form .tralla-card-workflow-option input[value="call"]:checked + span::after {
+    background: #8b5cf6;
+    border-color: #8b5cf6;
+}
+#tralla-create-card-form .tralla-create-basics,
+#tralla-create-card-form [data-create-machines-section],
+#tralla-create-card-form .tralla-create-call-description {
+    background: var(--tr-surface);
+    border: 1px solid var(--tr-border);
+    border-radius: 12px;
+    margin-bottom: 16px;
+    padding: 17px 18px;
+}
+#tralla-create-card-form .tralla-create-basics > h3 {
+    align-items: center;
+    color: var(--tr-text);
+    display: flex;
+    font-size: 14px;
+    font-weight: 700;
+    gap: 8px;
+    margin: 0 0 16px;
+}
+#tralla-create-card-form .tralla-create-basics > h3 i { color: var(--tr-primary); font-size: 18px; }
+#tralla-create-card-form .tralla-create-basics .tralla-combobox-field { margin-bottom: 18px; }
+#tralla-create-card-form .tralla-create-basics .tralla-form-row { gap: 16px; }
+#tralla-create-card-form .tralla-create-basics .tralla-field { min-width: 0; gap: 7px; }
+#tralla-create-card-form .tralla-create-basics .tralla-field > label {
+    color: var(--tr-text);
+    font-size: 13px;
+}
+#tralla-create-card-form .tralla-create-basics input[type="text"],
+#tralla-create-card-form .tralla-create-basics select { border-radius: 8px; min-height: 43px; }
+#tralla-create-card-form .tralla-create-basics input:invalid:not(:focus),
+#tralla-create-card-form .tralla-create-basics select:invalid:not(:focus) {
+    border-color: var(--tr-border-strong) !important;
+    box-shadow: none !important;
+}
+#tralla-create-card-form [data-create-machines-section] > h3 { color: var(--tr-text); margin-bottom: 13px; }
+#tralla-create-card-form .tralla-create-machine { background: var(--tr-surface-2); border-radius: 8px; padding: 13px 38px 13px 13px; }
+#tralla-create-card-form .tralla-modal-actions { border-top: 1px solid var(--tr-border); padding-top: 16px; }
 .tralla-create-call-description textarea { min-height: 150px; resize: vertical; width: 100%; }
 .tralla-create-call-description small { color: var(--tr-muted); display: block; margin-top: 6px; }
 .tralla-call-report textarea { min-height: 160px; resize: vertical; width: 100%; }
