@@ -2,12 +2,14 @@
 
 Plugin de quadros Kanban e manutenção de equipamentos para **GLPI 12**.
 
-O Tralla combina dois tipos de quadro:
+O Tralla combina três tipos de quadro:
 
 - **Normal**: listas e cards livres, com drag & drop.
 - **Manutenção**: fluxo controlado com técnico responsável, relatório por máquina, aprovação, retirada e conclusão.
+- **Atualizações**: cards com descrição ou checklist, responsável, solução e arquivos.
 
 Dentro de um quadro de manutenção, cada card pode ser **Manutenção** ou **Chamado**. O Chamado pede uma descrição da situação em vez de máquinas; o técnico registra o relatório do atendimento antes de finalizar. Depois da aprovação, vai direto para **Concluído**, sem separação nem retirada. Os cards de Chamado têm destaque roxo.
+Cards de Chamado aceitam arquivos de até 100 MB cada no detalhe do card.
 
 ## Requisitos
 
@@ -25,6 +27,15 @@ Dentro de um quadro de manutenção, cada card pode ser **Manutenção** ou **Ch
    - `plugin_tralla`: leitura, criação, atualização e exclusão para operadores.
    - `plugin_tralla_approve`: leitura para membros que aprovam no quadro.
 5. Acesse **Ferramentas > Tralla** para criar o primeiro quadro.
+
+Em uma atualização do plugin já instalado, atualize o código e execute o instalador idempotente para criar as novas tabelas e colunas antes de abrir um quadro de Atualizações:
+
+```bash
+cd /var/www/glpi/plugins/tralla && git pull --ff-only
+cd /var/www/glpi
+sudo -u www-data php bin/console plugin:install --force --username=glpi tralla
+sudo -u www-data php bin/console plugin:activate tralla
+```
 
 > A página de configuração do plugin exige o direito `plugin_tralla` de **atualização**.
 > O acesso aos quadros também respeita a entidade ativa do usuário e o vínculo com o quadro.
@@ -84,6 +95,12 @@ Pendente --Pegar--> Em Andamento --Finalizar--> Aprovação (/2)
 - **Cards decididos**: após aprovação ou reprovação, o card de aprovação permanece no quadro por 10 segundos com selo `Aprovado` ou `Reprovado` antes de sair.
 - **Concluído**: somente leitura.
 
+### Quadro de Atualizações
+
+Ao criar o quadro, o Tralla cria quatro listas fixas: **Atualização Futura**, **Atualização Pendente**, **Atualização Em Andamento** e **Atualização Concluído**. É possível criar cards nas duas primeiras. Em Futura, o criador ou um administrador do quadro move o card manualmente para Pendente. Em Pendente, **Fazer** atribui o card a quem clicou e o leva para Em Andamento.
+
+O card pode ser de **Descrição** (texto, anexos e solução) ou **Checklist** (itens marcáveis, até 10 arquivos de 100 MB por item e observação final opcional). Os textos são salvos automaticamente enquanto se digita. O responsável finaliza após registrar uma solução no card de Descrição ou marcar todos os itens no card de Checklist. O card segue diretamente para Concluído.
+
 ## Membros e papéis
 
 Cada quadro tem sua própria lista de membros. A visibilidade é definida pelo vínculo com o quadro; os direitos globais do perfil funcionam como limite superior e não concedem acesso a quadros dos quais o usuário não participa. Usuários com `plugin_tralla` **PURGE** global têm papel efetivo **SuperAdmin** e veem os quadros permitidos pela entidade ativa.
@@ -91,10 +108,11 @@ Cada quadro tem sua própria lista de membros. A visibilidade é definida pelo v
 | Papel | Capacidades principais |
 |---|---|
 | **Membro** (`member`) | Ver quadro e histórico, criar/editar cards, mover cards, pegar cards e solicitar exclusão, conforme os direitos globais. |
-| **Admin** (`admin`) | Tudo de Membro, mais configurar quadro e listas, ver **Excluídos** e restaurar cards. Não gerencia membros. |
-| **SuperAdmin** (`superadmin`) | Tudo de Admin, mais gerenciar membros, arquivar e excluir o quadro. |
+| **Admin** (`admin`) | Tudo de Membro, mais configurar quadro e cores das listas, ver **Excluídos** e restaurar cards. Não gerencia membros. |
+| **SuperAdmin** (`superadmin`) | Tudo de Admin, mais renomear listas, gerenciar membros, arquivar e excluir o quadro. |
 
 - Somente **SuperAdmin** adiciona, altera ou remove membros.
+- Somente o **SuperAdmin cadastrado no próprio quadro** pode alterar os títulos das listas. O perfil Super-Admin do GLPI sozinho não concede essa ação.
 - **Admin** visualiza a aba **Membros** em modo somente leitura.
 - O último **SuperAdmin** do quadro não pode ser removido nem rebaixado.
 - Aprovar ou reprovar exige vínculo com o quadro e o direito `plugin_tralla_approve`.

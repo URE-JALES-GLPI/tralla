@@ -401,6 +401,15 @@ class PluginTrallaHistory extends CommonDBTM
             'edit_approved'         => 'Edição aprovada',
             'edit_rejected'         => 'Edição recusada',
             'family_withdrawal_ready' => 'Família liberada para retirada',
+            'update_schedule'       => 'Atualização movida para Pendente',
+            'update_take'           => 'Atualização assumida',
+            'update_finish'         => 'Atualização concluída',
+            'update_item_add'       => 'Item adicionado à checklist',
+            'update_item_toggle'    => 'Item atualizado na checklist',
+            'update_item_rename'    => 'Item renomeado',
+            'update_item_delete'    => 'Item excluído da checklist',
+            'file_added'            => 'Arquivo vinculado',
+            'file_deleted'          => 'Arquivo removido',
         ];
 
         return $labels[$action] ?? $action;

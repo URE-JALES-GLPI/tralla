@@ -4,6 +4,7 @@ if (!defined('GLPI_ROOT')) {
 }
 
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/file.class.php';
 
 /**
  * Lista (coluna) de um quadro.
@@ -39,6 +40,10 @@ class PluginTrallaList extends CommonDBTM
         if ($boardType === 'maintenance') {
             if ($category !== '' && !tralla_is_maintenance_category($category)) {
                 $category = '';
+            }
+        } elseif ($boardType === 'updates') {
+            if (!in_array($category, tralla_update_categories(), true)) {
+                throw new RuntimeException('Categoria de atualização inválida.');
             }
         } else {
             $category = '';
@@ -77,6 +82,12 @@ class PluginTrallaList extends CommonDBTM
             $input['name'] = tralla_normalize_label($input['name']);
             if ($input['name'] === '') {
                 unset($input['name']);
+            } elseif ($input['name'] !== (string) $current['name']
+                && PluginTrallaBoardUser::getRole(
+                    (int) $current['plugin_tralla_boards_id'],
+                    (int) Session::getLoginUserID()
+                ) !== 'superadmin') {
+                throw new RuntimeException('Somente SuperAdmin deste quadro pode alterar o título da lista.');
             }
         }
 
@@ -89,7 +100,11 @@ class PluginTrallaList extends CommonDBTM
                 $category = $currentCategory;
             }
 
-            if ($boardType !== 'maintenance') {
+            if ($boardType === 'updates') {
+                if (!in_array($category, tralla_update_categories(), true)) {
+                    unset($input['category']);
+                }
+            } elseif ($boardType !== 'maintenance') {
                 $category = '';
             } elseif ($category !== '' && !tralla_is_maintenance_category($category)) {
                 unset($input['category']);
@@ -134,6 +149,7 @@ class PluginTrallaList extends CommonDBTM
         }
 
         if ($cardIds !== []) {
+            PluginTrallaFile::purgeForCards($cardIds);
             $DB->delete('glpi_plugin_tralla_machines', ['plugin_tralla_cards_id' => $cardIds]);
             $DB->delete('glpi_plugin_tralla_history', ['plugin_tralla_cards_id' => $cardIds]);
             $DB->delete('glpi_plugin_tralla_notifications', ['plugin_tralla_cards_id' => $cardIds]);

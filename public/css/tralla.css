@@ -445,6 +445,8 @@ body[data-theme="dark"] .tralla-toast,
     gap: 9px;
 }
 
+.tralla-board-group-create[hidden] { display: none; }
+
 .tralla-board-group-create label {
     color: var(--tr-text);
     font-weight: 700;
@@ -1122,6 +1124,20 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
     white-space: nowrap;
 }
 .tralla-card.is-call .tralla-card-top { flex-wrap: wrap; }
+.tralla-board-scroll .tralla-card.is-update,
+.tralla-board-scroll .tralla-card.is-update:hover {
+    border-left: 4px solid #0284c7;
+    background: color-mix(in srgb, var(--tr-card-bg) 94%, #0284c7);
+}
+.tralla-card-update-badge {
+    background: #dbeafe;
+    border-radius: 5px;
+    color: #075985;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+}
+.tralla-update-card-progress { color: var(--tr-muted); font-size: 11px; margin: 6px 0 2px; }
 .tralla-card-workflow-choice {
     border: 0;
     margin: 0 0 16px;
@@ -1153,8 +1169,47 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 .tralla-create-call-description small { color: var(--tr-muted); display: block; margin-top: 6px; }
 .tralla-call-report textarea { min-height: 160px; resize: vertical; width: 100%; }
 .tralla-call-report [data-save-call-report] { margin-top: 10px; }
+.tralla-call-files { display: grid; gap: 10px; }
+.tralla-call-file-row {
+    align-items: center;
+    background: var(--tr-surface);
+    border: 1px solid var(--tr-border);
+    border-radius: 8px;
+    display: flex;
+    gap: 10px;
+    min-width: 0;
+    padding: 9px 11px;
+}
+.tralla-call-file-row > i { color: var(--tr-primary); font-size: 18px; }
+.tralla-call-file-row > span { flex: 1; min-width: 0; }
+.tralla-call-file-row a { display: block; font-weight: 600; overflow-wrap: anywhere; }
+.tralla-call-file-row small { color: var(--tr-muted); display: block; margin-top: 3px; }
+.tralla-call-file-form { border-top: 1px solid var(--tr-border); display: grid; gap: 9px; padding-top: 12px; }
+.tralla-call-file-form label { font-weight: 600; }
+.tralla-call-file-form input[type="file"] { max-width: 100%; }
+.tralla-call-file-form .tralla-btn { justify-self: start; }
+.tralla-call-file-progress { color: var(--tr-muted); font-size: 12px; }
 [data-create-machines-section][hidden], [data-create-call-section][hidden] { display: none !important; }
 [data-call-release-section][hidden] { display: none !important; }
+[data-update-description][hidden], [data-update-checklist][hidden] { display: none !important; }
+.tralla-update-item {
+    background: var(--tr-surface);
+    border: 1px solid var(--tr-border);
+    border-radius: 9px;
+    display: grid;
+    gap: 6px;
+    grid-template-columns: 1fr auto auto;
+    margin: 9px 0;
+    padding: 11px;
+}
+.tralla-update-item-title { align-items: center; display: flex; gap: 9px; min-width: 0; }
+.tralla-update-item-title strong { overflow-wrap: anywhere; }
+.tralla-update-item-title input { flex: 0 0 auto; }
+.tralla-update-item-files { display: grid; gap: 7px; grid-column: 1 / -1; padding-left: 24px; }
+.tralla-update-item-files .tralla-call-file-form { padding-top: 8px; }
+.tralla-update-add-item { display: flex; gap: 8px; margin-top: 12px; }
+.tralla-update-add-item input { flex: 1; min-width: 0; }
+#tralla-update-create-items { display: grid; gap: 7px; margin-bottom: 10px; }
 .tralla-call-release-choice { margin-top: 16px; }
 .tralla-call-release-choice input[value="later"]:checked + span {
     background: #fff4e5;

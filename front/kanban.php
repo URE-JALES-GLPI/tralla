@@ -17,17 +17,18 @@ if ($boards_id <= 0 || !$board->getFromDB($boards_id) || !PluginTrallaBoard::can
 
 $pluginUrl = (string) $CFG_GLPI['root_doc'] . '/plugins/tralla';
 $isMaintenance = ($board->fields['type'] ?? '') === 'maintenance';
+$isUpdates = ($board->fields['type'] ?? '') === 'updates';
 
 $userId = (int) Session::getLoginUserID();
 $role = PluginTrallaBoard::roleFor($boards_id);
 $roleLabel = tralla_board_role_label($role);
-$canManageLists = PluginTrallaBoard::canAdminBoard($boards_id) && Session::haveRight('plugin_tralla', UPDATE);
-$canManageBoard = $canManageLists;
+$canManageLists = !$isUpdates && PluginTrallaBoard::canAdminBoard($boards_id) && Session::haveRight('plugin_tralla', UPDATE);
+$canManageBoard = PluginTrallaBoard::canAdminBoard($boards_id) && Session::haveRight('plugin_tralla', UPDATE);
 $canManageMembers = PluginTrallaBoard::canGovernBoard($boards_id) && Session::haveRight('plugin_tralla', UPDATE);
 $canViewDeleted = PluginTrallaBoard::canAdminBoard($boards_id);
 $canRestore = tralla_can_restore($role, Session::haveRight('plugin_tralla', UPDATE));
 $canCreateCard = PluginTrallaBoard::canOperateBoard($boards_id) && Session::haveRight('plugin_tralla', CREATE);
-$canMoveCard = PluginTrallaBoard::canOperateBoard($boards_id) && Session::haveRight('plugin_tralla', UPDATE) && !$isMaintenance;
+$canMoveCard = PluginTrallaBoard::canOperateBoard($boards_id) && Session::haveRight('plugin_tralla', UPDATE) && !$isMaintenance && !$isUpdates;
 $canApprove = PluginTrallaCard::userIsApprover($userId, $boards_id);
 
 $boardState = tralla_board_state($boards_id, $canApprove);
@@ -41,15 +42,18 @@ $bootstrap = [
         'id'             => (int) $boards_id,
         'name'           => (string) $board->fields['name'],
         'type'           => (string) $board->fields['type'],
-        'type_label'     => $isMaintenance ? 'Manutenção' : 'Normal',
+        'type_label'     => $isMaintenance ? 'Manutenção' : ($isUpdates ? 'Atualizações' : 'Normal'),
         'background'     => (string) $board->fields['background'],
         'color'          => (string) $board->fields['color'],
         'comment'        => (string) $board->fields['comment'],
         'is_maintenance' => $isMaintenance,
+        'is_updates'     => $isUpdates,
         'entities_id'    => (int) $board->fields['entities_id'],
         'role'           => $role,
         'role_label'     => $roleLabel,
         'can_defer_call' => PluginTrallaBoardUser::getRole($boards_id, $userId) === 'superadmin',
+        'can_rename_lists' => PluginTrallaBoardUser::getRole($boards_id, $userId) === 'superadmin'
+            && Session::haveRight('plugin_tralla', UPDATE),
     ],
     'lists' => array_map(static function (array $list): array {
         return [

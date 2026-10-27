@@ -5,6 +5,7 @@ if (!defined('GLPI_ROOT')) {
 
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/boarduser.class.php';
+require_once __DIR__ . '/file.class.php';
 
 /**
  * Quadro do Tralla.
@@ -73,6 +74,7 @@ class PluginTrallaBoard extends CommonDBTM
         return [
             'normal'      => 'Normal (listas e cards livres)',
             'maintenance' => 'Manutenção (fluxo controlado)',
+            'updates'     => 'Atualizações (tarefas e checklist)',
         ];
     }
 
@@ -86,6 +88,16 @@ class PluginTrallaBoard extends CommonDBTM
                 ['name' => 'Manutenção Retirada', 'category' => 'maintenance_withdrawal', 'color' => tralla_category_color('maintenance_withdrawal')],
                 ['name' => 'Manutenção Concluído', 'category' => 'maintenance_done', 'color' => tralla_category_color('maintenance_done')],
             ];
+        }
+
+        if ($type === 'updates') {
+            return array_map(static function (string $category): array {
+                return [
+                    'name' => tralla_category_label($category),
+                    'category' => $category,
+                    'color' => tralla_category_color($category),
+                ];
+            }, tralla_update_categories());
         }
 
         return [
@@ -160,6 +172,9 @@ class PluginTrallaBoard extends CommonDBTM
         $type = (string) ($this->fields['type'] ?? 'normal');
         $rank = 1000.0;
 
+        // O criador precisa ser membro antes da validação de acesso das listas padrão.
+        PluginTrallaBoardUser::addCreator($boardId, (int) Session::getLoginUserID());
+
         foreach (self::getDefaultLists($type) as $list) {
             $item = new PluginTrallaList();
             $item->add([
@@ -175,7 +190,6 @@ class PluginTrallaBoard extends CommonDBTM
             $rank += 1000.0;
         }
 
-        PluginTrallaBoardUser::addCreator($boardId, (int) Session::getLoginUserID());
     }
 
     public function cleanDBonPurge()
@@ -197,6 +211,7 @@ class PluginTrallaBoard extends CommonDBTM
         }
 
         if ($cardIds !== []) {
+            PluginTrallaFile::purgeForCards($cardIds);
             $DB->delete('glpi_plugin_tralla_machines', ['plugin_tralla_cards_id' => $cardIds]);
             $DB->delete('glpi_plugin_tralla_history', ['plugin_tralla_cards_id' => $cardIds]);
             $DB->delete('glpi_plugin_tralla_notifications', ['plugin_tralla_cards_id' => $cardIds]);
@@ -499,7 +514,7 @@ class PluginTrallaBoard extends CommonDBTM
             "SELECT COUNT(*) AS c, COALESCE(SUM(CRC32(CONCAT_WS('|', id, name, category, color, is_archived, rank, date_mod))), 0) AS s
                 FROM `glpi_plugin_tralla_lists`
                 WHERE `plugin_tralla_boards_id` = {$boardId}",
-            "SELECT COUNT(*) AS c, COALESCE(SUM(CRC32(CONCAT_WS('|', id, plugin_tralla_lists_id, name, description, status, stage, parent_cards_id, approval_cards_id, family_cards_id, code_root_cards_id, family_seq, split_from_cards_id, approval_kind, source, is_locked, is_archived, is_deleted, rank, users_id, technician_id, users_id_approver, machines_total, date_taken, date_finalized, date_approved, date_withdrawn, rejection_reason, date_mod))), 0) AS s
+            "SELECT COUNT(*) AS c, COALESCE(SUM(CRC32(CONCAT_WS('|', id, plugin_tralla_lists_id, name, description, update_mode, update_solution, update_observation, status, stage, parent_cards_id, approval_cards_id, family_cards_id, code_root_cards_id, family_seq, split_from_cards_id, approval_kind, source, is_locked, is_archived, is_deleted, rank, users_id, technician_id, users_id_approver, machines_total, date_taken, date_finalized, date_approved, date_withdrawn, rejection_reason, date_mod))), 0) AS s
                 FROM `glpi_plugin_tralla_cards`
                 WHERE `plugin_tralla_boards_id` = {$boardId}",
             "SELECT COUNT(*) AS c, COALESCE(SUM(CRC32(CONCAT_WS('|', m.id, m.plugin_tralla_cards_id, m.plugin_tralla_machine_models_id, m.label, m.serial, m.report, m.status, m.service_done, m.needs_inventory, m.inventory_items_id, m.rank, m.report_saved_at, m.date_mod))), 0) AS s
@@ -509,6 +524,14 @@ class PluginTrallaBoard extends CommonDBTM
             "SELECT COUNT(*) AS c, COALESCE(SUM(CRC32(CONCAT_WS('|', users_id, role, can_approve))), 0) AS s
                 FROM `glpi_plugin_tralla_boards_users`
                 WHERE `plugin_tralla_boards_id` = {$boardId}",
+            "SELECT COUNT(*) AS c, COALESCE(SUM(CRC32(CONCAT_WS('|', i.id, i.title, i.is_done, i.rank, i.date_mod))), 0) AS s
+                FROM `glpi_plugin_tralla_update_items` AS i
+                INNER JOIN `glpi_plugin_tralla_cards` AS c ON c.id = i.plugin_tralla_cards_id
+                WHERE c.plugin_tralla_boards_id = {$boardId}",
+            "SELECT COUNT(*) AS c, COALESCE(SUM(CRC32(CONCAT_WS('|', f.id, f.plugin_tralla_cards_id, f.plugin_tralla_update_items_id, f.original_name, f.file_size))), 0) AS s
+                FROM `glpi_plugin_tralla_files` AS f
+                INNER JOIN `glpi_plugin_tralla_cards` AS c ON c.id = f.plugin_tralla_cards_id
+                WHERE c.plugin_tralla_boards_id = {$boardId}",
         ];
 
         $parts = [];

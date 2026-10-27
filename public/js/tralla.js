@@ -40,8 +40,14 @@
         var groupFocus = document.querySelector('[data-group-create-focus]');
         if (groupFocus) {
             groupFocus.addEventListener('click', function () {
-                createGroup.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'end' });
-                createGroup.querySelector('[name="name"]').focus();
+                createGroup.hidden = !createGroup.hidden;
+                groupFocus.setAttribute('aria-expanded', createGroup.hidden ? 'false' : 'true');
+                if (!createGroup.hidden) {
+                    createGroup.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'end' });
+                    createGroup.querySelector('[name="name"]').focus();
+                } else {
+                    groupFocus.focus();
+                }
             });
         }
         createGroup.addEventListener('submit', function (event) {
@@ -553,6 +559,7 @@
     var searchClear = document.querySelector('[data-search-clear]');
     var searchCount = document.querySelector('[data-search-count]');
     var isMaintenance = !!state.board.is_maintenance;
+    var isUpdates = !!state.board.is_updates;
     var can = state.can || state.rights || {};
     var labels = state.labels || {};
     var activeCard = null;
@@ -588,14 +595,20 @@
         maintenance_in_progress: '#0079bf',
         maintenance_approval: '#c377e0',
         maintenance_withdrawal: '#f2d600',
-        maintenance_done: '#61bd4f'
+        maintenance_done: '#61bd4f',
+        update_future: '#7c8ba7',
+        update_pending: '#f59e0b',
+        update_in_progress: '#0284c7',
+        update_done: '#22a35a'
     };
 
     var addCardBlockedCategories = {
         maintenance_in_progress: true,
         maintenance_approval: true,
         maintenance_withdrawal: true,
-        maintenance_done: true
+        maintenance_done: true,
+        update_in_progress: true,
+        update_done: true
     };
 
     var statusClasses = {
@@ -605,7 +618,11 @@
         withdrawal: 'withdrawal',
         done: 'done',
         approved: 'done',
-        rejected: 'danger'
+        rejected: 'danger',
+        update_future: 'pending',
+        update_pending: 'pending',
+        update_in_progress: 'is-in-progress',
+        update_done: 'done'
     };
 
     var escapeMap = {
@@ -810,7 +827,9 @@
             if (value === undefined || value === null) {
                 return;
             }
-            if (typeof value === 'object') {
+            if (value instanceof Blob) {
+                formData.set(key, value, 'chunk.bin');
+            } else if (typeof value === 'object') {
                 formData.set(key, JSON.stringify(value));
             } else {
                 formData.set(key, String(value));
@@ -980,7 +999,7 @@
     }
 
     function statusPill(card) {
-        if (!isMaintenance) {
+        if (!isMaintenance && !isUpdates) {
             return '';
         }
         var label = card.status_label || labels.statuses[card.status] || card.status || '';
@@ -1162,7 +1181,7 @@
         var color = safeColor(list.color, palette[list.category] || palette['']);
         var actions = '';
 
-        if (can.manage_lists) {
+        if (can.manage_lists || (isUpdates && state.board.can_rename_lists)) {
             actions += '<button type="button" class="tralla-icon-btn" data-edit-list="' + listId + '" title="Editar lista">'
                 + '<i class="ti ti-pencil"></i></button>';
         }
@@ -1171,7 +1190,7 @@
                 + '<i class="ti ti-trash"></i></button>';
         }
 
-        var composerOpen = !isMaintenance && can.create_card && Number(inlineComposerListId) === listId;
+        var composerOpen = !isMaintenance && !isUpdates && can.create_card && Number(inlineComposerListId) === listId;
         var addCardBlocked = !!addCardBlockedCategories[list.category];
         var addCard = can.create_card && !composerOpen && !addCardBlocked
             ? '<button type="button" class="tralla-add-card" data-add-card="' + listId + '">'
@@ -1201,11 +1220,11 @@
         var cardId = Number(card.id);
         var departing = card._departing || null;
         var departingClass = departing ? ' is-departing' : '';
-        var canDrag = !isMaintenance && !!can.move_card && searchQuery === '' && !departing;
+        var canDrag = !isMaintenance && !isUpdates && !!can.move_card && searchQuery === '' && !departing;
         var machineCount = Number(card.machine_count || 0);
         var progress = card.progress || { total: machineCount, filled: 0, percent: 0 };
         var showProgress = isMaintenance && (machineCount > 0 || Number(progress.total) > 0);
-        var statusLabel = isMaintenance ? (card.status_label || labels.statuses[card.status] || '') : '';
+        var statusLabel = (isMaintenance || isUpdates) ? (card.status_label || labels.statuses[card.status] || '') : '';
         var statusClass = statusClasses[card.status] || '';
         var labelClass = approvalKindClass(card) || statusClass;
         var cardApprovalClass = Number(card.stage) === 2 ? approvalKindClass(card) : '';
@@ -1251,10 +1270,13 @@
         }
         badges += machineBadge + lock;
 
-        var takeButton = !departing && card.permissions && card.permissions.take
+        var takeButton = !departing && card.permissions && card.permissions.update_take
+            ? '<button type="button" class="tralla-card-take" data-update-take="' + cardId + '" title="Fazer esta atualização">'
+                + '<i class="ti ti-hand-stop" aria-hidden="true"></i> Fazer</button>'
+            : (!departing && card.permissions && card.permissions.take
             ? '<button type="button" class="tralla-card-take" data-card-take="' + cardId + '" title="Pegar para mim">'
                 + '<i class="ti ti-hand-stop" aria-hidden="true"></i> Pegar</button>'
-            : '';
+            : '');
         var termButton = card.assignature_term_url
             ? '<a class="tralla-card-term" href="' + attr(card.assignature_term_url) + '" target="_blank" rel="noopener noreferrer" title="Abrir termo assinado">'
                 + '<i class="ti ti-file-check" aria-hidden="true"></i> Termo assinado</a>'
@@ -1265,10 +1287,13 @@
             + '<span class="tralla-card-id-chip" title="ID do card: ' + attr(cardCode) + '">'
             + esc(cardCode) + '</span>'
             + (card.workflow_type === 'call' ? '<span class="tralla-card-call-badge">Chamado</span>' : '')
+            + (isUpdates ? '<span class="tralla-card-update-badge">'
+                + (card.update_mode === 'checklist' ? 'Checklist' : 'Descrição') + '</span>' : '')
             + (label || '<span class="tralla-card-top-spacer" aria-hidden="true"></span>')
             + '</div>';
 
         return '<article class="tralla-card' + (card.workflow_type === 'call' ? ' is-call' : '')
+            + (isUpdates ? ' is-update' : '')
             + (card.is_locked ? ' is-locked' : '') + (cardApprovalClass ? ' ' + cardApprovalClass : '') + departingClass
             + '" data-card-id="' + cardId + '"'
             + (canDrag ? ' draggable="true"' : '')
@@ -1276,6 +1301,10 @@
             + '<span class="tralla-card-edit" aria-hidden="true"><i class="ti ti-pencil"></i></span>'
             + cardTop
             + '<h4 class="tralla-card-title">' + esc(card.name) + '</h4>'
+            + (isUpdates && card.update_mode === 'checklist' && card.update_progress
+                ? '<div class="tralla-update-card-progress">'
+                    + Number(card.update_progress.done || 0) + '/' + Number(card.update_progress.total || 0)
+                    + ' itens</div>' : '')
             + ((badges || tech || takeButton)
                 ? '<div class="tralla-card-footer">'
                     + '<div class="tralla-card-badges">' + badges + '</div>'
@@ -1403,6 +1432,9 @@
         if (!modalRoot) {
             return;
         }
+        if (isUpdates && activeCard && modalRoot.querySelector('[data-update-text]')) {
+            flushUpdateText().catch(function (error) { toast(error.message, 'error'); });
+        }
         modalRoot.innerHTML = '';
         document.body.classList.remove('tralla-modal-open');
         activeCard = null;
@@ -1460,7 +1492,8 @@
         var rows = '';
         rows += metaRow('Código', card.code || ('#' + card.id));
         rows += metaRow('Lista', card.list_name);
-        rows += metaRow('Tipo', isMaintenance ? (card.workflow_type === 'call' ? 'Chamado' : 'Manutenção') : 'Normal');
+        rows += metaRow('Tipo', isUpdates ? (card.update_mode === 'checklist' ? 'Checklist' : 'Descrição')
+            : (isMaintenance ? (card.workflow_type === 'call' ? 'Chamado' : 'Manutenção') : 'Normal'));
         rows += metaRow('Responsável', card.technician_name || 'Não atribuído');
         rows += metaRow('Criado por', card.creator_name);
         rows += metaRow('Criado em', formatDate(card.date_creation));
@@ -1822,7 +1855,132 @@
             + '</span></a>';
     }
 
+    function fileSizeLabel(bytes) {
+        var size = Number(bytes) || 0;
+        if (size >= 1048576) { return (size / 1048576).toFixed(1).replace('.', ',') + ' MB'; }
+        if (size >= 1024) { return Math.ceil(size / 1024) + ' KB'; }
+        return size + ' B';
+    }
+
+    function renderCallFiles(card) {
+        if (!isMaintenance || card.workflow_type !== 'call') { return ''; }
+        var files = Array.isArray(card.call_files) ? card.call_files : [];
+        var rows = files.map(function (file) {
+            return '<div class="tralla-call-file-row">'
+                + '<i class="ti ti-paperclip" aria-hidden="true"></i>'
+                + '<span><a href="' + attr(file.url) + '">' + esc(file.name) + '</a>'
+                + '<small>' + esc(fileSizeLabel(file.size)) + ' · ' + esc(file.uploaded_by || '')
+                + ' · ' + esc(formatDate(file.date_creation)) + '</small></span>'
+                + (file.can_delete ? '<button type="button" class="tralla-icon-btn" data-call-file-delete="'
+                    + Number(file.id) + '" title="Remover arquivo" aria-label="Remover arquivo ' + attr(file.name) + '">'
+                    + '<i class="ti ti-trash"></i></button>' : '')
+                + '</div>';
+        }).join('');
+        var upload = card.permissions && card.permissions.upload_call_file
+            ? '<form id="tralla-call-file-form" class="tralla-call-file-form">'
+                + '<label for="tralla-call-file-input">Vincular arquivos (até 100 MB cada)</label>'
+                + '<input id="tralla-call-file-input" type="file" name="files" multiple required>'
+                + '<button type="submit" class="tralla-btn tralla-btn-primary"><i class="ti ti-upload"></i> Enviar arquivos</button>'
+                + '<div class="tralla-call-file-progress" role="status" hidden></div>'
+                + '</form>' : '';
+        return '<section class="tralla-detail-section tralla-call-files">'
+            + '<h3><i class="ti ti-paperclip"></i> Arquivos vinculados</h3>'
+            + (rows || '<p class="tralla-empty-mini">Nenhum arquivo vinculado.</p>')
+            + upload + '</section>';
+    }
+
+    function renderUpdateFileRows(files) {
+        return (files || []).map(function (file) {
+            return '<div class="tralla-call-file-row"><i class="ti ti-paperclip" aria-hidden="true"></i>'
+                + '<span><a href="' + attr(file.url) + '">' + esc(file.name) + '</a>'
+                + '<small>' + esc(fileSizeLabel(file.size)) + ' · ' + esc(file.uploaded_by || '') + '</small></span>'
+                + (file.can_delete ? '<button type="button" class="tralla-icon-btn" data-call-file-delete="'
+                    + Number(file.id) + '" aria-label="Remover arquivo ' + attr(file.name) + '">'
+                    + '<i class="ti ti-trash"></i></button>' : '') + '</div>';
+        }).join('');
+    }
+
+    function renderUpdateUpload(card, itemId, count) {
+        if (!card.permissions || !card.permissions.upload_update_file) { return ''; }
+        if (itemId && count >= 10) { return '<small>Limite de 10 arquivos neste item.</small>'; }
+        return '<form class="tralla-call-file-form tralla-update-file-form" data-update-item-id="'
+            + Number(itemId || 0) + '">'
+            + '<label>Anexar arquivos (até 100 MB cada' + (itemId ? ', 10 por item' : '') + ')</label>'
+            + '<input type="file" name="files" multiple required>'
+            + '<button type="submit" class="tralla-btn tralla-btn-ghost"><i class="ti ti-upload"></i> Enviar</button>'
+            + '<div class="tralla-call-file-progress" role="status" hidden></div></form>';
+    }
+
+    function renderUpdateModal(card) {
+        var p = card.permissions || {};
+        var files = Array.isArray(card.update_files) ? card.update_files : [];
+        var body = '';
+        if (card.update_mode === 'description') {
+            body += '<section class="tralla-detail-section"><h3><i class="ti ti-file-text"></i> Descrição</h3>';
+            body += p.update_edit_brief
+                ? '<div class="tralla-field"><label>O que precisa ser feito</label><textarea rows="7" maxlength="200000"'
+                    + ' data-update-text="description">' + esc(card.description || '') + '</textarea>'
+                    + '<small>Salvo automaticamente enquanto você digita.</small></div>'
+                : '<div class="tralla-detail-description">' + (card.description ? esc(card.description)
+                    : '<span class="tralla-empty-mini">Sem descrição.</span>') + '</div>';
+            body += renderUpdateFileRows(files.filter(function (file) { return !Number(file.item_id); }))
+                + renderUpdateUpload(card, 0, 0) + '</section>';
+            if (card.status === 'update_in_progress' || card.status === 'update_done') {
+                body += '<section class="tralla-detail-section"><h3><i class="ti ti-bulb"></i> Solução</h3>'
+                    + (p.update_edit_work
+                        ? '<div class="tralla-field"><label>Descreva a solução</label><textarea rows="7" maxlength="200000"'
+                            + ' data-update-text="update_solution">' + esc(card.update_solution || '') + '</textarea>'
+                            + '<small>Salvo automaticamente enquanto você digita.</small></div>'
+                        : '<div class="tralla-detail-description">' + (card.update_solution ? esc(card.update_solution)
+                            : '<span class="tralla-empty-mini">Solução não registrada.</span>') + '</div>') + '</section>';
+            }
+        } else {
+            var items = Array.isArray(card.update_items) ? card.update_items : [];
+            body += '<section class="tralla-detail-section"><h3><i class="ti ti-list-check"></i> Checklist</h3>';
+            body += items.length ? items.map(function (item) {
+                var itemFiles = files.filter(function (file) { return Number(file.item_id) === Number(item.id); });
+                return '<div class="tralla-update-item" data-update-item="' + Number(item.id) + '">'
+                    + '<label class="tralla-update-item-title"><input type="checkbox" data-update-toggle="'
+                    + Number(item.id) + '"' + (item.is_done ? ' checked' : '')
+                    + (p.update_edit_work ? '' : ' disabled') + '><strong>' + esc(item.title) + '</strong></label>'
+                    + ((p.update_edit_brief || p.update_edit_work)
+                        ? '<button type="button" class="tralla-icon-btn" data-update-rename="' + Number(item.id)
+                            + '" title="Renomear item"><i class="ti ti-pencil"></i></button>'
+                            + '<button type="button" class="tralla-icon-btn" data-update-delete="' + Number(item.id)
+                            + '" title="Excluir item"><i class="ti ti-trash"></i></button>' : '')
+                    + '<div class="tralla-update-item-files">' + renderUpdateFileRows(itemFiles)
+                    + renderUpdateUpload(card, Number(item.id), itemFiles.length) + '</div></div>';
+            }).join('') : '<p class="tralla-empty-mini">Nenhum item na checklist.</p>';
+            if (p.update_edit_brief || p.update_edit_work) {
+                body += '<form id="tralla-update-add-item" class="tralla-update-add-item">'
+                    + '<input name="title" type="text" maxlength="500" placeholder="Novo item da checklist" required>'
+                    + '<button type="submit" class="tralla-btn tralla-btn-ghost"><i class="ti ti-plus"></i> Adicionar</button></form>';
+            }
+            body += '</section>';
+            if (card.status === 'update_in_progress' || card.status === 'update_done') {
+                body += '<section class="tralla-detail-section"><h3><i class="ti ti-note"></i> Observação final (opcional)</h3>'
+                    + (p.update_edit_work
+                        ? '<textarea rows="5" maxlength="200000" data-update-text="update_observation"'
+                            + ' placeholder="Acrescente uma observação, se quiser...">'
+                            + esc(card.update_observation || '') + '</textarea><small>Salvo automaticamente.</small>'
+                        : '<div class="tralla-detail-description">' + (card.update_observation ? esc(card.update_observation)
+                            : '<span class="tralla-empty-mini">Sem observação.</span>') + '</div>') + '</section>';
+            }
+        }
+        body += renderHistory(card);
+        var actions = '';
+        if (p.update_schedule) { actions += '<button type="button" class="tralla-btn tralla-btn-primary" data-update-transition="schedule">Mover para Pendente</button>'; }
+        if (p.update_take) { actions += '<button type="button" class="tralla-btn tralla-btn-primary" data-update-transition="take">Fazer</button>'; }
+        if (p.update_finish) { actions += '<button type="button" class="tralla-btn tralla-btn-primary" data-update-transition="finish">Finalizar</button>'; }
+        var side = renderSideMeta(card) + '<div class="tralla-card"><h3>Ações</h3><div class="tralla-form">'
+            + (actions || '<p class="tralla-muted">Nenhuma ação disponível neste estado.</p>') + '</div></div>';
+        showModal(detailHeader(card) + '<div class="tralla-modal-body"><div class="tralla-detail-grid">'
+            + '<div class="tralla-detail-main">' + body + '</div>'
+            + '<aside class="tralla-detail-side">' + side + '</aside></div></div>', true);
+    }
+
     function renderCardModal(card) {
+        if (isUpdates) { renderUpdateModal(card); return; }
         var permissions = card.permissions || {};
         var body = '';
 
@@ -1868,6 +2026,7 @@
             body += renderMachines(card);
         }
 
+        body += renderCallFiles(card);
         body += renderAssignature(card);
         body += renderHistory(card);
 
@@ -1880,9 +2039,97 @@
 
     async function openCard(id) {
         try {
+            if (isUpdates && activeCard && Number(activeCard.id) !== Number(id)) {
+                await flushUpdateText();
+            }
             var card = await api('card_get', { id: id });
             activeCard = card;
             renderCardModal(card);
+        } catch (error) {
+            toast(error.message, 'error');
+        }
+    }
+
+    async function uploadCallFiles(form) {
+        if (!activeCard || !['call', 'update'].includes(activeCard.workflow_type)) { return; }
+        var cardId = Number(activeCard.id);
+        var itemId = Number(form.dataset.updateItemId || 0);
+        var input = form.querySelector('input[type="file"]');
+        var files = Array.prototype.slice.call(input && input.files ? input.files : []);
+        if (!files.length) { toast('Selecione ao menos um arquivo.', 'error'); return; }
+        var maxSize = 104857600;
+        if (files.some(function (file) { return file.size < 1 || file.size > maxSize; })) {
+            toast('Cada arquivo deve ter até 100 MB e não pode estar vazio.', 'error');
+            return;
+        }
+        if (itemId && activeCard.workflow_type === 'update') {
+            var alreadyAttached = (activeCard.update_files || []).filter(function (file) {
+                return Number(file.item_id) === itemId;
+            }).length;
+            if (alreadyAttached + files.length > 10) {
+                toast('Cada item da checklist aceita até 10 arquivos.', 'error');
+                return;
+            }
+        }
+        var button = form.querySelector('button[type="submit"]');
+        var progress = form.querySelector('.tralla-call-file-progress');
+        var chunkSize = 1048576;
+        var total = files.reduce(function (sum, file) { return sum + file.size; }, 0);
+        var sent = 0;
+        var uploaded = 0;
+        setBusy(button, true);
+        progress.hidden = false;
+        try {
+            for (var f = 0; f < files.length; f++) {
+                var file = files[f];
+                var random = crypto.getRandomValues(new Uint8Array(16));
+                var uploadId = Array.prototype.map.call(random, function (byte) {
+                    return byte.toString(16).padStart(2, '0');
+                }).join('');
+                var count = Math.ceil(file.size / chunkSize);
+                for (var index = 0; index < count; index++) {
+                    var start = index * chunkSize;
+                    var chunk = file.slice(start, Math.min(start + chunkSize, file.size));
+                    await api('call_file_chunk', {
+                        id: cardId, upload_id: uploadId, index: index, count: count,
+                        file_size: file.size, file_name: file.name, file: chunk, item_id: itemId
+                    });
+                    sent += chunk.size;
+                    progress.textContent = 'Enviando ' + file.name + ' · ' + Math.round(sent / total * 100) + '%';
+                }
+                uploaded++;
+            }
+            await refreshState();
+            await openCard(cardId);
+            toast(uploaded === 1 ? 'Arquivo vinculado.' : uploaded + ' arquivos vinculados.', 'success');
+        } catch (error) {
+            toast(error.message, 'error');
+            if (uploaded > 0) {
+                await refreshState();
+                await openCard(cardId);
+            } else {
+                setBusy(button, false);
+                progress.hidden = true;
+            }
+        }
+    }
+
+    async function deleteCallFile(fileId) {
+        if (!activeCard) { return; }
+        var cardId = Number(activeCard.id);
+        var confirmed = await confirmDialog({
+            title: 'Remover arquivo',
+            message: 'Remover este arquivo vinculado ao card?',
+            icon: 'ti-trash',
+            tone: 'danger',
+            confirmLabel: 'Remover arquivo'
+        });
+        if (!confirmed) { return; }
+        try {
+            var data = await api('call_file_delete', { file_id: fileId });
+            applyState(data);
+            await openCard(cardId);
+            toast('Arquivo removido.', 'success');
         } catch (error) {
             toast(error.message, 'error');
         }
@@ -3212,11 +3459,141 @@
             + '</div></form>';
     }
 
+    function openCreateUpdateCard(list) {
+        if (addCardBlockedCategories[list.category]) { return; }
+        showModal('<form id="tralla-create-update-form" class="tralla-form" data-list-id="'
+            + Number(list.id) + '">'
+            + '<div class="tralla-modal-head"><div><h2><i class="ti ti-refresh"></i> Nova atualização</h2>'
+            + '<p>' + esc(list.name) + '</p></div>' + modalCloseButton() + '</div>'
+            + '<div class="tralla-modal-body">'
+            + '<div class="tralla-field"><label for="tralla-update-title">Título *</label>'
+            + '<input id="tralla-update-title" name="name" type="text" maxlength="255" required autofocus></div>'
+            + '<fieldset class="tralla-card-workflow-choice"><legend>Como deseja organizar?</legend>'
+            + '<div class="tralla-card-workflow-options">'
+            + '<label class="tralla-card-workflow-option"><input type="radio" name="mode" value="description" checked>'
+            + '<span><i class="ti ti-file-text"></i><strong>Descrição</strong><small>Explique a atualização em texto e anexe arquivos depois</small></span></label>'
+            + '<label class="tralla-card-workflow-option"><input type="radio" name="mode" value="checklist">'
+            + '<span><i class="ti ti-list-check"></i><strong>Checklist</strong><small>Adicione itens e arquivos a cada etapa</small></span></label>'
+            + '</div></fieldset>'
+            + '<div class="tralla-field" data-update-description><label for="tralla-update-description">Descrição</label>'
+            + '<textarea id="tralla-update-description" name="description" rows="7" maxlength="200000"'
+            + ' placeholder="Descreva a situação ou o que precisa ser atualizado..."></textarea></div>'
+            + '<div class="tralla-field" data-update-checklist hidden><label>Itens da checklist</label>'
+            + '<div id="tralla-update-create-items"><input type="text" maxlength="500" placeholder="Primeiro item"></div>'
+            + '<button type="button" class="tralla-btn tralla-btn-ghost" data-update-add-create-item>'
+            + '<i class="ti ti-plus"></i> Adicionar item</button>'
+            + '<small>Você poderá adicionar outros itens e anexar até 10 arquivos por item após criar o card.</small></div>'
+            + '</div><div class="tralla-modal-actions">'
+            + '<button type="button" class="tralla-btn tralla-btn-ghost" data-tralla-close>Cancelar</button>'
+            + '<button type="submit" class="tralla-btn tralla-btn-primary">Criar card</button></div></form>');
+    }
+
+    async function submitCreateUpdate(form) {
+        var name = form.querySelector('[name="name"]').value.trim();
+        var mode = form.querySelector('[name="mode"]:checked').value;
+        var items = Array.prototype.map.call(form.querySelectorAll('#tralla-update-create-items input'),
+            function (input) { return input.value.trim(); }).filter(Boolean);
+        if (!name) { toast('Informe o título da atualização.', 'error'); return; }
+        var button = form.querySelector('button[type="submit"]');
+        setBusy(button, true);
+        try {
+            var data = await api('update_create', {
+                boards_id: state.board.id, list_id: Number(form.dataset.listId), name: name,
+                mode: mode, description: form.querySelector('[name="description"]').value,
+                items: mode === 'checklist' ? items : []
+            });
+            closeModal();
+            applyState(data);
+            toast('Atualização criada.', 'success');
+            await openCard(data.card.id);
+        } catch (error) {
+            toast(error.message, 'error');
+            setBusy(button, false);
+        }
+    }
+
+    var updateTextTimers = {};
+    var updateTextQueue = Promise.resolve();
+
+    function queueUpdateText(input) {
+        var field = input.dataset.updateText;
+        if (!activeCard || !field) { return; }
+        var id = Number(activeCard.id);
+        var value = input.value;
+        input.dataset.saveState = 'Salvando...';
+        window.clearTimeout(updateTextTimers[field]);
+        updateTextTimers[field] = window.setTimeout(function () {
+            delete updateTextTimers[field];
+            updateTextQueue = updateTextQueue.catch(function () { }).then(async function () {
+                var data = await api('update_text', { id: id, field: field, value: value });
+                if (activeCard && Number(activeCard.id) === id) {
+                    activeCard[field] = data.card[field];
+                    input.dataset.saveState = 'Salvo';
+                }
+                applyState(data);
+            }).catch(function (error) {
+                input.dataset.saveState = 'Falha ao salvar';
+                toast(error.message, 'error');
+            });
+        }, 600);
+    }
+
+    async function flushUpdateText() {
+        Object.keys(updateTextTimers).forEach(function (field) {
+            window.clearTimeout(updateTextTimers[field]);
+            delete updateTextTimers[field];
+        });
+        if (!activeCard) { return; }
+        var card = activeCard;
+        var id = Number(card.id);
+        var inputs = Array.prototype.slice.call(modalRoot.querySelectorAll('[data-update-text]'));
+        await updateTextQueue;
+        for (var i = 0; i < inputs.length; i++) {
+            var input = inputs[i];
+            if (input.value !== String(card[input.dataset.updateText] || '')) {
+                var data = await api('update_text', { id: id, field: input.dataset.updateText, value: input.value });
+                card[input.dataset.updateText] = data.card[input.dataset.updateText];
+                applyState(data);
+            }
+        }
+    }
+
+    async function updateTransition(action, cardId) {
+        var id = Number(cardId || (activeCard && activeCard.id));
+        if (!id) { return; }
+        try {
+            if (activeCard && Number(activeCard.id) === id) { await flushUpdateText(); }
+            var data = await api('update_transition', { id: id, transition: action });
+            applyState(data);
+            if (activeCard && Number(activeCard.id) === id) { await openCard(id); }
+            toast(action === 'take' ? 'Atualização assumida.'
+                : (action === 'schedule' ? 'Movida para Pendente.' : 'Atualização concluída.'), 'success');
+        } catch (error) { toast(error.message, 'error'); }
+    }
+
+    async function updateItem(action, itemId, title) {
+        if (!activeCard) { return; }
+        var id = Number(activeCard.id);
+        try {
+            await flushUpdateText();
+            var data = await api('update_item', {
+                id: id, item_id: Number(itemId || 0), item_action: action, title: title || ''
+            });
+            applyState(data);
+            await openCard(id);
+        } catch (error) { toast(error.message, 'error'); }
+    }
+
     function openCreateCard(listId) {
         var list = state.lists.find(function (item) {
             return Number(item.id) === Number(listId);
         });
         if (!list) {
+            return;
+        }
+
+        if (isUpdates) {
+            openCreateUpdateCard(list);
             return;
         }
 
@@ -3444,7 +3821,11 @@
             + '<div class="tralla-modal-body">'
             + '<div class="tralla-field"><label for="tralla-list-name">Nome da lista *</label>'
             + '<input id="tralla-list-name" type="text" name="name" maxlength="255" required autofocus value="'
-            + attr(existing ? existing.name : '') + '"></div>'
+            + attr(existing ? existing.name : '') + '"'
+            + (existing && !(state.board && state.board.can_rename_lists) ? ' readonly' : '') + '>'
+            + (existing && !(state.board && state.board.can_rename_lists)
+                ? '<small>Somente SuperAdmin deste quadro pode alterar o título da lista.</small>' : '')
+            + '</div>'
             + categoryField
             + '<div class="tralla-field"><label for="tralla-list-color">Cor</label>'
             + '<input id="tralla-list-color" type="color" name="color" value="' + attr(color) + '"></div>'
@@ -3590,6 +3971,14 @@
             return;
         }
 
+        var updateTakeButton = event.target.closest('[data-update-take]');
+        if (updateTakeButton) {
+            event.preventDefault();
+            event.stopPropagation();
+            updateTransition('take', Number(updateTakeButton.dataset.updateTake));
+            return;
+        }
+
         if (event.target.closest('.tralla-card-term')) {
             event.stopPropagation();
             return;
@@ -3604,7 +3993,7 @@
         if (event.key !== 'Enter' && event.key !== ' ') {
             return;
         }
-        if (event.target.closest('[data-card-take], .tralla-card-term')) {
+        if (event.target.closest('[data-card-take], [data-update-take], .tralla-card-term')) {
             return;
         }
         var cardElement = event.target.closest('.tralla-card');
@@ -3751,6 +4140,48 @@
             return;
         }
 
+        var deleteFileButton = event.target.closest('[data-call-file-delete]');
+        if (deleteFileButton) {
+            event.preventDefault();
+            deleteCallFile(Number(deleteFileButton.dataset.callFileDelete));
+            return;
+        }
+
+        var transitionButton = event.target.closest('[data-update-transition]');
+        if (transitionButton) {
+            updateTransition(transitionButton.dataset.updateTransition);
+            return;
+        }
+        if (event.target.closest('[data-update-add-create-item]')) {
+            var itemList = modalRoot.querySelector('#tralla-update-create-items');
+            if (itemList) {
+                itemList.insertAdjacentHTML('beforeend', '<input type="text" maxlength="500" placeholder="Novo item">');
+                itemList.lastElementChild.focus();
+            }
+            return;
+        }
+        var renameItemButton = event.target.closest('[data-update-rename]');
+        if (renameItemButton && activeCard) {
+            var renameId = Number(renameItemButton.dataset.updateRename);
+            var renameItem = (activeCard.update_items || []).find(function (item) { return Number(item.id) === renameId; });
+            if (renameItem) {
+                promptDialog({ title: 'Renomear item', label: 'Título', value: renameItem.title,
+                    icon: 'ti-pencil', required: true, confirmLabel: 'Salvar' }).then(function (title) {
+                    if (title !== null) { updateItem('rename', renameId, title); }
+                });
+            }
+            return;
+        }
+        var deleteItemButton = event.target.closest('[data-update-delete]');
+        if (deleteItemButton) {
+            var deleteId = Number(deleteItemButton.dataset.updateDelete);
+            confirmDialog({ title: 'Excluir item', message: 'Excluir este item da checklist?',
+                icon: 'ti-trash', tone: 'danger', confirmLabel: 'Excluir' }).then(function (ok) {
+                    if (ok) { updateItem('delete', deleteId); }
+                });
+            return;
+        }
+
         var saveButton = event.target.closest('[data-save-card]');
         if (saveButton) {
             saveCard(saveButton);
@@ -3854,6 +4285,25 @@
     modalRoot.addEventListener('submit', function (event) {
         var form = event.target;
 
+        if (form.id === 'tralla-call-file-form' || form.classList.contains('tralla-update-file-form')) {
+            event.preventDefault();
+            uploadCallFiles(form);
+            return;
+        }
+
+        if (form.id === 'tralla-create-update-form') {
+            event.preventDefault();
+            submitCreateUpdate(form);
+            return;
+        }
+
+        if (form.id === 'tralla-update-add-item') {
+            event.preventDefault();
+            var title = form.querySelector('[name="title"]').value.trim();
+            if (title) { updateItem('add', 0, title); }
+            return;
+        }
+
         if (form.id === 'tralla-split-form') {
             event.preventDefault();
             submitSplitCard(form);
@@ -3899,6 +4349,10 @@
     });
 
     modalRoot.addEventListener('input', function (event) {
+        if (event.target.matches('[data-update-text]')) {
+            queueUpdateText(event.target);
+            return;
+        }
         var createRow = event.target.closest('[data-create-machine]');
         if (createRow) {
             updateCreateMachineSummary(createRow);
@@ -3919,6 +4373,17 @@
     });
 
     modalRoot.addEventListener('change', async function (event) {
+        if (event.target.matches('#tralla-create-update-form [name="mode"]')) {
+            var createUpdateForm = event.target.closest('form');
+            var checklistMode = event.target.value === 'checklist';
+            createUpdateForm.querySelector('[data-update-description]').hidden = checklistMode;
+            createUpdateForm.querySelector('[data-update-checklist]').hidden = !checklistMode;
+            return;
+        }
+        if (event.target.matches('[data-update-toggle]')) {
+            updateItem('toggle', Number(event.target.dataset.updateToggle));
+            return;
+        }
         if (event.target.matches('[data-select-all-machines]')) {
             var checked = event.target.checked;
             Array.prototype.forEach.call(modalRoot.querySelectorAll('[data-select-machine]'), function (checkbox) {

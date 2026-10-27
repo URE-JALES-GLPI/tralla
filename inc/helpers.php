@@ -33,6 +33,10 @@ if (!function_exists('tralla_category_labels')) {
             'maintenance_approval'  => 'Manutenção Aprovação',
             'maintenance_withdrawal' => 'Manutenção Retirada',
             'maintenance_done'      => 'Manutenção Concluído',
+            'update_future'         => 'Atualização Futura',
+            'update_pending'        => 'Atualização Pendente',
+            'update_in_progress'    => 'Atualização Em Andamento',
+            'update_done'           => 'Atualização Concluído',
         ];
     }
 }
@@ -57,6 +61,13 @@ if (!function_exists('tralla_is_maintenance_category')) {
     }
 }
 
+if (!function_exists('tralla_update_categories')) {
+    function tralla_update_categories(): array
+    {
+        return ['update_future', 'update_pending', 'update_in_progress', 'update_done'];
+    }
+}
+
 if (!function_exists('tralla_category_label')) {
     function tralla_category_label(string $category): string
     {
@@ -76,6 +87,10 @@ if (!function_exists('tralla_category_colors')) {
             'maintenance_approval'   => '#c377e0',
             'maintenance_withdrawal' => '#f2d600',
             'maintenance_done'       => '#61bd4f',
+            'update_future'          => '#7c8ba7',
+            'update_pending'         => '#f59e0b',
+            'update_in_progress'     => '#0284c7',
+            'update_done'            => '#22a35a',
         ];
     }
 }
@@ -102,6 +117,10 @@ if (!function_exists('tralla_status_labels')) {
             'done'             => 'Concluído',
             'approved'         => 'Aprovado',
             'rejected'         => 'Reprovado',
+            'update_future'    => 'Futura',
+            'update_pending'   => 'Pendente',
+            'update_in_progress' => 'Em andamento',
+            'update_done'      => 'Concluído',
         ];
     }
 }

@@ -126,6 +126,9 @@ try {
         case 'list_add':
             tralla_ajax_require(CREATE);
             $boards_id = tralla_post_int('boards_id');
+            if (PluginTrallaCard::getBoardType($boards_id) === 'updates') {
+                throw new RuntimeException('As listas do quadro Atualizações são fixas.');
+            }
             if (!PluginTrallaBoard::canViewBoard($boards_id)) {
                 throw new RuntimeException('Quadro sem acesso.');
             }
@@ -182,7 +185,7 @@ try {
                 throw new RuntimeException('Lista não encontrada.');
             }
             if ((string) $list['category'] !== '') {
-                throw new RuntimeException('Listas do fluxo de manutenção não podem ser excluídas.');
+                throw new RuntimeException('Listas de fluxo não podem ser excluídas.');
             }
             $cardCount = countElementsInTable('glpi_plugin_tralla_cards', [
                 'plugin_tralla_lists_id' => $listId,
@@ -198,6 +201,9 @@ try {
         case 'list_reorder':
             tralla_ajax_require(UPDATE);
             $boards_id = tralla_post_int('boards_id');
+            if (PluginTrallaCard::getBoardType($boards_id) === 'updates') {
+                throw new RuntimeException('A ordem das listas de Atualizações é fixa.');
+            }
             if (!PluginTrallaBoard::canViewBoard($boards_id)) {
                 throw new RuntimeException('Quadro sem acesso.');
             }
@@ -249,6 +255,46 @@ try {
                 ],
             ]);
 
+        case 'update_create':
+            tralla_ajax_require(CREATE);
+            $boards_id = tralla_post_int('boards_id');
+            $items = json_decode(tralla_post_string('items', '[]'), true);
+            $detail = PluginTrallaUpdate::create(
+                $boards_id, tralla_post_int('list_id'), tralla_post_string('name'),
+                tralla_post_string('mode'), tralla_post_string('description'),
+                is_array($items) ? $items : [], $userId
+            );
+            tralla_json(['ok' => true, 'data' => [
+                'card' => $detail, 'state' => tralla_ajax_state($boards_id),
+            ]]);
+
+        case 'update_transition':
+            tralla_ajax_require(UPDATE);
+            $detail = PluginTrallaUpdate::transition(tralla_post_int('id'),
+                tralla_post_string('transition'), $userId);
+            tralla_json(['ok' => true, 'data' => [
+                'card' => $detail,
+                'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id']),
+            ]]);
+
+        case 'update_text':
+            tralla_ajax_require(UPDATE);
+            $detail = PluginTrallaUpdate::saveText(tralla_post_int('id'),
+                tralla_post_string('field'), tralla_post_string('value'), $userId);
+            tralla_json(['ok' => true, 'data' => [
+                'card' => $detail,
+                'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id']),
+            ]]);
+
+        case 'update_item':
+            tralla_ajax_require(UPDATE);
+            $detail = PluginTrallaUpdate::item(tralla_post_int('id'), tralla_post_int('item_id'),
+                tralla_post_string('item_action'), tralla_post_string('title'), $userId);
+            tralla_json(['ok' => true, 'data' => [
+                'card' => $detail,
+                'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id']),
+            ]]);
+
         case 'card_get':
             $cardId = tralla_post_int('id');
             tralla_json(['ok' => true, 'data' => PluginTrallaCard::getCardDetail($cardId, $userId)]);
@@ -265,6 +311,30 @@ try {
         case 'call_report_update':
             tralla_ajax_require(UPDATE);
             $detail = PluginTrallaCard::updateCallReport(tralla_post_int('id'), tralla_post_string('report'), $userId, $isAdmin);
+            tralla_json(['ok' => true, 'data' => [
+                'card' => $detail,
+                'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id']),
+            ]]);
+
+        case 'call_file_chunk':
+            tralla_ajax_require(UPDATE);
+            $result = PluginTrallaFile::uploadChunk(
+                tralla_post_int('id'),
+                $userId,
+                tralla_post_string('upload_id'),
+                tralla_post_int('index', -1),
+                tralla_post_int('count'),
+                tralla_post_int('file_size'),
+                tralla_post_string('file_name'),
+                (array) ($_FILES['file'] ?? []),
+                tralla_post_int('item_id')
+            );
+            tralla_json(['ok' => true, 'data' => $result]);
+
+        case 'call_file_delete':
+            tralla_ajax_require(UPDATE);
+            $cardId = PluginTrallaFile::delete(tralla_post_int('file_id'), $userId);
+            $detail = PluginTrallaCard::getCardDetail($cardId, $userId);
             tralla_json(['ok' => true, 'data' => [
                 'card' => $detail,
                 'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id']),

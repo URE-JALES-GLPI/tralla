@@ -19,7 +19,7 @@ function plugin_tralla_install(): bool
             CREATE TABLE `glpi_plugin_tralla_boards` (
                 `id`           INT {$sign} NOT NULL AUTO_INCREMENT,
                 `name`         VARCHAR(255) NOT NULL DEFAULT '',
-                `type`         VARCHAR(20)  NOT NULL DEFAULT 'normal' COMMENT 'normal|maintenance',
+                `type`         VARCHAR(20)  NOT NULL DEFAULT 'normal' COMMENT 'normal|maintenance|updates',
                 `color`        VARCHAR(20)  NOT NULL DEFAULT '#0079bf',
                 `background`   VARCHAR(40)  NOT NULL DEFAULT 'ocean',
                 `comment`      TEXT         DEFAULT NULL,
@@ -105,6 +105,9 @@ function plugin_tralla_install(): bool
                 `name`                    VARCHAR(255) NOT NULL DEFAULT '',
                 `description`             LONGTEXT     DEFAULT NULL,
                 `service_report`          LONGTEXT     DEFAULT NULL,
+                `update_mode`             VARCHAR(20) NOT NULL DEFAULT '',
+                `update_solution`         LONGTEXT DEFAULT NULL,
+                `update_observation`      LONGTEXT DEFAULT NULL,
                 `rank`                    DOUBLE       NOT NULL DEFAULT '0',
                 `users_id`                INT {$sign} NOT NULL DEFAULT '0',
                 `technician_id`           INT {$sign} NOT NULL DEFAULT '0',
@@ -161,6 +164,9 @@ function plugin_tralla_install(): bool
     // Colunas de exclusão em tabelas de cards já existentes.
     $cards_columns = [
         'service_report'              => 'LONGTEXT DEFAULT NULL',
+        'update_mode'                 => "VARCHAR(20) NOT NULL DEFAULT ''",
+        'update_solution'             => 'LONGTEXT DEFAULT NULL',
+        'update_observation'          => 'LONGTEXT DEFAULT NULL',
         'workflow_type'               => "VARCHAR(20) NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|call'",
         'is_deleted'                  => 'TINYINT(1)   NOT NULL DEFAULT 0',
         'approval_kind'               => "VARCHAR(20)  NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|deletion|edit|split|call_release'",
@@ -378,6 +384,41 @@ function plugin_tralla_install(): bool
         ") or die($DB->error());
     }
 
+    if (!$DB->tableExists('glpi_plugin_tralla_update_items')) {
+        $DB->doQuery("
+            CREATE TABLE `glpi_plugin_tralla_update_items` (
+                `id`                     INT {$sign} NOT NULL AUTO_INCREMENT,
+                `plugin_tralla_cards_id` INT {$sign} NOT NULL DEFAULT '0',
+                `title`                  VARCHAR(500) NOT NULL DEFAULT '',
+                `is_done`                TINYINT(1) NOT NULL DEFAULT '0',
+                `rank`                   DOUBLE NOT NULL DEFAULT '0',
+                `date_creation`          DATETIME DEFAULT NULL,
+                `date_mod`               DATETIME DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                KEY `plugin_tralla_cards_id` (`plugin_tralla_cards_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}
+        ") or die($DB->error());
+    }
+
+    if (!$DB->tableExists('glpi_plugin_tralla_files')) {
+        $DB->doQuery("
+            CREATE TABLE `glpi_plugin_tralla_files` (
+                `id`                     INT {$sign} NOT NULL AUTO_INCREMENT,
+                `plugin_tralla_cards_id` INT {$sign} NOT NULL DEFAULT '0',
+                `plugin_tralla_update_items_id` INT {$sign} NOT NULL DEFAULT '0',
+                `original_name`          VARCHAR(255) NOT NULL DEFAULT '',
+                `stored_name`            VARCHAR(40) NOT NULL DEFAULT '',
+                `file_size`              BIGINT UNSIGNED NOT NULL DEFAULT '0',
+                `users_id`               INT {$sign} NOT NULL DEFAULT '0',
+                `date_creation`          DATETIME DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                KEY `plugin_tralla_cards_id` (`plugin_tralla_cards_id`),
+                KEY `plugin_tralla_update_items_id` (`plugin_tralla_update_items_id`),
+                UNIQUE KEY `stored_name` (`stored_name`)
+            ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}
+        ") or die($DB->error());
+    }
+
     // Garante que o criador de cada quadro existente seja SuperAdmin.
     require_once __DIR__ . '/inc/boarduser.class.php';
     foreach ($DB->request([
@@ -466,6 +507,8 @@ function plugin_tralla_uninstall(): bool
     }
 
     $tables = [
+        'glpi_plugin_tralla_files',
+        'glpi_plugin_tralla_update_items',
         'glpi_plugin_tralla_notifications',
         'glpi_plugin_tralla_history',
         'glpi_plugin_tralla_machines',

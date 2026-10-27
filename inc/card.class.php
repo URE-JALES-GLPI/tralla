@@ -4,6 +4,8 @@ if (!defined('GLPI_ROOT')) {
 }
 
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/file.class.php';
+require_once __DIR__ . '/update.class.php';
 
 /**
  * Card do Tralla (normal ou manutenção).
@@ -127,6 +129,19 @@ class PluginTrallaCard extends CommonDBTM
         }
         $modelNames = PluginTrallaMachineModel::getModelNames(array_values($modelIds));
 
+        $updateProgress = [];
+        if ($boardType === 'updates') {
+            foreach ($DB->request([
+                'FROM' => 'glpi_plugin_tralla_update_items',
+                'WHERE' => ['plugin_tralla_cards_id' => $cardIds],
+            ]) as $item) {
+                $itemCardId = (int) $item['plugin_tralla_cards_id'];
+                $updateProgress[$itemCardId]['total'] = ($updateProgress[$itemCardId]['total'] ?? 0) + 1;
+                $updateProgress[$itemCardId]['done'] = ($updateProgress[$itemCardId]['done'] ?? 0)
+                    + (int) $item['is_done'];
+            }
+        }
+
         $lists = [];
         foreach (PluginTrallaList::getListsForBoard($boards_id) as $list) {
             $lists[(int) $list['id']] = $list;
@@ -205,6 +220,9 @@ class PluginTrallaCard extends CommonDBTM
             $card['machine_summary'] = PluginTrallaMachine::summarizeModels($machines, $modelNames);
             $card['progress'] = tralla_machines_progress($machines);
             $card['is_filled'] = tralla_all_machines_filled($machines);
+            if ($boardType === 'updates') {
+                $card['update_progress'] = $updateProgress[(int) $card['id']] ?? ['total' => 0, 'done' => 0];
+            }
             $card['permissions'] = self::permissionsFor($card, $boardType, $userId, $isAdmin);
             if ((int) $card['stage'] === 1) {
                 $root = self::familyRoot($card);
@@ -368,6 +386,30 @@ class PluginTrallaCard extends CommonDBTM
             ? PluginTrallaConfig::assignatureTermUrl($id)
             : '';
         $card['permissions'] = self::permissionsFor($card, $boardType, $userId, $isAdmin);
+        $card['update_items'] = [];
+        $card['update_files'] = [];
+        if ($boardType === 'updates' && (string) ($card['workflow_type'] ?? '') === 'update') {
+            $card['update_items'] = PluginTrallaUpdate::items($id);
+            $card['update_files'] = PluginTrallaFile::listForCard($id, $userId);
+            $card['permissions']['upload_update_file'] = PluginTrallaFile::canUpload($card, $userId);
+        }
+        $card['call_files'] = [];
+        $card['permissions']['upload_call_file'] = false;
+        if ($boardType === 'maintenance' && (string) ($card['workflow_type'] ?? '') === 'call') {
+            $fileCard = (int) $card['stage'] === 2 ? $parentCard : $card;
+            if (is_array($fileCard) && (int) ($fileCard['stage'] ?? 0) === 1) {
+                $fileCardId = (int) $fileCard['id'];
+                $card['call_files'] = PluginTrallaFile::listForCard($fileCardId, $userId);
+                if ((int) $card['stage'] === 2) {
+                    foreach ($card['call_files'] as &$callFile) {
+                        $callFile['can_delete'] = false;
+                    }
+                    unset($callFile);
+                }
+                $card['permissions']['upload_call_file'] = (int) $card['stage'] === 1
+                    && PluginTrallaFile::canUpload($card, $userId);
+            }
+        }
         if ((int) $card['stage'] === 1 && !empty($card['permissions']['split'])) {
             $root = self::familyRoot($card);
             if (count($machines) < 2 || !self::familyIsIdle($root)) {
@@ -392,6 +434,22 @@ class PluginTrallaCard extends CommonDBTM
             && (int) $card['technician_id'] === $userId;
         $canUpdate = Session::haveRight(self::$rightname, UPDATE);
         $isBoardAdmin = $isAdmin || tralla_role_at_least($role, 'admin');
+
+        if ($boardType === 'updates') {
+            $manager = $isBoardAdmin || (int) ($card['users_id'] ?? 0) === $userId;
+            $inProgressOwner = $status === 'update_in_progress' && $isTechnician;
+            return [
+                'view' => true,
+                'update_schedule' => $isMember && $canUpdate && $manager && $status === 'update_future',
+                'update_take' => $isMember && $canUpdate && $status === 'update_pending',
+                'update_finish' => $isMember && $canUpdate && $inProgressOwner,
+                'update_edit_brief' => $isMember && $canUpdate && $manager
+                    && in_array($status, ['update_future', 'update_pending'], true),
+                'update_edit_work' => $isMember && $canUpdate && $inProgressOwner,
+                'request_deletion' => false,
+                'move' => false,
+            ];
+        }
 
         $canEditMachines = $isMember
             && $boardType === 'maintenance'
@@ -521,6 +579,9 @@ class PluginTrallaCard extends CommonDBTM
         }
 
         $boardType = self::getBoardType($boards_id);
+        if ($boardType === 'updates') {
+            throw new RuntimeException('Use o fluxo de Atualizações para criar cards neste quadro.');
+        }
         $name = tralla_normalize_label($data['name'] ?? '');
         $workflowType = $boardType === 'maintenance' ? (string) ($data['workflow_type'] ?? 'maintenance') : 'maintenance';
         if (!in_array($workflowType, ['maintenance', 'call'], true)) {
@@ -792,6 +853,9 @@ class PluginTrallaCard extends CommonDBTM
         }
         self::assertBoardAccess($card);
         $boardType = self::getBoardType((int) $card['plugin_tralla_boards_id']);
+        if ($boardType === 'updates') {
+            throw new RuntimeException('Use os campos do fluxo de Atualizações para editar este card.');
+        }
         if ($boardType === 'maintenance') {
             $permissions = self::permissionsFor($card, $boardType, $userId, $isAdmin);
             if (empty($permissions['edit_card'])) {
@@ -3124,6 +3188,7 @@ class PluginTrallaCard extends CommonDBTM
             self::deleteCard($childId);
         }
 
+        PluginTrallaFile::purgeForCards([$id]);
         $DB->delete('glpi_plugin_tralla_machines', ['plugin_tralla_cards_id' => $id]);
         $DB->delete('glpi_plugin_tralla_history', ['plugin_tralla_cards_id' => $id]);
         $DB->delete('glpi_plugin_tralla_notifications', ['plugin_tralla_cards_id' => $id]);

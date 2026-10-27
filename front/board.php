@@ -96,7 +96,8 @@ $pluginUrl = $root . '/plugins/tralla';
                     <i class="ti ti-settings"></i> Configurações
                 </a>
             <?php endif; ?>
-            <button type="button" class="tralla-btn tralla-btn-ghost" data-group-create-focus>
+            <button type="button" class="tralla-btn tralla-btn-ghost" data-group-create-focus
+                    aria-controls="tralla-new-group-form" aria-expanded="false">
                 <i class="ti ti-layout-columns"></i> Novo grupo
             </button>
             <?php if ($canCreate): ?>
@@ -152,8 +153,8 @@ $pluginUrl = $root . '/plugins/tralla';
                     <a class="tralla-board-tile tr-bg-<?= tralla_h($background) ?>"
                        href="<?= tralla_h($pluginUrl) ?>/front/kanban.php?boards_id=<?= $boardId ?>">
                         <span class="tralla-board-type <?= $isMaintenance ? 'is-maintenance' : '' ?>">
-                            <i class="ti <?= $isMaintenance ? 'ti-tool' : 'ti-layout-kanban' ?>"></i>
-                            <?= $isMaintenance ? 'Manutenção' : 'Normal' ?>
+                            <i class="ti <?= $isMaintenance ? 'ti-tool' : ($type === 'updates' ? 'ti-refresh' : 'ti-layout-kanban') ?>"></i>
+                            <?= $isMaintenance ? 'Manutenção' : ($type === 'updates' ? 'Atualizações' : 'Normal') ?>
                         </span>
                         <h2><?= tralla_h($board['name']) ?></h2>
                         <?php if (trim((string) $board['comment']) !== ''): ?>
@@ -185,7 +186,7 @@ $pluginUrl = $root . '/plugins/tralla';
                 </div>
               </section>
             <?php endforeach; ?>
-            <form class="tralla-board-group-create" data-board-group-create>
+            <form id="tralla-new-group-form" class="tralla-board-group-create" data-board-group-create hidden>
                 <label for="tralla-new-group">Novo grupo</label>
                 <input id="tralla-new-group" name="name" type="text" maxlength="80" placeholder="Nome do grupo" required>
                 <button type="submit" class="tralla-btn tralla-btn-primary"><i class="ti ti-plus"></i> Criar grupo</button>
@@ -207,6 +208,11 @@ $typeMeta = [
         'title'       => 'Manutenção',
         'description' => 'Fluxo com aprovação, retirada e histórico.',
         'icon'        => 'ti-tool',
+    ],
+    'updates' => [
+        'title'       => 'Atualizações',
+        'description' => 'Tarefas com descrição ou checklist, responsáveis e arquivos.',
+        'icon'        => 'ti-refresh',
     ],
 ];
 $backgrounds = tralla_backgrounds();
