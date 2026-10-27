@@ -1802,8 +1802,9 @@
         }
 
         if (card.status === 'withdrawal' && Number(card.stage) === 1 && card.assignature_url) {
-            buttons += '<a class="tralla-btn tralla-btn-sign" href="' + attr(card.assignature_url)
-                + '" target="_blank" rel="noopener noreferrer"><i class="ti ti-signature"></i> Assinar</a>';
+            buttons += '<a class="tralla-btn tralla-btn-sign" data-withdrawal-action href="'
+                + attr(withdrawalBatchUrl(withdrawalSelectedCards()) || card.assignature_url)
+                + '" target="_blank" rel="noopener noreferrer"><i class="ti ti-signature"></i> <span data-withdrawal-action-label>Assinar</span></a>';
         }
 
         if (permissions.approve) {
@@ -2152,7 +2153,9 @@
         if (!card.assignature_url) {
             return '';
         }
-        return '<a class="tralla-assignature-link" href="' + attr(card.assignature_url) + '" target="_blank" rel="noopener noreferrer">'
+        return '<a class="tralla-assignature-link" data-withdrawal-action href="'
+            + attr(withdrawalBatchUrl(withdrawalSelectedCards()) || card.assignature_url)
+            + '" target="_blank" rel="noopener noreferrer">'
             + '<i class="ti ti-external-link"></i><span>'
             + (card.assignature_sent ? 'Abrir comprovante no Assignat-ure' : 'Assinar retirada no Assignat-ure')
             + '</span></a>';
@@ -2340,11 +2343,15 @@
 
     function syncWithdrawalSignButton(root) {
         var scope = root || document;
-        var button = scope.querySelector('[data-withdrawal-sign]');
-        if (!button) { return; }
         var count = withdrawalSelectedCards().length;
-        button.disabled = count === 0;
-        button.querySelector('[data-withdrawal-count]').textContent = String(count);
+        var url = withdrawalBatchUrl(withdrawalSelectedCards());
+        if (activeCard && activeCard.assignature_url) {
+            modalRoot.querySelectorAll('[data-withdrawal-action]').forEach(function (link) {
+                link.href = url || activeCard.assignature_url;
+                var label = link.querySelector('[data-withdrawal-action-label]');
+                if (label) { label.textContent = count > 1 ? 'Assinar (' + count + ')' : 'Assinar'; }
+            });
+        }
         var all = scope.querySelector('[data-withdrawal-select-all]');
         if (all) {
             var boxes = scope.querySelectorAll('[data-withdrawal-select]:not(:disabled)');
@@ -2363,23 +2370,13 @@
             nav.querySelectorAll('[data-withdrawal-select]:not(:disabled)').forEach(function (input) {
                 input.checked = all.checked;
                 withdrawalSelection[Number(input.value)] = all.checked;
+                input.closest('.tralla-withdrawal-pick').classList.toggle('is-selected', all.checked);
             });
         } else if (box) {
             withdrawalSelection[Number(box.value)] = box.checked;
+            box.closest('.tralla-withdrawal-pick').classList.toggle('is-selected', box.checked);
         }
         syncWithdrawalSignButton(nav);
-    });
-
-    document.addEventListener('click', function (event) {
-        var button = event.target.closest('[data-withdrawal-sign]');
-        if (!button || button.disabled) { return; }
-        event.preventDefault();
-        var url = withdrawalBatchUrl(withdrawalSelectedCards());
-        if (!url) {
-            toast('Configure a URL do Assignat-ure para assinar pelo Tralla.', 'error');
-            return;
-        }
-        window.open(url, '_blank', 'noopener');
     });
 
     function renderWithdrawalNavigation(card) {
@@ -2427,15 +2424,7 @@
                     + '<span class="tralla-approval-navigation-kind">'
                     + esc(item.machine_summary || ((item.machine_count || 0) + ' máquina(s)')) + '</span>'
                     + '</button></div>';
-            }).join('') + '</div>'
-            + (signable.length
-                ? '<div class="tralla-withdrawal-sign-bar">'
-                    + '<button type="button" class="tralla-btn tralla-btn-sign" data-withdrawal-sign' + (selectedCount ? '' : ' disabled') + '>'
-                    + '<i class="ti ti-signature" aria-hidden="true"></i> Assinar selecionados'
-                    + ' (<span data-withdrawal-count>' + selectedCount + '</span>)</button>'
-                    + '<small>Abre o Assignat-ure com os cards marcados para assinar de uma vez.</small></div>'
-                : '')
-            + '</nav>';
+            }).join('') + '</div></nav>';
     }
 
     function renderCardModal(card) {
@@ -2909,18 +2898,12 @@
                 }
             }
 
-            if (action === 'finalize') {
-                var pendingCount = (activeCard.machines || []).filter(function (machine) {
-                    return machine.status === 'pending';
-                }).length;
+            if (action === 'finalize' && activeCard.workflow_type === 'call') {
                 var finalizeConfirmed = await checkboxConfirmation({
-                    title: activeCard.workflow_type === 'call' ? 'Finalizar chamado' : 'Finalizar manutenção',
+                    title: 'Finalizar chamado',
                     message: 'Confira as informações antes de enviar este card para aprovação.',
                     card: activeCard,
-                    impact: activeCard.workflow_type === 'call'
-                        ? 'Após a aprovação, o chamado irá para Concluído.' : pendingCount > 0
-                        ? 'As máquinas concluídas ou inservíveis seguirão para aprovação. As ' + pendingCount + ' pendente(s) serão reunidas em um novo card.'
-                        : 'Após a aprovação, a manutenção seguirá para Retirada.',
+                    impact: 'Após a aprovação, o chamado irá para Concluído.',
                     icon: 'ti-checkup-list',
                     confirmLabel: 'Finalizar'
                 });
