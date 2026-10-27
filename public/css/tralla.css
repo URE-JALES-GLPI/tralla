@@ -4899,3 +4899,22 @@ body.tralla-modal-open {
 .tralla-sla-row.is-met em { color: var(--tr-success); }
 .tralla-sla-row.is-late_met { border-left-color: var(--tr-warning); }
 .tralla-sla-row.is-late_met em { color: var(--tr-warning); }
+
+/* Seleção de retiradas para assinar em lote (1.6.0) */
+.tralla-withdrawal-select-all {
+    align-items: center; color: var(--tr-text-soft); cursor: pointer; display: flex;
+    font-size: 12px; font-weight: 600; gap: 7px; padding: 0 6px;
+}
+.tralla-withdrawal-pick { align-items: stretch; display: flex; flex: 0 0 auto; gap: 6px; min-width: 0; }
+.tralla-withdrawal-pick .tralla-approval-navigation-item { flex: 1 1 auto; }
+.tralla-withdrawal-check { accent-color: var(--tr-primary); align-self: center; cursor: pointer; flex: none; height: 18px; margin: 0; width: 18px; }
+.tralla-withdrawal-check:disabled { cursor: not-allowed; opacity: .4; }
+.tralla-withdrawal-pick.is-selected .tralla-approval-navigation-item { border-color: var(--tr-primary); }
+.tralla-withdrawal-sign-bar {
+    border-top: 1px solid var(--tr-border); display: flex; flex-direction: column;
+    gap: 6px; margin-top: auto; padding: 12px 4px 0;
+}
+.tralla-withdrawal-sign-bar .tralla-btn { justify-content: center; width: 100%; }
+.tralla-withdrawal-sign-bar .tralla-btn:disabled { cursor: not-allowed; opacity: .55; }
+.tralla-withdrawal-sign-bar small { color: var(--tr-muted); font-size: 11px; line-height: 1.35; }
+@media (max-width: 900px) { .tralla-withdrawal-pick { flex-basis: 220px; } .tralla-withdrawal-pick .tralla-approval-navigation-item { flex-basis: auto; } .tralla-withdrawal-sign-bar { padding-top: 8px; } }

@@ -2243,6 +2243,75 @@
             }).join('') + '</div></nav>';
     }
 
+    var withdrawalSelection = {};
+
+    function withdrawalSelectedCards() {
+        return (state.cards || []).filter(function (item) {
+            return withdrawalSelection[Number(item.id)] && Number(item.stage) === 1
+                && item.status === 'withdrawal' && item.assignature_url;
+        });
+    }
+
+    function withdrawalBatchUrl(cards) {
+        if (!cards.length) { return ''; }
+        try {
+            var url = new URL(cards[0].assignature_url, window.location.href);
+            var refs = cards.map(function (item) {
+                return new URL(item.assignature_url, window.location.href).searchParams.get('card') || '';
+            }).filter(Boolean);
+            if (!refs.length) { return ''; }
+            url.searchParams.delete('card');
+            url.searchParams.set('cards', refs.join(','));
+            return url.toString();
+        } catch (error) {
+            return '';
+        }
+    }
+
+    function syncWithdrawalSignButton(root) {
+        var scope = root || document;
+        var button = scope.querySelector('[data-withdrawal-sign]');
+        if (!button) { return; }
+        var count = withdrawalSelectedCards().length;
+        button.disabled = count === 0;
+        button.querySelector('[data-withdrawal-count]').textContent = String(count);
+        var all = scope.querySelector('[data-withdrawal-select-all]');
+        if (all) {
+            var boxes = scope.querySelectorAll('[data-withdrawal-select]:not(:disabled)');
+            var checked = scope.querySelectorAll('[data-withdrawal-select]:checked');
+            all.checked = boxes.length > 0 && checked.length === boxes.length;
+            all.indeterminate = checked.length > 0 && checked.length < boxes.length;
+        }
+    }
+
+    document.addEventListener('change', function (event) {
+        var box = event.target.closest('[data-withdrawal-select]');
+        var all = event.target.closest('[data-withdrawal-select-all]');
+        if (!box && !all) { return; }
+        var nav = event.target.closest('.tralla-withdrawal-navigation');
+        if (all && nav) {
+            nav.querySelectorAll('[data-withdrawal-select]:not(:disabled)').forEach(function (input) {
+                input.checked = all.checked;
+                withdrawalSelection[Number(input.value)] = all.checked;
+            });
+        } else if (box) {
+            withdrawalSelection[Number(box.value)] = box.checked;
+        }
+        syncWithdrawalSignButton(nav);
+    });
+
+    document.addEventListener('click', function (event) {
+        var button = event.target.closest('[data-withdrawal-sign]');
+        if (!button || button.disabled) { return; }
+        event.preventDefault();
+        var url = withdrawalBatchUrl(withdrawalSelectedCards());
+        if (!url) {
+            toast('Configure a URL do Assignat-ure para assinar pelo Tralla.', 'error');
+            return;
+        }
+        window.open(url, '_blank', 'noopener');
+    });
+
     function renderWithdrawalNavigation(card) {
         if (!isMaintenance || Number(card.stage) !== 1 || card.status !== 'withdrawal') { return ''; }
         var entityName = String(card.name || '').trim();
@@ -2255,21 +2324,48 @@
         if (!withdrawalCards.some(function (item) { return Number(item.id) === Number(card.id); })) {
             withdrawalCards.push(card);
         }
+        var visibleIds = {};
+        withdrawalCards.forEach(function (item) { visibleIds[Number(item.id)] = true; });
+        Object.keys(withdrawalSelection).forEach(function (id) {
+            if (!visibleIds[Number(id)]) { delete withdrawalSelection[id]; }
+        });
+        var signable = withdrawalCards.filter(function (item) { return !!item.assignature_url; });
+        var selectedCount = withdrawalCards.filter(function (item) {
+            return withdrawalSelection[Number(item.id)] && item.assignature_url;
+        }).length;
         return '<nav class="tralla-approval-navigation tralla-withdrawal-navigation" aria-label="Cards em Retirada desta entidade">'
             + '<div class="tralla-approval-navigation-head"><strong>Retiradas desta entidade</strong>'
             + '<span>' + withdrawalCards.length + ' card' + (withdrawalCards.length === 1 ? '' : 's') + '</span></div>'
+            + (signable.length > 1
+                ? '<label class="tralla-withdrawal-select-all"><input type="checkbox" data-withdrawal-select-all'
+                    + (selectedCount === signable.length ? ' checked' : '') + '> Selecionar todos</label>'
+                : '')
             + '<div class="tralla-approval-navigation-list">'
             + withdrawalCards.map(function (item) {
                 var current = Number(item.id) === Number(card.id);
-                return '<button type="button" class="tralla-approval-navigation-item'
+                var canSign = !!item.assignature_url;
+                return '<div class="tralla-withdrawal-pick' + (withdrawalSelection[Number(item.id)] && canSign ? ' is-selected' : '') + '">'
+                    + '<input type="checkbox" class="tralla-withdrawal-check" data-withdrawal-select value="' + Number(item.id) + '"'
+                    + ' aria-label="Selecionar ' + attr(item.code || ('#' + item.id)) + ' para assinar"'
+                    + (withdrawalSelection[Number(item.id)] && canSign ? ' checked' : '')
+                    + (canSign ? '' : ' disabled title="Assignat-ure não configurado"') + '>'
+                    + '<button type="button" class="tralla-approval-navigation-item'
                     + (current ? ' is-current' : '') + '" data-open-card="' + Number(item.id) + '"'
                     + (current ? ' aria-current="true"' : '') + '>'
                     + '<span class="tralla-approval-navigation-code">' + esc(item.code || ('#' + item.id)) + '</span>'
                     + '<strong>' + esc(item.name) + '</strong>'
                     + '<span class="tralla-approval-navigation-kind">'
                     + esc(item.machine_summary || ((item.machine_count || 0) + ' máquina(s)')) + '</span>'
-                    + '</button>';
-            }).join('') + '</div></nav>';
+                    + '</button></div>';
+            }).join('') + '</div>'
+            + (signable.length
+                ? '<div class="tralla-withdrawal-sign-bar">'
+                    + '<button type="button" class="tralla-btn tralla-btn-sign" data-withdrawal-sign' + (selectedCount ? '' : ' disabled') + '>'
+                    + '<i class="ti ti-signature" aria-hidden="true"></i> Assinar selecionados'
+                    + ' (<span data-withdrawal-count>' + selectedCount + '</span>)</button>'
+                    + '<small>Abre o Assignat-ure com os cards marcados para assinar de uma vez.</small></div>'
+                : '')
+            + '</nav>';
     }
 
     function renderCardModal(card) {
