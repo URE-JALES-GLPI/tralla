@@ -70,6 +70,7 @@ $bootstrap = [
     'activity_cursor' => PluginTrallaHistory::getLatestIdForBoard($boards_id),
     'version'         => PluginTrallaBoard::getVersion($boards_id),
     'entities' => tralla_all_entity_options(),
+    'call_categories' => tralla_call_categories(),
     'models' => array_map(static function (array $model): array {
         return [
             'id'   => (int) $model['id'],

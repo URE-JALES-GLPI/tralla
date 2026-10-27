@@ -1,0 +1,86 @@
+{
+  "Equipamentos": [
+    "Hardware",
+    "Software",
+    "Dano Físico",
+    "Queda de Link"
+  ],
+  "Redes/Conectividade": [
+    "Falha na rede interna",
+    "Intermitência",
+    "Queda de Link",
+    "Lentidão",
+    "Software"
+  ],
+  "Infraestrutura": [
+    "Reparo em Pontos de Rede",
+    "Instalação de Cabeamento",
+    "Mudança de Sala do Equipamento",
+    "Hardware"
+  ],
+  "Atendimento ao Usuário": [
+    "Suporte via Telefone",
+    "Orientação sobre uso de computadores e dispositivos",
+    "Vistoria técnica para diagnóstico"
+  ],
+  "Hardware Administrativo": [
+    "Instalação e configuração de computador",
+    "Instalação e configuração de notebook",
+    "Instalação e configuração de tablet",
+    "Instalação e configuração de celular",
+    "Preparação de nova estação de trabalho",
+    "Reconfiguração de estação de trabalho",
+    "Atualização de sistema operacional",
+    "Upgrade de componente de hardware",
+    "Remanejamento de equipamentos",
+    "Substituição de equipamento de TI"
+  ],
+  "Hardware Pedagógico": [
+    "Instalação e configuração de computador",
+    "Instalação e configuração de notebook",
+    "Instalação e configuração de tablet",
+    "Instalação e configuração de celular",
+    "Preparação de nova estação de trabalho",
+    "Reconfiguração de estação de trabalho",
+    "Atualização de sistema operacional",
+    "Upgrade de componente de hardware",
+    "Substituição de equipamento de TI",
+    "Suporte Educatron"
+  ],
+  "Software": [
+    "Certificado Digital",
+    "Configuração de software",
+    "Suporte às ferramentas utilizadas pela SEDUC-SP/FDE"
+  ],
+  "Sistema Operacional": [
+    "Instalação e configuração"
+  ],
+  "Impressão": [
+    "Instalação e configuração de impressora",
+    "Suporte a falhas ou Duvidas"
+  ],
+  "Rede Cabeada": [
+    "Diagnóstico de ponto de rede",
+    "Ponto de rede sem conectividade"
+  ],
+  "Rede Sem Fio": [
+    "Diagnóstico de conectividade WLAN/Wi-Fi",
+    "Dispositivo não conecta à rede Wi-Fi",
+    "Queda ou instabilidade de conexão Wi-Fi"
+  ],
+  "Ativos e Inventário": [
+    "Inventário dos ativos das Escolas"
+  ],
+  "Garantia": [
+    "Abrir chamado com o Fornecedor"
+  ],
+  "Reuniões e Eventos": [
+    "Preparação de ambiente para Evento"
+  ],
+  "Alerta Monitoria": [
+    "Verificar alerta Prisma/Zabbix/Meraki"
+  ],
+  "Equipamentos de Rede": [
+    "Verificação de Rack"
+  ]
+}

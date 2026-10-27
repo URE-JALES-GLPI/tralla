@@ -104,6 +104,8 @@ function plugin_tralla_install(): bool
                 `plugin_tralla_lists_id`  INT {$sign} NOT NULL DEFAULT '0',
                 `name`                    VARCHAR(255) NOT NULL DEFAULT '',
                 `description`             LONGTEXT     DEFAULT NULL,
+                `call_category`           VARCHAR(255) NOT NULL DEFAULT '',
+                `call_subcategory`        VARCHAR(255) NOT NULL DEFAULT '',
                 `service_report`          LONGTEXT     DEFAULT NULL,
                 `update_mode`             VARCHAR(20) NOT NULL DEFAULT '',
                 `update_solution`         LONGTEXT DEFAULT NULL,
@@ -163,6 +165,8 @@ function plugin_tralla_install(): bool
 
     // Colunas de exclusão em tabelas de cards já existentes.
     $cards_columns = [
+        'call_category'              => "VARCHAR(255) NOT NULL DEFAULT ''",
+        'call_subcategory'           => "VARCHAR(255) NOT NULL DEFAULT ''",
         'service_report'              => 'LONGTEXT DEFAULT NULL',
         'update_mode'                 => "VARCHAR(20) NOT NULL DEFAULT ''",
         'update_solution'             => 'LONGTEXT DEFAULT NULL',

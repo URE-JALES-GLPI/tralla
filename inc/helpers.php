@@ -429,6 +429,30 @@ if (!function_exists('tralla_normalize_label')) {
     }
 }
 
+if (!function_exists('tralla_call_categories')) {
+    /** Categorias e subcategorias importadas da planilha de atendimento. */
+    function tralla_call_categories(): array
+    {
+        static $categories = null;
+        if ($categories === null) {
+            $json = @file_get_contents(__DIR__ . '/../data/call_categories.json');
+            $decoded = is_string($json) ? json_decode($json, true) : null;
+            $categories = is_array($decoded) ? $decoded : [];
+        }
+        return $categories;
+    }
+}
+
+if (!function_exists('tralla_valid_call_category')) {
+    function tralla_valid_call_category(string $category, string $subcategory): bool
+    {
+        $categories = tralla_call_categories();
+        return isset($categories[$category])
+            && is_array($categories[$category])
+            && in_array($subcategory, $categories[$category], true);
+    }
+}
+
 if (!function_exists('tralla_all_entity_options')) {
     /**
      * Entidades disponíveis para o combobox de nome do card.

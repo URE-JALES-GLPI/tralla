@@ -243,6 +243,8 @@ try {
                 'name'        => tralla_post_string('name'),
                 'entity_id'   => tralla_post_int('entity_id'),
                 'description' => tralla_post_string('description'),
+                'call_category' => tralla_post_string('call_category'),
+                'call_subcategory' => tralla_post_string('call_subcategory'),
                 'source'      => tralla_post_string('source', 'manual'),
                 'workflow_type' => tralla_post_string('workflow_type', 'maintenance'),
                 'release_mode' => tralla_post_string('release_mode', 'now'),

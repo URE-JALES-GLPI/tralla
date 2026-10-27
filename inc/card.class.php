@@ -604,6 +604,12 @@ class PluginTrallaCard extends CommonDBTM
         }
 
         $description = trim(strip_tags((string) ($data['description'] ?? '')));
+        $callCategory = trim((string) ($data['call_category'] ?? ''));
+        $callSubcategory = trim((string) ($data['call_subcategory'] ?? ''));
+        if ($boardType === 'maintenance'
+            && !tralla_valid_call_category($callCategory, $callSubcategory)) {
+            throw new RuntimeException('Selecione uma categoria e subcategoria válidas.');
+        }
         $source = (string) ($data['source'] ?? 'manual');
         if (!array_key_exists($source, tralla_source_choices())) {
             $source = 'manual';
@@ -681,6 +687,8 @@ class PluginTrallaCard extends CommonDBTM
                 'plugin_tralla_lists_id'  => (int) $list['id'],
                 'name'                    => $name,
                 'description'             => $description,
+                'call_category'           => $callCategory,
+                'call_subcategory'        => $callSubcategory,
                 'rank'                    => self::nextRankForList((int) $list['id']),
                 'users_id'                => $userId,
                 'technician_id'           => 0,
@@ -788,6 +796,8 @@ class PluginTrallaCard extends CommonDBTM
             'plugin_tralla_lists_id' => (int) $list['id'],
             'name' => (string) $card['name'],
             'description' => (string) $card['description'],
+            'call_category' => (string) ($card['call_category'] ?? ''),
+            'call_subcategory' => (string) ($card['call_subcategory'] ?? ''),
             'rank' => self::nextRankForList((int) $list['id']),
             'users_id' => $userId,
             'technician_id' => 0,
@@ -1265,6 +1275,8 @@ class PluginTrallaCard extends CommonDBTM
                     'plugin_tralla_lists_id'  => (int) $pendingList['id'],
                     'name'                    => (string) $card['name'],
                     'description'             => $card['description'],
+                    'call_category'           => (string) ($card['call_category'] ?? ''),
+                    'call_subcategory'        => (string) ($card['call_subcategory'] ?? ''),
                     'rank'                    => self::nextRankForList((int) $pendingList['id']),
                     'users_id'                => $userId,
                     'technician_id'           => 0,
@@ -1303,6 +1315,8 @@ class PluginTrallaCard extends CommonDBTM
                 'plugin_tralla_lists_id'  => (int) $approvalList['id'],
                 'name'                    => $card['name'],
                 'description'             => $card['description'],
+                'call_category'           => (string) ($card['call_category'] ?? ''),
+                'call_subcategory'        => (string) ($card['call_subcategory'] ?? ''),
                 'rank'                    => self::nextRankForList((int) $approvalList['id']),
                 'users_id'                => $userId,
                 'technician_id'           => (int) $card['technician_id'],
@@ -1947,6 +1961,8 @@ class PluginTrallaCard extends CommonDBTM
                 'plugin_tralla_lists_id'  => (int) $approvalList['id'],
                 'name'                    => $proposedName,
                 'description'             => $fresh['description'],
+                'call_category'           => (string) ($fresh['call_category'] ?? ''),
+                'call_subcategory'        => (string) ($fresh['call_subcategory'] ?? ''),
                 'rank'                    => self::nextRankForList((int) $approvalList['id']),
                 'users_id'                => $userId,
                 'technician_id'           => (int) $fresh['technician_id'],
@@ -2093,6 +2109,8 @@ class PluginTrallaCard extends CommonDBTM
                 'plugin_tralla_lists_id'  => (int) $list['id'],
                 'name'                    => (string) $fresh['name'],
                 'description'             => $fresh['description'],
+                'call_category'           => (string) ($fresh['call_category'] ?? ''),
+                'call_subcategory'        => (string) ($fresh['call_subcategory'] ?? ''),
                 'rank'                    => self::nextRankForList((int) $list['id']),
                 'users_id'                => $userId,
                 'technician_id'           => (int) $fresh['technician_id'],
@@ -2213,6 +2231,8 @@ class PluginTrallaCard extends CommonDBTM
                     'plugin_tralla_lists_id' => (int) $list['id'],
                     'name' => (string) $parent['name'],
                     'description' => $parent['description'],
+                    'call_category' => (string) ($parent['call_category'] ?? ''),
+                    'call_subcategory' => (string) ($parent['call_subcategory'] ?? ''),
                     'rank' => self::nextRankForList((int) $list['id']),
                     'users_id' => (int) $approval['users_id'],
                     'technician_id' => (int) $approval['users_id'],
@@ -2611,6 +2631,8 @@ class PluginTrallaCard extends CommonDBTM
                     'plugin_tralla_lists_id'  => (int) $approvalList['id'],
                     'name'                    => $fresh['name'],
                     'description'             => $fresh['description'],
+                    'call_category'           => (string) ($fresh['call_category'] ?? ''),
+                    'call_subcategory'        => (string) ($fresh['call_subcategory'] ?? ''),
                     'rank'                    => self::nextRankForList((int) $approvalList['id']),
                     'users_id'                => $userId,
                     'technician_id'           => (int) $fresh['technician_id'],

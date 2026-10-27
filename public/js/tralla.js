@@ -1498,6 +1498,8 @@
         rows += metaRow('Lista', card.list_name);
         rows += metaRow('Tipo', isUpdates ? (card.update_mode === 'checklist' ? 'Checklist' : 'Descrição')
             : (isMaintenance ? (card.workflow_type === 'call' ? 'Chamado' : 'Manutenção') : 'Normal'));
+        rows += metaRow('Categoria', card.call_category);
+        rows += metaRow('Subcategoria', card.call_subcategory);
         rows += metaRow('Responsável', card.technician_name || 'Não atribuído');
         rows += metaRow('Criado por', card.creator_name);
         rows += metaRow('Criado em', formatDate(card.date_creation));
@@ -3759,6 +3761,19 @@
 
         var entities = Array.isArray(state.entities) ? state.entities : [];
         var hasEntities = entities.length > 0;
+        var callCategories = state.call_categories || {};
+        var categoryOptions = Object.keys(callCategories).map(function (category) {
+            return '<option value="' + attr(category) + '">' + esc(category) + '</option>';
+        }).join('');
+        var categoryFields = isMaintenance
+            ? '<div class="tralla-form-row">'
+                + '<div class="tralla-field"><label for="tralla-create-category">Categoria *</label>'
+                + '<select id="tralla-create-category" name="call_category" required>'
+                + '<option value="">Selecione uma categoria...</option>' + categoryOptions + '</select></div>'
+                + '<div class="tralla-field"><label for="tralla-create-subcategory">Subcategoria *</label>'
+                + '<select id="tralla-create-subcategory" name="call_subcategory" required disabled>'
+                + '<option value="">Selecione a categoria primeiro...</option></select></div></div>'
+            : '';
         var nameField = '<div class="tralla-field tralla-combobox-field">'
             + '<label for="tralla-create-name">Nome do card *</label>'
             + '<div class="tralla-combobox">'
@@ -3789,6 +3804,7 @@
             + '</div>'
             + '</fieldset>'
             + nameField
+            + categoryFields
             + machinesSection
             + '<section class="tralla-detail-section tralla-create-call-description" data-create-call-section hidden>'
             + '<div class="tralla-field"><label for="tralla-create-description">Descrição da situação *</label>'
@@ -3816,6 +3832,18 @@
             addCreateMachineRow();
         }
         var createForm = modalRoot.querySelector('#tralla-create-card-form');
+        var categorySelect = createForm.querySelector('#tralla-create-category');
+        var subcategorySelect = createForm.querySelector('#tralla-create-subcategory');
+        if (categorySelect && subcategorySelect) {
+            categorySelect.addEventListener('change', function () {
+                var choices = callCategories[categorySelect.value] || [];
+                subcategorySelect.innerHTML = '<option value="">Selecione uma subcategoria...</option>'
+                    + choices.map(function (value) {
+                        return '<option value="' + attr(value) + '">' + esc(value) + '</option>';
+                    }).join('');
+                subcategorySelect.disabled = !choices.length;
+            });
+        }
         createForm.querySelectorAll('[name="workflow_type"]').forEach(function (radio) {
             radio.addEventListener('change', function () {
                 var call = radio.value === 'call' && radio.checked;
@@ -3851,6 +3879,17 @@
         var releaseMode = workflowType === 'call' && releaseModeField ? releaseModeField.value : 'now';
         var descriptionField = form.querySelector('[name="description"]');
         var description = descriptionField ? descriptionField.value.trim() : '';
+        var categoryField = form.querySelector('[name="call_category"]');
+        var subcategoryField = form.querySelector('[name="call_subcategory"]');
+        var callCategory = categoryField ? categoryField.value : '';
+        var callSubcategory = subcategoryField ? subcategoryField.value : '';
+        var validSubcategories = (state.call_categories || {})[callCategory] || [];
+        if (!inline && isMaintenance && !validSubcategories.includes(callSubcategory)) {
+            toast('Selecione uma categoria e subcategoria.', 'error');
+            if (!callCategory && categoryField) { categoryField.focus(); }
+            else if (subcategoryField) { subcategoryField.focus(); }
+            return;
+        }
         var entityIdField = form.querySelector('[name="entity_id"]');
         var entityId = entityIdField ? Number(entityIdField.value) : 0;
         if (!inline && isMaintenance && workflowType === 'call' && entityId <= 0) {
@@ -3901,6 +3940,8 @@
                 name: name,
                 entity_id: entityId,
                 description: description,
+                call_category: callCategory,
+                call_subcategory: callSubcategory,
                 source: 'manual',
                 workflow_type: workflowType,
                 release_mode: releaseMode,
