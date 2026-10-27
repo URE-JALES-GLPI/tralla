@@ -563,6 +563,7 @@
     var can = state.can || state.rights || {};
     var labels = state.labels || {};
     var activeCard = null;
+    var openCardRequest = 0;
     var dragCardId = null;
     var dragSource = null;
     var dragPreview = null;
@@ -1432,6 +1433,7 @@
         if (!modalRoot) {
             return;
         }
+        openCardRequest++;
         if (isUpdates && activeCard && modalRoot.querySelector('[data-update-text]')) {
             flushUpdateText().catch(function (error) { toast(error.message, 'error'); });
         }
@@ -1979,6 +1981,39 @@
             + '<aside class="tralla-detail-side">' + side + '</aside></div></div>', true);
     }
 
+    function renderApprovalNavigation(card) {
+        if (!isMaintenance || Number(card.stage) !== 2) { return ''; }
+        var approvalList = (state.lists || []).find(function (list) {
+            return list.category === 'maintenance_approval';
+        });
+        if (!approvalList || Number(card.plugin_tralla_lists_id) !== Number(approvalList.id)) { return ''; }
+        var approvalCards = (state.cards || []).filter(function (item) {
+            return Number(item.plugin_tralla_lists_id) === Number(approvalList.id)
+                && Number(item.stage) === 2;
+        }).sort(function (left, right) {
+            return Number(left.rank) - Number(right.rank) || Number(left.id) - Number(right.id);
+        });
+        if (!approvalCards.some(function (item) { return Number(item.id) === Number(card.id); })) {
+            approvalCards.push(card);
+        }
+        return '<nav class="tralla-approval-navigation" aria-label="Cards da Manutenção Aprovação">'
+            + '<div class="tralla-approval-navigation-head"><strong>Manutenção Aprovação</strong>'
+            + '<span>' + approvalCards.length + ' card' + (approvalCards.length === 1 ? '' : 's') + '</span></div>'
+            + '<div class="tralla-approval-navigation-list">'
+            + approvalCards.map(function (item) {
+                var current = Number(item.id) === Number(card.id);
+                return '<button type="button" class="tralla-approval-navigation-item '
+                    + esc(approvalKindClass(item)) + (current ? ' is-current' : '') + '"'
+                    + ' data-open-card="' + Number(item.id) + '"'
+                    + (current ? ' aria-current="true" autofocus' : '') + '>'
+                    + '<span class="tralla-approval-navigation-code">' + esc(item.code || ('#' + item.id))
+                    + (item.workflow_type === 'call' ? ' · Chamado' : '') + '</span>'
+                    + '<strong>' + esc(item.name) + '</strong>'
+                    + '<span class="tralla-approval-navigation-kind">' + esc(approvalKindLabel(item)) + '</span>'
+                    + '</button>';
+            }).join('') + '</div></nav>';
+    }
+
     function renderCardModal(card) {
         if (isUpdates) { renderUpdateModal(card); return; }
         var permissions = card.permissions || {};
@@ -2030,23 +2065,29 @@
         body += renderAssignature(card);
         body += renderHistory(card);
 
-        showModal(detailHeader(card)
+        var approvalNavigation = renderApprovalNavigation(card);
+        showModal(approvalNavigation + detailHeader(card)
             + '<div class="tralla-modal-body"><div class="tralla-detail-grid">'
             + '<div class="tralla-detail-main">' + body + '</div>'
             + '<aside class="tralla-detail-side">' + renderSideMeta(card) + renderSideActions(card) + '</aside>'
             + '</div></div>', true);
+        if (approvalNavigation) {
+            modalRoot.querySelector('.tralla-modal').classList.add('has-approval-navigation');
+        }
     }
 
     async function openCard(id) {
+        var requestId = ++openCardRequest;
         try {
             if (isUpdates && activeCard && Number(activeCard.id) !== Number(id)) {
                 await flushUpdateText();
             }
             var card = await api('card_get', { id: id });
+            if (requestId !== openCardRequest) { return; }
             activeCard = card;
             renderCardModal(card);
         } catch (error) {
-            toast(error.message, 'error');
+            if (requestId === openCardRequest) { toast(error.message, 'error'); }
         }
     }
 
