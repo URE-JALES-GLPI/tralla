@@ -3339,6 +3339,8 @@
             return;
         }
         input.value = option.dataset.entityName || '';
+        input.classList.remove('is-entity-invalid');
+        input.classList.add('is-entity-selected');
         var entityId = document.getElementById(input.id + '-entity-id');
         if (entityId) {
             entityId.value = option.dataset.entityId || '';
@@ -3362,6 +3364,7 @@
 
         input.addEventListener('click', openList);
         input.addEventListener('input', function () {
+            input.classList.remove('is-entity-selected', 'is-entity-invalid');
             var entityId = document.getElementById(input.id + '-entity-id');
             if (entityId) {
                 entityId.value = '';
@@ -3778,6 +3781,7 @@
             + '<label for="tralla-create-name">Nome do card *</label>'
             + '<div class="tralla-combobox">'
             + '<input id="tralla-create-name" type="text" name="name" maxlength="255" required autocomplete="off"'
+            + ' placeholder="Busque e selecione uma entidade..."'
             + (hasEntities
                 ? ' role="combobox" aria-autocomplete="list" aria-expanded="false"'
                     + ' aria-controls="tralla-create-name-list" aria-haspopup="listbox"'
@@ -3787,7 +3791,7 @@
             + (hasEntities
                 ? '<div id="tralla-create-name-list" class="tralla-combobox-list" role="listbox" hidden></div>'
                 : '')
-            + '</div></div>';
+            + '</div><small>Digite para buscar e clique em uma entidade da lista.</small></div>';
 
         showModal('<form id="tralla-create-card-form" class="tralla-form" data-list-id="' + Number(listId) + '" novalidate>'
             + '<div class="tralla-modal-head"><div>'
@@ -3894,9 +3898,10 @@
             return;
         }
         var entityIdField = form.querySelector('[name="entity_id"]');
-        var entityId = entityIdField ? Number(entityIdField.value) : 0;
-        if (!inline && isMaintenance && workflowType === 'call' && entityId <= 0) {
-            toast('Selecione uma entidade da lista para o nome do chamado.', 'error');
+        var entityId = entityIdField ? entityIdField.value : '';
+        if (!inline && isMaintenance && entityId === '') {
+            toast('Selecione uma entidade da lista para o nome do card.', 'error');
+            nameEl.classList.add('is-entity-invalid');
             nameEl.focus();
             return;
         }

@@ -241,7 +241,7 @@ try {
                 'boards_id'   => $boards_id,
                 'list_id'     => tralla_post_int('list_id'),
                 'name'        => tralla_post_string('name'),
-                'entity_id'   => tralla_post_int('entity_id'),
+                'entity_id'   => tralla_post_string('entity_id'),
                 'description' => tralla_post_string('description'),
                 'call_category' => tralla_post_string('call_category'),
                 'call_subcategory' => tralla_post_string('call_subcategory'),

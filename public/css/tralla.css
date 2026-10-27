@@ -1239,6 +1239,13 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 }
 #tralla-create-card-form .tralla-create-basics input[type="text"],
 #tralla-create-card-form .tralla-create-basics select { border-radius: 8px; min-height: 43px; }
+#tralla-create-card-form #tralla-create-name.is-entity-selected {
+    border-color: var(--tr-success);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--tr-success) 12%, transparent);
+}
+#tralla-create-card-form #tralla-create-name.is-entity-invalid {
+    border-color: var(--tr-danger) !important;
+}
 #tralla-create-card-form .tralla-create-basics input:invalid:not(:focus),
 #tralla-create-card-form .tralla-create-basics select:invalid:not(:focus) {
     border-color: var(--tr-border-strong) !important;
@@ -1246,7 +1253,33 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 }
 #tralla-create-card-form [data-create-machines-section] > h3 { color: var(--tr-text); margin-bottom: 13px; }
 #tralla-create-card-form .tralla-create-machine { background: var(--tr-surface-2); border-radius: 8px; padding: 13px 38px 13px 13px; }
-#tralla-create-card-form .tralla-modal-actions { border-top: 1px solid var(--tr-border); padding-top: 16px; }
+#tralla-create-card-form .tralla-modal-actions {
+    background: var(--tr-surface);
+    border-top: 1px solid var(--tr-border);
+    gap: 12px;
+    padding: 18px 24px 22px;
+}
+#tralla-create-card-form .tralla-modal-actions .tralla-btn {
+    border-radius: 9px;
+    font-size: 14px;
+    min-height: 44px;
+    padding: 10px 20px;
+}
+#tralla-create-card-form .tralla-modal-actions .tralla-btn-ghost {
+    background: var(--tr-surface-2);
+    border-color: var(--tr-border-strong);
+    min-width: 116px;
+}
+#tralla-create-card-form .tralla-modal-actions .tralla-btn-ghost:hover {
+    background: var(--tr-surface-3);
+}
+#tralla-create-card-form .tralla-modal-actions .tralla-btn-primary {
+    box-shadow: 0 3px 9px color-mix(in srgb, var(--tr-primary) 25%, transparent);
+    min-width: 160px;
+}
+@media (max-width: 520px) {
+    #tralla-create-card-form .tralla-modal-actions .tralla-btn { flex: 1 1 0; }
+}
 .tralla-create-call-description textarea { min-height: 150px; resize: vertical; width: 100%; }
 .tralla-create-call-description small { color: var(--tr-muted); display: block; margin-top: 6px; }
 .tralla-call-report textarea { min-height: 160px; resize: vertical; width: 100%; }

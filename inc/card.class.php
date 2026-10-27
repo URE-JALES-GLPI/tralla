@@ -590,16 +590,16 @@ class PluginTrallaCard extends CommonDBTM
         if ($name === '') {
             throw new RuntimeException('Informe o nome do card.');
         }
-        if ($workflowType === 'call') {
-            $entityId = (int) ($data['entity_id'] ?? 0);
-            $entity = $entityId > 0 ? $DB->request([
+        if ($boardType === 'maintenance') {
+            $entityIdValue = trim((string) ($data['entity_id'] ?? ''));
+            $entity = ctype_digit($entityIdValue) ? $DB->request([
                 'SELECT' => ['id', 'name'],
                 'FROM' => 'glpi_entities',
-                'WHERE' => ['id' => $entityId],
+                'WHERE' => ['id' => (int) $entityIdValue],
                 'LIMIT' => 1,
             ])->current() : null;
             if (!is_array($entity) || tralla_normalize_label((string) $entity['name']) !== $name) {
-                throw new RuntimeException('Selecione uma entidade da lista para o nome do chamado.');
+                throw new RuntimeException('Selecione uma entidade da lista para o nome do card.');
             }
         }
 
