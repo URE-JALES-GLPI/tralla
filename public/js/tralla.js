@@ -1174,11 +1174,55 @@
         listsEl.scrollLeft = scrollLeft;
     }
 
+    var slaSortedCategories = {
+        maintenance_pending: true,
+        maintenance_in_progress: true,
+        maintenance_approval: true
+    };
+
+    function cardSlaForSort(card) {
+        if (card && card.sla && card.sla.priority) {
+            return card.sla;
+        }
+        if (card && Number(card.stage) === 2 && Number(card.parent_cards_id) > 0) {
+            var parent = (state.cards || []).find(function (item) {
+                return Number(item.id) === Number(card.parent_cards_id);
+            });
+            if (parent && parent.sla && parent.sla.priority) {
+                return parent.sla;
+            }
+        }
+        return null;
+    }
+
+    function slaSortKey(card) {
+        var sla = cardSlaForSort(card);
+        if (!sla) {
+            return { group: 2, deadline: Infinity, priority: 9 };
+        }
+        var priority = Number(String(sla.priority).replace(/\D/g, '')) || 9;
+        if (!sla.next || !sla.next.deadline) {
+            return { group: 1, deadline: Infinity, priority: priority };
+        }
+        var time = new Date(String(sla.next.deadline).replace(' ', 'T')).getTime();
+        return { group: 0, deadline: isNaN(time) ? Infinity : time, priority: priority };
+    }
+
+    function compareBySla(left, right) {
+        var a = slaSortKey(left);
+        var b = slaSortKey(right);
+        if (a.group !== b.group) { return a.group - b.group; }
+        if (a.deadline !== b.deadline) { return a.deadline < b.deadline ? -1 : 1; }
+        if (a.priority !== b.priority) { return a.priority - b.priority; }
+        return Number(left.rank) - Number(right.rank) || Number(left.id) - Number(right.id);
+    }
+
     function renderList(list, cards) {
         var listId = Number(list.id);
+        var sortBySla = isMaintenance && !!slaSortedCategories[list.category];
         var listCards = (Array.isArray(cards) ? cards : state.cards).filter(function (card) {
             return Number(card.plugin_tralla_lists_id) === listId;
-        }).sort(function (left, right) {
+        }).sort(sortBySla ? compareBySla : function (left, right) {
             return Number(left.rank) - Number(right.rank) || Number(left.id) - Number(right.id);
         });
 
@@ -2219,9 +2263,7 @@
         var approvalCards = (state.cards || []).filter(function (item) {
             return Number(item.plugin_tralla_lists_id) === Number(approvalList.id)
                 && Number(item.stage) === 2;
-        }).sort(function (left, right) {
-            return Number(left.rank) - Number(right.rank) || Number(left.id) - Number(right.id);
-        });
+        }).sort(compareBySla);
         if (!approvalCards.some(function (item) { return Number(item.id) === Number(card.id); })) {
             approvalCards.push(card);
         }
@@ -4105,7 +4147,7 @@
             return '<option value="' + attr(category) + '">' + esc(category) + '</option>';
         }).join('');
         var categoryFields = isMaintenance
-            ? '<div class="tralla-form-row">'
+            ? '<div class="tralla-form-row" data-create-category-section hidden>'
                 + '<div class="tralla-field"><label for="tralla-create-category">Categoria *</label>'
                 + '<select id="tralla-create-category" name="call_category" required>'
                 + '<option value="">Selecione uma categoria...</option>' + categoryOptions + '</select></div>'
@@ -4225,6 +4267,8 @@
                 if (!radio.checked) { return; }
                 createForm.querySelector('[data-create-machines-section]').hidden = call;
                 createForm.querySelector('[data-create-call-section]').hidden = !call;
+                var categorySection = createForm.querySelector('[data-create-category-section]');
+                if (categorySection) { categorySection.hidden = !call; }
                 var releaseSection = createForm.querySelector('[data-call-release-section]');
                 if (releaseSection) { releaseSection.hidden = !call; }
                 syncReleaseUi();
@@ -4279,10 +4323,10 @@
         var description = descriptionField ? descriptionField.value.trim() : '';
         var categoryField = form.querySelector('[name="call_category"]');
         var subcategoryField = form.querySelector('[name="call_subcategory"]');
-        var callCategory = categoryField ? categoryField.value : '';
-        var callSubcategory = subcategoryField ? subcategoryField.value : '';
+        var callCategory = categoryField && workflowType === 'call' ? categoryField.value : '';
+        var callSubcategory = subcategoryField && workflowType === 'call' ? subcategoryField.value : '';
         var validSubcategories = (state.call_categories || {})[callCategory] || [];
-        if (!inline && isMaintenance && !validSubcategories.includes(callSubcategory)) {
+        if (!inline && isMaintenance && workflowType === 'call' && !validSubcategories.includes(callSubcategory)) {
             toast('Selecione uma categoria e subcategoria.', 'error');
             if (!callCategory && categoryField) { categoryField.focus(); }
             else if (subcategoryField) { subcategoryField.focus(); }
