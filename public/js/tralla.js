@@ -1281,11 +1281,8 @@
             ? '<button type="button" class="tralla-card-take" data-card-take="' + cardId + '" title="Pegar para mim">'
                 + '<i class="ti ti-hand-stop" aria-hidden="true"></i> Pegar</button>'
             : '');
-        var signButton = card.status === 'withdrawal' && Number(card.stage) === 1 && card.assignature_url
-            ? '<a class="tralla-card-take tralla-card-sign" href="' + attr(card.assignature_url)
-                + '" target="_blank" rel="noopener noreferrer" title="Assinar no Assignat-ure">'
-                + '<i class="ti ti-signature" aria-hidden="true"></i> Assinar</a>'
-            : '';
+        // Botão "Assinar" removido dos cards do quadro; a assinatura continua no detalhe do card.
+        var signButton = '';
         var termButton = card.assignature_term_url
             ? '<a class="tralla-card-term" href="' + attr(card.assignature_term_url) + '" target="_blank" rel="noopener noreferrer" title="Abrir termo assinado">'
                 + '<i class="ti ti-file-check" aria-hidden="true"></i> Termo assinado</a>'
