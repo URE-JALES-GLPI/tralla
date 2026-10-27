@@ -152,7 +152,7 @@ echo "<script>document.title = 'Tralla';</script>";
                     <i class="ti ti-trash" aria-hidden="true"></i> Excluídos
                 </button>
             <?php endif; ?>
-            <?php if ($canManageLists): ?>
+            <?php if ($canManageLists && !$isMaintenance): ?>
                 <button type="button" class="tralla-btn tralla-kanban-action" data-tralla-add-list>
                     <i class="ti ti-plus" aria-hidden="true"></i> Lista
                 </button>

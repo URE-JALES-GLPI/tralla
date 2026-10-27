@@ -216,6 +216,9 @@ class PluginTrallaCard extends CommonDBTM
             $card['assignature_term_url'] = (string) $card['status'] === 'done' && !empty($card['assignature_sent'])
                 ? PluginTrallaConfig::assignatureTermUrl((int) $card['id'])
                 : '';
+            $card['assignature_url'] = (string) $card['status'] === 'withdrawal' && (int) $card['stage'] === 1
+                ? PluginTrallaConfig::assignatureCardUrl((int) $card['id'])
+                : '';
             $card['machine_count'] = count($machines) ?: (int) $card['machines_total'];
             $card['machine_summary'] = PluginTrallaMachine::summarizeModels($machines, $modelNames);
             $card['progress'] = tralla_machines_progress($machines);

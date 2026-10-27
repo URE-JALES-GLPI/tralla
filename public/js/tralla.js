@@ -1280,6 +1280,11 @@
             ? '<button type="button" class="tralla-card-take" data-card-take="' + cardId + '" title="Pegar para mim">'
                 + '<i class="ti ti-hand-stop" aria-hidden="true"></i> Pegar</button>'
             : '');
+        var signButton = card.status === 'withdrawal' && Number(card.stage) === 1 && card.assignature_url
+            ? '<a class="tralla-card-take tralla-card-sign" href="' + attr(card.assignature_url)
+                + '" target="_blank" rel="noopener noreferrer" title="Assinar no Assignat-ure">'
+                + '<i class="ti ti-signature" aria-hidden="true"></i> Assinar</a>'
+            : '';
         var termButton = card.assignature_term_url
             ? '<a class="tralla-card-term" href="' + attr(card.assignature_term_url) + '" target="_blank" rel="noopener noreferrer" title="Abrir termo assinado">'
                 + '<i class="ti ti-file-check" aria-hidden="true"></i> Termo assinado</a>'
@@ -1304,15 +1309,21 @@
             + '<span class="tralla-card-edit" aria-hidden="true"><i class="ti ti-pencil"></i></span>'
             + cardTop
             + '<h4 class="tralla-card-title">' + esc(card.name) + '</h4>'
+            + (card.workflow_type === 'call' && (card.call_category || card.call_subcategory)
+                ? '<div class="tralla-card-call-category">'
+                    + (card.call_category ? '<span>' + esc(card.call_category) + '</span>' : '')
+                    + (card.call_subcategory ? '<small>' + esc(card.call_subcategory) + '</small>' : '')
+                    + '</div>' : '')
             + (isUpdates && card.update_mode === 'checklist' && card.update_progress
                 ? '<div class="tralla-update-card-progress">'
                     + Number(card.update_progress.done || 0) + '/' + Number(card.update_progress.total || 0)
                     + ' itens</div>' : '')
-            + ((badges || tech || takeButton)
+            + ((badges || tech || takeButton || signButton)
                 ? '<div class="tralla-card-footer">'
                     + '<div class="tralla-card-badges">' + badges + '</div>'
                     + tech
                     + takeButton
+                    + signButton
                     + '</div>'
                 : '')
             + termButton
@@ -1513,6 +1524,34 @@
         return '<div class="tralla-card"><h3>Detalhes</h3><div class="tralla-meta-list">' + rows + '</div></div>';
     }
 
+    function finalizeBlockedReason(card) {
+        if (card.is_locked) { return 'O card está bloqueado enquanto aguarda outra ação.'; }
+        if (!card.permissions || !card.permissions.edit_machines) {
+            return 'Somente o técnico responsável pode finalizar este card.';
+        }
+        var machines = card.machines || [];
+        if (card.workflow_type === 'call' && !machines.length) {
+            return 'Registre e salve o relatório do atendimento para finalizar o chamado.';
+        }
+        if (!machines.length) { return 'Adicione ao menos uma máquina ao card.'; }
+        if (machines.some(function (machine) { return !String(machine.report || '').trim(); })) {
+            return 'Preencha o relatório técnico de todas as máquinas.';
+        }
+        if (machines.some(function (machine) { return !Number(machine.service_done); })) {
+            return 'Marque Serviço realizado em todas as máquinas.';
+        }
+        if (machines.some(function (machine) {
+            return ['done', 'not_repairable', 'pending'].indexOf(machine.status) < 0;
+        })) { return 'Escolha o status de todas as máquinas.'; }
+        if (!machines.some(function (machine) {
+            return machine.status === 'done' || machine.status === 'not_repairable';
+        })) { return 'Ao menos uma máquina deve estar Concluída ou Inservível.'; }
+        if (card.workflow_type === 'call' && machines.some(function (machine) { return machine.status === 'pending'; })) {
+            return 'Chamados não podem ser finalizados com máquinas pendentes.';
+        }
+        return 'Este card ainda não pode ser finalizado.';
+    }
+
     function renderSideActions(card) {
         var permissions = card.permissions || {};
         var buttons = '';
@@ -1528,13 +1567,23 @@
                 + '<i class="ti ti-lock-open"></i> Solicitar liberação</button>';
         }
 
-        if (permissions.finalize) {
-            buttons += '<button type="button" class="tralla-btn tralla-btn-primary" data-card-action="finalize">'
-                + '<i class="ti ti-checkup-list"></i> Finalizar ' + (card.workflow_type === 'call' ? 'chamado' : 'manutenção') + '</button>';
-        } else if (card.status === 'in_progress' && Number(card.stage) === 1) {
-            note = card.workflow_type === 'call' && Number(card.machine_count || 0) === 0
-                ? 'Registre e salve o relatório do atendimento para finalizar o chamado.'
-                : 'Preencha o relatório, marque Serviço realizado e escolha o status de todas as máquinas. Ao menos uma deve estar Concluída ou Inservível.';
+        if (card.status === 'in_progress' && Number(card.stage) === 1) {
+            var finalizeLabel = 'Finalizar ' + (card.workflow_type === 'call' ? 'chamado' : 'manutenção');
+            if (permissions.finalize) {
+                buttons += '<button type="button" class="tralla-btn tralla-btn-primary" data-card-action="finalize">'
+                    + '<i class="ti ti-checkup-list"></i> ' + finalizeLabel + '</button>';
+            } else {
+                note = finalizeBlockedReason(card);
+                buttons += '<span class="tralla-disabled-action" title="' + attr(note) + '" tabindex="0" aria-label="'
+                    + attr(finalizeLabel + ': ' + note) + '">'
+                    + '<button type="button" class="tralla-btn tralla-btn-primary" disabled aria-hidden="true">'
+                    + '<i class="ti ti-checkup-list"></i> ' + finalizeLabel + '</button></span>';
+            }
+        }
+
+        if (card.status === 'withdrawal' && Number(card.stage) === 1 && card.assignature_url) {
+            buttons += '<a class="tralla-btn tralla-btn-sign" href="' + attr(card.assignature_url)
+                + '" target="_blank" rel="noopener noreferrer"><i class="ti ti-signature"></i> Assinar</a>';
         }
 
         if (permissions.approve) {
@@ -2018,6 +2067,35 @@
             }).join('') + '</div></nav>';
     }
 
+    function renderWithdrawalNavigation(card) {
+        if (!isMaintenance || Number(card.stage) !== 1 || card.status !== 'withdrawal') { return ''; }
+        var entityName = String(card.name || '').trim();
+        var withdrawalCards = (state.cards || []).filter(function (item) {
+            return Number(item.stage) === 1 && item.status === 'withdrawal'
+                && String(item.name || '').trim() === entityName;
+        }).sort(function (left, right) {
+            return Number(left.rank) - Number(right.rank) || Number(left.id) - Number(right.id);
+        });
+        if (!withdrawalCards.some(function (item) { return Number(item.id) === Number(card.id); })) {
+            withdrawalCards.push(card);
+        }
+        return '<nav class="tralla-approval-navigation tralla-withdrawal-navigation" aria-label="Cards em Retirada desta entidade">'
+            + '<div class="tralla-approval-navigation-head"><strong>Retiradas desta entidade</strong>'
+            + '<span>' + withdrawalCards.length + ' card' + (withdrawalCards.length === 1 ? '' : 's') + '</span></div>'
+            + '<div class="tralla-approval-navigation-list">'
+            + withdrawalCards.map(function (item) {
+                var current = Number(item.id) === Number(card.id);
+                return '<button type="button" class="tralla-approval-navigation-item'
+                    + (current ? ' is-current' : '') + '" data-open-card="' + Number(item.id) + '"'
+                    + (current ? ' aria-current="true"' : '') + '>'
+                    + '<span class="tralla-approval-navigation-code">' + esc(item.code || ('#' + item.id)) + '</span>'
+                    + '<strong>' + esc(item.name) + '</strong>'
+                    + '<span class="tralla-approval-navigation-kind">'
+                    + esc(item.machine_summary || ((item.machine_count || 0) + ' máquina(s)')) + '</span>'
+                    + '</button>';
+            }).join('') + '</div></nav>';
+    }
+
     function renderCardModal(card) {
         if (isUpdates) { renderUpdateModal(card); return; }
         var permissions = card.permissions || {};
@@ -2069,7 +2147,7 @@
         body += renderAssignature(card);
         body += renderHistory(card);
 
-        var approvalNavigation = renderApprovalNavigation(card);
+        var approvalNavigation = renderApprovalNavigation(card) || renderWithdrawalNavigation(card);
         showModal(approvalNavigation + detailHeader(card)
             + '<div class="tralla-modal-body"><div class="tralla-detail-grid">'
             + '<div class="tralla-detail-main">' + body + '</div>'
@@ -2257,30 +2335,10 @@
         }
     }
 
-    var TRALLA_CHALLENGE_PRIORITY_WORDS = ['PAIVA', 'MASSON', 'NETO', 'FERRARI', 'SAWATA'];
-    var TRALLA_CHALLENGE_WORDS = [
-        'BACKUP', 'SERVIDOR', 'REDE', 'ROTEADOR', 'SWITCH', 'FIREWALL',
-        'SOFTWARE', 'HARDWARE', 'TECLADO', 'MONITOR', 'PROCESSADOR', 'MEMORIA',
-        'SISTEMA', 'CODIGO', 'ARQUIVO', 'DADOS', 'NUVEM', 'NAVEGADOR',
-        'ANTIVIRUS', 'IMPRESSORA', 'LOGIN', 'SENHA', 'USUARIO', 'SUPORTE',
-        'CHAMADO', 'NOTEBOOK', 'DESKTOP', 'MOUSE', 'WIFI', 'SERVICO',
-        'INTERNET', 'ETHERNET', 'PROGRAMA', 'APLICATIVO', 'TERMINAL', 'CONEXAO'
-    ];
-
-    function pickChallengeWord() {
-        var words = Math.random() < 0.7
-            ? TRALLA_CHALLENGE_PRIORITY_WORDS
-            : TRALLA_CHALLENGE_WORDS;
-        return words[Math.floor(Math.random() * words.length)];
-    }
-
-    function wordChallenge() {
-        var word = pickChallengeWord();
+    function checkboxConfirmation(options) {
+        options = options || {};
         return new Promise(function (resolve) {
-            if (activePluginDialog) {
-                activePluginDialog.cancel();
-            }
-            var uid = 'tralla-challenge-' + Date.now();
+            var uid = 'tralla-confirm-' + Date.now();
             var layer = document.createElement('div');
             layer.className = 'tralla-dialog-layer';
             layer.innerHTML = '<div class="tralla-dialog-backdrop" data-dialog-backdrop></div>'
@@ -2288,21 +2346,20 @@
                 + '<div class="tralla-dialog-head">'
                 + '<span class="tralla-dialog-icon" aria-hidden="true"><i class="ti ti-shield-check"></i></span>'
                 + '<div class="tralla-dialog-copy">'
-                + '<h2 class="tralla-dialog-title" id="' + uid + '-title">Verificacao</h2>'
-                + '<p class="tralla-dialog-message">Digite a palavra exibida abaixo para confirmar:</p>'
+                + '<h2 class="tralla-dialog-title" id="' + uid + '-title">' + esc(options.title || 'Confirmar ação') + '</h2>'
+                + '<p class="tralla-dialog-message">' + esc(options.message || 'Deseja confirmar esta ação?') + '</p>'
                 + '</div></div>'
-                + '<div class="tralla-challenge-word">' + word + '</div>'
-                + '<div class="tralla-dialog-field"><label for="' + uid + '-input">Palavra</label>'
-                + '<input id="' + uid + '-input" class="tralla-challenge-input" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Digite aqui"></div>'
-                + '<p class="tralla-dialog-error" hidden></p>'
+                + '<label class="tralla-confirm-checkbox" for="' + uid + '-check">'
+                + '<input id="' + uid + '-check" type="checkbox"> Confirmo esta ação</label>'
                 + '<div class="tralla-dialog-actions">'
                 + '<button type="button" class="tralla-btn tralla-btn-ghost" data-dialog-cancel>Cancelar</button>'
-                + '<button type="button" class="tralla-btn tralla-btn-primary" data-dialog-confirm>Confirmar</button>'
+                + '<button type="button" class="tralla-btn tralla-btn-primary" data-dialog-confirm disabled>'
+                + esc(options.confirmLabel || 'Confirmar') + '</button>'
                 + '</div></div>';
             document.body.appendChild(layer);
             document.body.classList.add('tralla-dialog-open');
             var inputEl = layer.querySelector('input');
-            var errorEl = layer.querySelector('.tralla-dialog-error');
+            var confirmEl = layer.querySelector('[data-dialog-confirm]');
             var finished = false;
             function finish(ok) {
                 if (finished) return;
@@ -2311,38 +2368,12 @@
                 layer.remove();
                 resolve(ok);
             }
-            function submit() {
-                var value = inputEl ? inputEl.value.trim() : '';
-                if (!value) {
-                    if (errorEl) { errorEl.hidden = false; errorEl.textContent = 'Digite a palavra exibida.'; }
-                    if (inputEl) inputEl.focus();
-                    return;
-                }
-                if (value.toUpperCase() !== word.toUpperCase()) {
-                    if (errorEl) { errorEl.hidden = false; errorEl.textContent = 'Palavra incorreta. Tente novamente.'; }
-                    if (inputEl) { inputEl.value = ''; inputEl.focus(); }
-                    return;
-                }
-                finish(true);
-            }
-            layer.querySelector('[data-dialog-confirm]').addEventListener('click', submit);
+            inputEl.addEventListener('change', function () { confirmEl.disabled = !inputEl.checked; });
+            confirmEl.addEventListener('click', function () { if (inputEl.checked) finish(true); });
             layer.querySelector('[data-dialog-backdrop]').addEventListener('click', function () { finish(false); });
             layer.querySelector('[data-dialog-cancel]').addEventListener('click', function () { finish(false); });
-            function uppercaseInput() {
-                var start = inputEl.selectionStart;
-                var end = inputEl.selectionEnd;
-                var upper = inputEl.value.toUpperCase();
-                if (inputEl.value !== upper) {
-                    inputEl.value = upper;
-                    inputEl.setSelectionRange(start, end);
-                }
-            }
-            inputEl.addEventListener('input', function (e) {
-                if (!e.isComposing) uppercaseInput();
-            });
-            inputEl.addEventListener('compositionend', uppercaseInput);
             inputEl.addEventListener('keydown', function (e) {
-                if (e.key === 'Enter') { e.preventDefault(); submit(); }
+                if (e.key === 'Enter' && inputEl.checked) { e.preventDefault(); finish(true); }
                 if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
             });
             window.setTimeout(function () { if (inputEl) inputEl.focus(); }, 30);
@@ -2467,7 +2498,11 @@
                 if (rejectReason === null) {
                     return;
                 }
-                if (!await wordChallenge()) {
+                if (!await checkboxConfirmation({
+                    title: rejectConfig.title,
+                    message: 'Confirma esta recusa? O motivo informado será registrado no histórico.',
+                    confirmLabel: rejectConfig.confirmLabel
+                })) {
                     return;
                 }
                 setBusy(button, true);
@@ -2503,15 +2538,10 @@
             }
 
             if (action === 'finalize') {
-                var finalizeChallenge = await wordChallenge();
-                if (!finalizeChallenge) {
-                    toast('Verificação incorreta. Ação cancelada.', 'error');
-                    return;
-                }
                 var pendingCount = (activeCard.machines || []).filter(function (machine) {
                     return machine.status === 'pending';
                 }).length;
-                var finalizeConfirmed = await confirmDialog({
+                var finalizeConfirmed = await checkboxConfirmation({
                     title: activeCard.workflow_type === 'call' ? 'Finalizar chamado' : 'Finalizar manutenção',
                     message: activeCard.workflow_type === 'call'
                         ? 'Finalizar o chamado e enviar para aprovação?' : pendingCount > 0
@@ -2563,11 +2593,8 @@
                         confirmLabel: 'Aprovar'
                     };
                 }
-                var approveConfirmed = await confirmDialog(approveConfig);
+                var approveConfirmed = await checkboxConfirmation(approveConfig);
                 if (!approveConfirmed) {
-                    return;
-                }
-                if (!await wordChallenge()) {
                     return;
                 }
             }
@@ -2576,9 +2603,12 @@
             var data;
 
             if (action === 'take') {
-                var takeChallenge = await wordChallenge();
+                var takeChallenge = await checkboxConfirmation({
+                    title: 'Pegar card',
+                    message: 'Confirma que deseja assumir este card?',
+                    confirmLabel: 'Pegar card'
+                });
                 if (!takeChallenge) {
-                    toast('Verificação incorreta. Ação cancelada.', 'error');
                     return;
                 }
                 data = await api('take_card', { id: cardId });
@@ -2833,7 +2863,11 @@
         var submit = form.querySelector('button[type="submit"]');
         setBusy(submit, true);
         try {
-            if (!await wordChallenge()) {
+            if (!await checkboxConfirmation({
+                title: 'Solicitar edição',
+                message: 'Confirma o envio das alterações para aprovação?',
+                confirmLabel: 'Solicitar edição'
+            })) {
                 setBusy(submit, false);
                 return;
             }
@@ -3072,10 +3106,6 @@
         }
         if (label) {
             label.textContent = progress.filled + '/' + progress.total;
-        }
-        var finalize = modalRoot.querySelector('[data-card-action="finalize"]');
-        if (finalize) {
-            finalize.disabled = progress.percent < 100;
         }
     }
 
@@ -4179,7 +4209,7 @@
             return;
         }
 
-        if (event.target.closest('.tralla-card-term')) {
+        if (event.target.closest('.tralla-card-term, .tralla-card-sign')) {
             event.stopPropagation();
             return;
         }
@@ -4193,7 +4223,7 @@
         if (event.key !== 'Enter' && event.key !== ' ') {
             return;
         }
-        if (event.target.closest('[data-card-take], [data-update-take], .tralla-card-term')) {
+        if (event.target.closest('[data-card-take], [data-update-take], .tralla-card-term, .tralla-card-sign')) {
             return;
         }
         var cardElement = event.target.closest('.tralla-card');

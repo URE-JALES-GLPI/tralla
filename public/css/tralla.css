@@ -1292,6 +1292,26 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
     box-shadow: 0 3px 9px color-mix(in srgb, var(--tr-primary) 25%, transparent);
     min-width: 160px;
 }
+#tralla-edit-form {
+    flex: 1 1 auto;
+    gap: 0;
+    max-height: inherit;
+    min-height: 0;
+    overflow: hidden;
+    width: 100%;
+}
+#tralla-edit-form .tralla-modal-head,
+#tralla-edit-form .tralla-modal-actions { flex: 0 0 auto; }
+#tralla-edit-form .tralla-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+#tralla-edit-form .tralla-modal-actions {
+    background: var(--tr-surface);
+    border-top: 1px solid var(--tr-border);
+    padding-top: 16px;
+}
 @media (max-width: 520px) {
     #tralla-create-card-form .tralla-modal-actions .tralla-btn { flex: 1 1 0; }
 }
@@ -1552,6 +1572,19 @@ body[data-theme="dark"] .tralla-card-id-chip,
     margin-top: 8px;
     min-height: 20px;
 }
+
+.tralla-card-call-category {
+    color: var(--tr-muted);
+    display: flex;
+    flex-direction: column;
+    font-size: 11px;
+    gap: 2px;
+    line-height: 1.3;
+    margin-top: 5px;
+    overflow-wrap: anywhere;
+}
+
+.tralla-card-call-category span { color: var(--tr-text); font-weight: 600; }
 
 .tralla-card-badges {
     align-items: center;
@@ -4210,6 +4243,30 @@ body.tralla-modal-open {
     color: #ffffff;
 }
 
+.tralla-card-sign,
+.tralla-card-sign:hover {
+    background: #facc15;
+    border-color: #eab308;
+    color: #18243b;
+    text-decoration: none;
+}
+
+.tralla-card-sign .ti { color: #18243b; }
+.tralla-card-sign:hover { background: #fde047; }
+
+.tralla-btn-sign,
+.tralla-btn-sign:hover {
+    background: #facc15;
+    border-color: #eab308;
+    color: #18243b;
+    text-decoration: none;
+}
+.tralla-btn-sign:hover { background: #fde047; }
+
+.tralla-disabled-action { display: flex; width: 100%; }
+.tralla-disabled-action .tralla-btn { cursor: not-allowed; opacity: .55; pointer-events: none; width: 100%; }
+.tralla-disabled-action:focus-visible { border-radius: 6px; outline: 2px solid var(--tr-primary); outline-offset: 2px; }
+
 .tralla-card-label-approval-final {
     background: var(--tr-primary);
 }
@@ -4515,23 +4572,20 @@ body.tralla-modal-open {
 .tralla-modal-body .tralla-detail-section {
     margin-bottom: 16px;
 }
-.tralla-challenge-word {
-    background: var(--tr-primary-soft);
-    border: 2px dashed var(--tr-primary);
-    border-radius: var(--tr-radius);
-    color: var(--tr-primary);
-    font-size: 28px;
-    font-weight: 800;
-    letter-spacing: 4px;
-    margin: 12px 0;
-    padding: 16px;
-    text-align: center;
-    text-transform: uppercase;
+.tralla-confirm-checkbox {
+    align-items: center;
+    background: var(--tr-surface-2);
+    border: 1px solid var(--tr-border);
+    border-radius: var(--tr-radius-sm);
+    color: var(--tr-text);
+    cursor: pointer;
+    display: flex;
+    font-size: 13px;
+    gap: 10px;
+    margin: 16px 0;
+    padding: 12px;
 }
-
-.tralla-challenge-input {
-    text-transform: uppercase;
-}
+.tralla-confirm-checkbox input { cursor: pointer; height: 18px; width: 18px; }
 
 /* Painel de manutenções por usuário (topo da lista de quadros) */
 .tralla-user-dash {
