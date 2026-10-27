@@ -161,9 +161,6 @@ echo "<script>document.title = 'Tralla';</script>";
                 <a class="tralla-btn tralla-kanban-action" href="<?= tralla_h($pluginUrl) ?>/front/board.form.php?id=<?= (int) $boards_id ?>">
                     <i class="ti ti-pencil" aria-hidden="true"></i> Editar quadro
                 </a>
-                <a class="tralla-btn tralla-kanban-action tralla-kanban-action-icon" href="<?= tralla_h($pluginUrl) ?>/front/config.form.php" title="Configurações do Tralla" aria-label="Configurações do Tralla">
-                    <i class="ti ti-settings" aria-hidden="true"></i>
-                </a>
             <?php endif; ?>
         </div>
     </header>

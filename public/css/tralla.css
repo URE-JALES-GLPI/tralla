@@ -863,11 +863,6 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
     color: #fff;
 }
 
-.tralla-kanban-action-icon {
-    padding: 6px;
-    width: 32px;
-}
-
 .tralla-kanban-search {
     align-items: center;
     align-self: center;
