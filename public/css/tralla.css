@@ -1165,7 +1165,22 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 .tralla-card-workflow-option input:focus-visible + span { outline: 3px solid var(--tr-primary); outline-offset: 2px; }
 .tralla-card-workflow-option input[value="call"]:checked + span { background: #f3efff; border-color: #8b5cf6; color: #3b1c66; }
 .tralla-card-workflow-option input[value="call"]:checked + span small { color: #6547a3; }
-#tralla-create-card-form .tralla-modal-body { padding-top: 20px; }
+#tralla-create-card-form {
+    flex: 1 1 auto;
+    gap: 0;
+    max-height: inherit;
+    min-height: 0;
+    overflow: hidden;
+    width: 100%;
+}
+#tralla-create-card-form .tralla-modal-head,
+#tralla-create-card-form .tralla-modal-actions { flex: 0 0 auto; }
+#tralla-create-card-form .tralla-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding-top: 20px;
+}
 #tralla-create-card-form .tralla-card-workflow-choice { margin-bottom: 18px; }
 #tralla-create-card-form .tralla-card-workflow-choice legend {
     color: var(--tr-text);
