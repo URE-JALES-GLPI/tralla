@@ -3313,7 +3313,7 @@
             var name = String(entity.name || '');
             return '<button type="button" class="tralla-combobox-option" role="option"'
                 + ' id="' + attr(list.id) + '-entity-' + index + '" aria-selected="false"'
-                + ' data-entity-name="' + attr(name) + '">'
+                + ' data-entity-name="' + attr(name) + '" data-entity-id="' + Number(entity.id) + '">'
                 + '<span>' + esc(name) + '</span></button>';
         }).join('');
         list.hidden = false;
@@ -3337,6 +3337,10 @@
             return;
         }
         input.value = option.dataset.entityName || '';
+        var entityId = document.getElementById(input.id + '-entity-id');
+        if (entityId) {
+            entityId.value = option.dataset.entityId || '';
+        }
         closeEntityOptions(input);
     }
 
@@ -3355,7 +3359,13 @@
         }
 
         input.addEventListener('click', openList);
-        input.addEventListener('input', openList);
+        input.addEventListener('input', function () {
+            var entityId = document.getElementById(input.id + '-entity-id');
+            if (entityId) {
+                entityId.value = '';
+            }
+            openList();
+        });
         input.addEventListener('keydown', function (event) {
             var options = Array.prototype.slice.call(list.querySelectorAll('[role="option"]'));
             var active = list.querySelector('[role="option"].is-active');
@@ -3758,6 +3768,7 @@
                     + ' aria-controls="tralla-create-name-list" aria-haspopup="listbox"'
                 : '')
             + '>'
+            + '<input id="tralla-create-name-entity-id" type="hidden" name="entity_id" value="">'
             + (hasEntities
                 ? '<div id="tralla-create-name-list" class="tralla-combobox-list" role="listbox" hidden></div>'
                 : '')
@@ -3840,6 +3851,13 @@
         var releaseMode = workflowType === 'call' && releaseModeField ? releaseModeField.value : 'now';
         var descriptionField = form.querySelector('[name="description"]');
         var description = descriptionField ? descriptionField.value.trim() : '';
+        var entityIdField = form.querySelector('[name="entity_id"]');
+        var entityId = entityIdField ? Number(entityIdField.value) : 0;
+        if (!inline && isMaintenance && workflowType === 'call' && entityId <= 0) {
+            toast('Selecione uma entidade da lista para o nome do chamado.', 'error');
+            nameEl.focus();
+            return;
+        }
         if (workflowType === 'call' && !description) {
             toast('Descreva a situação do chamado.', 'error');
             descriptionField.focus();
@@ -3881,6 +3899,7 @@
                 boards_id: state.board.id,
                 list_id: Number(form.dataset.listId || 0),
                 name: name,
+                entity_id: entityId,
                 description: description,
                 source: 'manual',
                 workflow_type: workflowType,

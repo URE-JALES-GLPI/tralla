@@ -22,6 +22,7 @@ class PluginTrallaConfig
             'notification_emails'  => '',
             'pending_hours'        => '1',
             'withdrawal_hours'     => '24',
+            'assignature_id_offset' => '0',
         ];
     }
 
@@ -147,7 +148,7 @@ class PluginTrallaConfig
 
         $separator = str_contains($base, '?') ? '&' : '?';
 
-        return $base . $separator . 'card=' . $cards_id;
+        return $base . $separator . 'card=' . self::assignatureExternalId($cards_id);
     }
 
     public static function assignatureTermUrl(int $cards_id): string
@@ -158,7 +159,18 @@ class PluginTrallaConfig
         }
 
         $url = preg_replace('~/front/request\.php(?=\?|$)~', '/front/term.php', $base);
-        return $url . (str_contains($url, '?') ? '&' : '?') . 'card=' . $cards_id;
+        return $url . (str_contains($url, '?') ? '&' : '?') . 'card=' . self::assignatureExternalId($cards_id);
+    }
+
+    public static function assignatureExternalId(int $cards_id): int
+    {
+        return self::getInt('assignature_id_offset') + $cards_id;
+    }
+
+    public static function assignatureInternalId(int $externalId): int
+    {
+        $offset = self::getInt('assignature_id_offset');
+        return $externalId > $offset ? $externalId - $offset : 0;
     }
 
     public static function clearCache(): void

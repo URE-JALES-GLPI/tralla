@@ -55,7 +55,7 @@ if ($listMode === 'withdrawal') {
 
         $machines = PluginTrallaMachine::getMachinesForCard((int) $row['id']);
         $cards[] = [
-            'id'              => (int) $row['id'],
+            'id'              => PluginTrallaConfig::assignatureExternalId((int) $row['id']),
             'family_id'       => (int) ($row['family_cards_id'] ?: $row['id']),
             'code'            => tralla_display_code($row, 'maintenance'),
             'name'            => (string) $row['name'],
@@ -84,7 +84,8 @@ if ($listMode === 'withdrawal') {
     ]);
 }
 
-$cardId = (int) ($_GET['card'] ?? $_GET['cards_id'] ?? 0);
+$externalId = (int) ($_GET['card'] ?? $_GET['cards_id'] ?? 0);
+$cardId = PluginTrallaConfig::assignatureInternalId($externalId);
 if ($cardId <= 0 && isset($_GET['code'])) {
     $code = trim((string) $_GET['code']);
     if (preg_match('/^(\d+)\/2$/', $code, $matches)) {
@@ -154,7 +155,7 @@ foreach ($machines as $machine) {
 tralla_json([
     'ok'   => true,
     'data' => [
-        'id'              => (int) $card['id'],
+        'id'              => PluginTrallaConfig::assignatureExternalId((int) $card['id']),
         'family_id'       => (int) ($card['family_cards_id'] ?: $card['id']),
         'code'            => tralla_display_code($card, 'maintenance'),
         'parent_id'       => (int) $card['parent_cards_id'],

@@ -19,7 +19,7 @@ if (!is_array($data) || (string) ($data['action'] ?? '') !== 'signature_complete
 }
 try {
     PluginTrallaCard::completeSignedWithdrawal(
-        (int) ($data['id'] ?? 0),
+        PluginTrallaConfig::assignatureInternalId((int) ($data['id'] ?? 0)),
         (string) ($data['signer_name'] ?? ''),
         (string) ($data['signature_sha256'] ?? '')
     );

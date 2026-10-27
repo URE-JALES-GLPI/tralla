@@ -241,6 +241,7 @@ try {
                 'boards_id'   => $boards_id,
                 'list_id'     => tralla_post_int('list_id'),
                 'name'        => tralla_post_string('name'),
+                'entity_id'   => tralla_post_int('entity_id'),
                 'description' => tralla_post_string('description'),
                 'source'      => tralla_post_string('source', 'manual'),
                 'workflow_type' => tralla_post_string('workflow_type', 'maintenance'),
