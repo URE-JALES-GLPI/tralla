@@ -648,6 +648,10 @@
         return esc(value);
     }
 
+    function displayCardCode(code, id) {
+        return '#' + String(code || id || '').replace(/^#+/, '');
+    }
+
     function safeColor(value, fallback) {
         var color = String(value || '');
         return /^#[0-9a-f]{6}$/i.test(color) ? color : (fallback || '#97a0af');
@@ -920,7 +924,7 @@
     function activityText(event) {
         var who = String(event.user_name || 'Sistema');
         var action = String(event.action_label || event.action || 'Alteração');
-        var code = String(event.card_code || ('#' + event.card_id));
+        var code = displayCardCode(event.card_code, event.card_id);
         var detail = String(event.details || '').trim();
         if (detail.length > 90) {
             detail = detail.slice(0, 87) + '...';
@@ -1041,7 +1045,7 @@
         }
 
         var cardId = String(card.id || '');
-        var code = String(card.code || ('#' + cardId));
+        var code = displayCardCode(card.code, cardId);
         var familyRoot = Number(card.code_root_cards_id || card.family_cards_id || 0);
         var familySeq = Number(card.family_seq || 0);
         var parts = [
@@ -1343,7 +1347,7 @@
                 + '<i class="ti ti-file-check" aria-hidden="true"></i> Termo assinado</a>'
             : '';
 
-        var cardCode = String(card.code || ('#' + cardId));
+        var cardCode = displayCardCode(card.code, cardId);
         var cardTop = '<div class="tralla-card-top">'
             + '<span class="tralla-card-id-chip" title="ID do card: ' + attr(cardCode) + '">'
             + esc(cardCode) + '</span>'
@@ -1540,7 +1544,7 @@
 
         return '<div class="tralla-modal-head">'
             + '<div>'
-            + '<div class="tralla-detail-code">' + esc(card.code || ('#' + card.id))
+            + '<div class="tralla-detail-code">' + esc(displayCardCode(card.code, card.id))
             + ' · ' + esc(card.list_name || '') + '</div>'
             + (card.workflow_type === 'call' ? '<span class="tralla-card-call-badge">Chamado</span>' : '')
             + '<h2 class="tralla-detail-title">' + esc(card.name) + '</h2>'
@@ -1559,7 +1563,7 @@
 
     function renderSideMeta(card) {
         var rows = '';
-        rows += metaRow('Código', card.code || ('#' + card.id));
+        rows += metaRow('Código', displayCardCode(card.code, card.id));
         rows += metaRow('Lista', card.list_name);
         rows += metaRow('Tipo', isUpdates ? (card.update_mode === 'checklist' ? 'Checklist' : 'Descrição')
             : (isMaintenance ? (card.workflow_type === 'call' ? 'Chamado' : 'Manutenção') : 'Normal'));
@@ -1687,7 +1691,7 @@
                 + '<p class="tralla-dialog-message">Escolha a prioridade. Ao liberar, o card fica disponível para Pegar e os prazos começam a contar.</p>'
                 + '</div></div>'
                 + (card ? '<div class="tralla-confirm-card"><span>Card</span><strong><span class="tralla-confirm-code">'
-                    + esc(card.code || ('#' + card.id)) + '</span> ' + esc(card.name) + '</strong></div>' : '')
+                    + esc(displayCardCode(card.code, card.id)) + '</span> ' + esc(card.name) + '</strong></div>' : '')
                 + '<div class="tralla-priority-options" role="radiogroup" aria-label="Prioridade">'
                 + list.map(function (item) {
                     return '<label class="tralla-priority-option is-' + attr(String(item.key).toLowerCase()) + '">'
@@ -2075,7 +2079,7 @@
                 + '<i class="ti ti-arrow-up-right"></i> Ver origem</button>'
             : '';
         var parentLine = card.parent
-            ? '<small>Card de origem: ' + esc(card.parent.code) + ' — ' + esc(card.parent.name) + '</small>'
+            ? '<small>Card de origem: ' + esc(displayCardCode(card.parent.code, card.parent.id)) + ' — ' + esc(card.parent.name) + '</small>'
             : '';
 
         if (kind === 'deletion') {
@@ -2170,7 +2174,7 @@
         var chips = members.map(function (member) {
             return '<button type="button" class="tralla-family-chip' + (member.is_current ? ' is-current' : '')
                 + '" data-open-card="' + Number(member.id) + '">'
-                + '<span class="tralla-family-code">' + esc(member.code) + '</span>'
+                + '<span class="tralla-family-code">' + esc(displayCardCode(member.code, member.id)) + '</span>'
                 + '<span class="tralla-family-name">' + esc(member.name) + '</span>'
                 + '<small>' + esc(member.status_label || member.status || '') + '</small>'
                 + '</button>';
@@ -2179,7 +2183,7 @@
         var originBlock = origin
             ? '<p class="tralla-split-origin"><i class="ti ti-git-branch"></i> Separado de '
                 + '<button type="button" class="tralla-link-btn" data-open-card="' + Number(origin.id) + '">'
-                + esc(origin.code) + ' — ' + esc(origin.name) + '</button></p>'
+                + esc(displayCardCode(origin.code, origin.id)) + ' — ' + esc(origin.name) + '</button></p>'
             : '';
 
         return '<section class="tralla-detail-section tralla-family-section">'
@@ -2329,16 +2333,24 @@
             + '<aside class="tralla-detail-side">' + side + '</aside></div></div>', true);
     }
 
+    function approvalCardsInBoard() {
+        var approvalList = (state.lists || []).find(function (list) {
+            return list.category === 'maintenance_approval';
+        });
+        if (!approvalList) { return []; }
+        return (state.cards || []).filter(function (item) {
+            return Number(item.plugin_tralla_lists_id) === Number(approvalList.id)
+                && Number(item.stage) === 2;
+        }).sort(compareBySla);
+    }
+
     function renderApprovalNavigation(card) {
         if (!isMaintenance || Number(card.stage) !== 2) { return ''; }
         var approvalList = (state.lists || []).find(function (list) {
             return list.category === 'maintenance_approval';
         });
         if (!approvalList || Number(card.plugin_tralla_lists_id) !== Number(approvalList.id)) { return ''; }
-        var approvalCards = (state.cards || []).filter(function (item) {
-            return Number(item.plugin_tralla_lists_id) === Number(approvalList.id)
-                && Number(item.stage) === 2;
-        }).sort(compareBySla);
+        var approvalCards = approvalCardsInBoard();
         if (!approvalCards.some(function (item) { return Number(item.id) === Number(card.id); })) {
             approvalCards.push(card);
         }
@@ -2352,7 +2364,7 @@
                     + esc(approvalKindClass(item)) + (current ? ' is-current' : '') + '"'
                     + ' data-open-card="' + Number(item.id) + '"'
                     + (current ? ' aria-current="true" autofocus' : '') + '>'
-                    + '<span class="tralla-approval-navigation-code">' + esc(item.code || ('#' + item.id))
+                    + '<span class="tralla-approval-navigation-code">' + esc(displayCardCode(item.code, item.id))
                     + (item.workflow_type === 'call' ? ' · Chamado' : '') + '</span>'
                     + '<strong>' + esc(item.name) + '</strong>'
                     + '<span class="tralla-approval-navigation-kind">' + esc(approvalKindLabel(item)) + '</span>'
@@ -2457,13 +2469,13 @@
                 var canSign = !!item.assignature_url;
                 return '<div class="tralla-withdrawal-pick' + (withdrawalSelection[Number(item.id)] && canSign ? ' is-selected' : '') + '">'
                     + '<input type="checkbox" class="tralla-withdrawal-check" data-withdrawal-select value="' + Number(item.id) + '"'
-                    + ' aria-label="Selecionar ' + attr(item.code || ('#' + item.id)) + ' para assinar"'
+                    + ' aria-label="Selecionar ' + attr(displayCardCode(item.code, item.id)) + ' para assinar"'
                     + (withdrawalSelection[Number(item.id)] && canSign ? ' checked' : '')
                     + (canSign ? '' : ' disabled title="Assignat-ure não configurado"') + '>'
                     + '<button type="button" class="tralla-approval-navigation-item'
                     + (current ? ' is-current' : '') + '" data-open-card="' + Number(item.id) + '"'
                     + (current ? ' aria-current="true"' : '') + '>'
-                    + '<span class="tralla-approval-navigation-code">' + esc(item.code || ('#' + item.id)) + '</span>'
+                    + '<span class="tralla-approval-navigation-code">' + esc(displayCardCode(item.code, item.id)) + '</span>'
                     + '<strong>' + esc(item.name) + '</strong>'
                     + '<span class="tralla-approval-navigation-kind">'
                     + esc(item.machine_summary || ((item.machine_count || 0) + ' máquina(s)')) + '</span>'
@@ -2777,7 +2789,7 @@
                 + '</div></div>'
                 + (options.card ? '<div class="tralla-confirm-card">'
                     + '<span>Card selecionado</span>'
-                    + '<strong><span class="tralla-confirm-code">' + esc(options.card.code || ('#' + options.card.id)) + '</span> '
+                    + '<strong><span class="tralla-confirm-code">' + esc(displayCardCode(options.card.code, options.card.id)) + '</span> '
                     + esc(options.card.name) + '</strong>'
                     + '<small>' + esc(options.card.workflow_type === 'call' ? 'Chamado' : 'Manutenção')
                     + (machineCount ? ' · ' + machineCount + (machineCount === 1 ? ' máquina' : ' máquinas') : '')
@@ -3070,10 +3082,13 @@
                 applyState(data);
                 toast(departingCard.workflow_type === 'call'
                     ? 'Chamado finalizado e enviado para aprovação.' : data.pending_card
-                    ? 'Manutenção enviada para aprovação. Máquinas pendentes no card ' + (data.pending_card.code || ('#' + data.pending_card.id)) + '.'
+                    ? 'Manutenção enviada para aprovação. Máquinas pendentes no card ' + displayCardCode(data.pending_card.code, data.pending_card.id) + '.'
                     : 'Manutenção finalizada e enviada para aprovação.', 'success');
                 await openCard(data.approval ? data.approval.id : cardId);
             } else if (action === 'approve') {
+                var approvalPosition = isCallReleaseApproval
+                    ? approvalCardsInBoard().findIndex(function (item) { return Number(item.id) === Number(cardId); })
+                    : -1;
                 data = await api('approve_card', { id: cardId, priority: chosenPriority });
                 applyState(data);
                 scheduleDepartingCard(departingCard, 'approved');
@@ -3088,7 +3103,12 @@
                     await openCard(data.card.id);
                 } else if (isCallReleaseApproval) {
                     toast('Card liberado como ' + (priorityInfo(chosenPriority).label || chosenPriority) + '. Um técnico já pode clicar em Pegar.', 'success');
-                    await openCard(data.card.id);
+                    var remainingApprovals = approvalCardsInBoard();
+                    if (remainingApprovals.length) {
+                        await openCard(remainingApprovals[Math.min(Math.max(approvalPosition, 0), remainingApprovals.length - 1)].id);
+                    } else {
+                        closeModal();
+                    }
                 } else {
                     toast(departingCard.workflow_type === 'call'
                         ? 'Chamado aprovado e concluído.' : data.card.family_ready
@@ -3127,7 +3147,7 @@
         showModal('<form id="tralla-split-form" class="tralla-form" novalidate>'
             + '<div class="tralla-modal-head"><div>'
             + '<h2><i class="ti ti-git-branch"></i> Separar card</h2>'
-            + '<p>' + esc(card.code || ('#' + card.id)) + ' · ' + esc(card.name) + '</p>'
+            + '<p>' + esc(displayCardCode(card.code, card.id)) + ' · ' + esc(card.name) + '</p>'
             + '</div>' + modalCloseButton() + '</div>'
             + '<div class="tralla-modal-body">'
             + '<p class="tralla-muted">Selecione as máquinas e envie para aprovação. Após aprovada, a separação criará um novo card. Quando os dois forem finalizados e aprovados, as máquinas voltarão ao card de origem para a retirada.</p>'
@@ -3164,7 +3184,7 @@
             var approval = data.approval;
             applyState(data);
             closeModal();
-            toast('Separação enviada para aprovação em ' + (approval.code || ('#' + approval.id)) + '.', 'success');
+            toast('Separação enviada para aprovação em ' + displayCardCode(approval.code, approval.id) + '.', 'success');
             await openCard(data.card.id);
         } catch (error) {
             toast(error.message, 'error');
@@ -3232,7 +3252,7 @@
         showModal('<form id="tralla-edit-form" class="tralla-form" novalidate>'
             + '<div class="tralla-modal-head"><div>'
             + '<h2><i class="ti ti-pencil"></i> Solicitar edição</h2>'
-            + '<p>' + esc(card.code || ('#' + card.id)) + ' · ' + esc(card.name) + '</p>'
+            + '<p>' + esc(displayCardCode(card.code, card.id)) + ' · ' + esc(card.name) + '</p>'
             + '</div>' + modalCloseButton() + '</div>'
             + '<div class="tralla-modal-body">'
             + nameField
@@ -3353,7 +3373,7 @@
                 + cards.map(function (card) {
                     var cardId = Number(card.id);
                     return '<tr>'
-                        + '<td><span class="tralla-cell-title">' + esc(card.code || ('#' + cardId)) + '</span></td>'
+                        + '<td><span class="tralla-cell-title">' + esc(displayCardCode(card.code, cardId)) + '</span></td>'
                         + '<td>' + esc(card.name || '—') + '</td>'
                         + '<td><span class="tralla-cell-details">' + esc(card.deletion_reason || '—') + '</span></td>'
                         + '<td>' + esc(card.requested_at_formatted || '—') + '</td>'
@@ -3440,7 +3460,7 @@
                 + rows.map(function (row) {
                     return '<tr>'
                         + '<td>' + esc(row.date_formatted || '—') + '</td>'
-                        + '<td><span class="tralla-cell-title">' + esc(row.card_code || ('#' + row.card_id)) + '</span>'
+                        + '<td><span class="tralla-cell-title">' + esc(displayCardCode(row.card_code, row.card_id)) + '</span>'
                         + (row.card_name ? '<span class="tralla-cell-sub">' + esc(row.card_name) + '</span>' : '')
                         + '</td>'
                         + '<td>' + esc(row.action_label || row.action || '—') + '</td>'
