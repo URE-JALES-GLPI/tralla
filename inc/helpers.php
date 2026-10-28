@@ -272,9 +272,9 @@ if (!function_exists('tralla_code_cache')) {
      */
     function &tralla_code_cache(bool $reset = false): array
     {
-        static $cache = ['split' => [], 'rows' => []];
+        static $cache = ['split' => [], 'rows' => [], 'numbers' => []];
         if ($reset) {
-            $cache = ['split' => [], 'rows' => []];
+            $cache = ['split' => [], 'rows' => [], 'numbers' => []];
         }
         return $cache;
     }
@@ -303,6 +303,32 @@ if (!function_exists('tralla_code_root_has_split')) {
             $cache['split'][$root] = is_array($row);
         }
         return $cache['split'][$root];
+    }
+}
+
+if (!function_exists('tralla_code_number')) {
+    /** Número visual do card raiz no quadro; sem número atribuído, o id interno. */
+    function tralla_code_number(int $root, ?array $rootRow = null): int
+    {
+        global $DB;
+        if ($root <= 0) {
+            return 0;
+        }
+        $cache = &tralla_code_cache();
+        if (is_array($rootRow) && (int) ($rootRow['id'] ?? 0) === $root && array_key_exists('code_number', $rootRow)) {
+            $cache['numbers'][$root] = (int) $rootRow['code_number'];
+        }
+        if (!array_key_exists($root, $cache['numbers'])) {
+            $row = isset($DB) && is_object($DB) ? $DB->request([
+                'SELECT' => ['code_number'],
+                'FROM'   => 'glpi_plugin_tralla_cards',
+                'WHERE'  => ['id' => $root],
+                'LIMIT'  => 1,
+            ])->current() : null;
+            $cache['numbers'][$root] = is_array($row) ? (int) $row['code_number'] : 0;
+        }
+
+        return $cache['numbers'][$root] > 0 ? $cache['numbers'][$root] : $root;
     }
 }
 
@@ -337,7 +363,7 @@ if (!function_exists('tralla_display_code')) {
                 }
             }
             $root = (int) ($card['code_root_cards_id'] ?? 0) ?: (int) ($card['family_cards_id'] ?? 0) ?: $parentId;
-            return $root > 0 ? (string) $root : ($id > 0 ? '#' . $id : '');
+            return $root > 0 ? (string) tralla_code_number($root) : ($id > 0 ? '#' . $id : '');
         }
 
         $isMaintenance = $board_type === 'maintenance' || !empty($card['is_maintenance']);
@@ -351,11 +377,12 @@ if (!function_exists('tralla_display_code')) {
                 $familyRoot = $id;
             }
             $familySeq = max(1, (int) ($card['family_seq'] ?? 1));
+            $number = tralla_code_number($familyRoot, $card);
 
             if ($familySeq > 1 || tralla_code_root_has_split($familyRoot)) {
-                return $familyRoot . '/' . $familySeq;
+                return $number . '/' . $familySeq;
             }
-            return (string) $familyRoot;
+            return (string) $number;
         }
 
         return $id > 0 ? '#' . $id : '';

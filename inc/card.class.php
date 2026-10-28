@@ -874,10 +874,15 @@ class PluginTrallaCard extends CommonDBTM
                 }
             }
 
-            if ($deferCall) {
-                $DB->beginTransaction();
-            }
+            $DB->beginTransaction();
             try {
+            // Serializa a numeração visual do quadro.
+            $DB->doQuery(sprintf('SELECT `id` FROM `glpi_plugin_tralla_boards` WHERE `id` = %d FOR UPDATE', $boards_id));
+            $numberRow = $DB->request([
+                'SELECT' => ['MAX' => 'code_number AS max_number'],
+                'FROM'   => 'glpi_plugin_tralla_cards',
+                'WHERE'  => ['plugin_tralla_boards_id' => $boards_id],
+            ])->current();
             $DB->insert('glpi_plugin_tralla_cards', [
                 'plugin_tralla_boards_id' => $boards_id,
                 'plugin_tralla_lists_id'  => (int) $list['id'],
@@ -913,6 +918,7 @@ class PluginTrallaCard extends CommonDBTM
                 'family_cards_id' => $cardId,
                 'code_root_cards_id' => $cardId,
                 'family_seq'      => 1,
+                'code_number'     => (int) ($numberRow['max_number'] ?? 0) + 1,
             ], ['id' => $cardId]);
 
             $rank = 1024.0;
@@ -936,13 +942,9 @@ class PluginTrallaCard extends CommonDBTM
 
             PluginTrallaHistory::log($cardId, $userId, 'card_created',
                 ($workflowType === 'call' ? 'Chamado' : 'Card de manutenção') . ' criado com ' . count($machines) . ' máquina(s).');
-            if ($deferCall) {
-                $DB->commit();
-            }
+            $DB->commit();
             } catch (Throwable $e) {
-                if ($deferCall) {
-                    $DB->rollBack();
-                }
+                $DB->rollBack();
                 throw $e;
             }
 
@@ -2414,7 +2416,7 @@ class PluginTrallaCard extends CommonDBTM
                     'plugin_tralla_cards_id' => $childId, 'date_mod' => $now,
                 ], ['id' => $ids]);
                 PluginTrallaMachine::refreshCardTotal($parentId);
-                PluginTrallaHistory::log($parentId, $userId, 'card_split', 'Separação aprovada; card ' . $codeRoot . '/' . $seq . ' criado.');
+                PluginTrallaHistory::log($parentId, $userId, 'card_split', 'Separação aprovada; card ' . tralla_code_number($codeRoot) . '/' . $seq . ' criado.');
                 PluginTrallaHistory::log($childId, $userId, 'card_split', 'Card criado após aprovação da separação.');
             }
 

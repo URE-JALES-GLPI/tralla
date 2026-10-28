@@ -121,6 +121,7 @@ function plugin_tralla_install(): bool
                 `family_cards_id`         INT {$sign} NOT NULL DEFAULT '0' COMMENT 'card raiz da família',
                 `code_root_cards_id`      INT {$sign} NOT NULL DEFAULT '0' COMMENT 'raiz da numeração visual',
                 `family_seq`              INT {$sign} NOT NULL DEFAULT '1' COMMENT 'posição na numeração visual',
+                `code_number`             INT {$sign} NOT NULL DEFAULT '0' COMMENT 'número visual sequencial do card raiz no quadro',
                 `split_from_cards_id`     INT {$sign} NOT NULL DEFAULT '0' COMMENT 'card que originou a separação',
                 `status`                  VARCHAR(30)  NOT NULL DEFAULT '' COMMENT 'normal,pending,in_progress,waiting_approval,withdrawal,done,approved,rejected,deletion_pending,deleted',
                 `workflow_type`           VARCHAR(20)  NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|call',
@@ -195,6 +196,7 @@ function plugin_tralla_install(): bool
         'priority'                    => "VARCHAR(2)   NOT NULL DEFAULT '' COMMENT 'P1..P5'",
         'date_sla_start'              => 'DATETIME     DEFAULT NULL',
         'withdrawal_notice_marked'    => "TINYINT(1) NOT NULL DEFAULT '0'",
+        'code_number'                 => "INT {$sign} NOT NULL DEFAULT 0",
     ];
     $added_is_deleted = false;
     $added_approval_kind = false;
@@ -290,6 +292,32 @@ function plugin_tralla_install(): bool
             $DB->rollBack();
             throw $e;
         }
+    }
+
+    // Número visual sequencial por quadro (1, 2, 3...) para cada card raiz, independente
+    // do id interno, que também é consumido por cards de aprovação. Idempotente.
+    $nextNumber = [];
+    foreach ($DB->request([
+        'SELECT' => ['plugin_tralla_boards_id', 'MAX' => 'code_number AS max_number'],
+        'FROM'   => 'glpi_plugin_tralla_cards',
+        'GROUPBY' => 'plugin_tralla_boards_id',
+    ]) as $row) {
+        $nextNumber[(int) $row['plugin_tralla_boards_id']] = (int) $row['max_number'];
+    }
+    foreach ($DB->request([
+        'SELECT' => ['id', 'plugin_tralla_boards_id', 'code_root_cards_id', 'family_cards_id'],
+        'FROM'   => 'glpi_plugin_tralla_cards',
+        'WHERE'  => ['stage' => 1, 'code_number' => 0],
+        'ORDER'  => 'id ASC',
+    ]) as $row) {
+        $cardId = (int) $row['id'];
+        $root = (int) $row['code_root_cards_id'] ?: (int) $row['family_cards_id'] ?: $cardId;
+        if ($root !== $cardId) {
+            continue;
+        }
+        $boardId = (int) $row['plugin_tralla_boards_id'];
+        $nextNumber[$boardId] = ($nextNumber[$boardId] ?? 0) + 1;
+        $DB->update('glpi_plugin_tralla_cards', ['code_number' => $nextNumber[$boardId]], ['id' => $cardId]);
     }
 
     if ($cards_table_existed) {

@@ -204,6 +204,16 @@ class PluginTrallaHistory extends CommonDBTM
         if ($cardFilter !== null) {
             $type = (string) ($cardFilter['type'] ?? 'all');
             $id = (int) ($cardFilter['id'] ?? 0);
+            // O código digitado é o número visual do quadro; converte para o card raiz.
+            $rootRow = $DB->request([
+                'SELECT' => ['id'],
+                'FROM'   => 'glpi_plugin_tralla_cards',
+                'WHERE'  => ['plugin_tralla_boards_id' => $boardId, 'stage' => 1, 'code_number' => $id],
+                'LIMIT'  => 1,
+            ])->current();
+            if (is_array($rootRow)) {
+                $id = (int) $rootRow['id'];
+            }
 
             if ($type === 'stage') {
                 $where['c.code_root_cards_id'] = $id;

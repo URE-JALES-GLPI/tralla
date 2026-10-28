@@ -1046,19 +1046,13 @@
 
         var cardId = String(card.id || '');
         var code = displayCardCode(card.code, cardId);
-        var familyRoot = Number(card.code_root_cards_id || card.family_cards_id || 0);
-        var familySeq = Number(card.family_seq || 0);
+        // O código visual (#3, #3/2) é o número do card no quadro, não o id interno.
         var parts = [
             card.name,
             card.technician_name,
             code,
-            cardId,
-            '#' + cardId
+            code.replace(/^#/, '')
         ];
-        if (familyRoot > 0) {
-            parts.push(String(familyRoot));
-            parts.push(familyRoot + '/' + familySeq);
-        }
         if (Number(card.stage) === 2 && card.parent && card.parent.code) {
             parts.push(card.parent.code);
         }

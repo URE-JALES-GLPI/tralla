@@ -83,6 +83,7 @@ Pendente --Pegar--> Em Andamento --Finalizar--> Retirada --Confirmar--> Concluí
 - **Pegar**: grava o técnico responsável e move o card para Em Andamento. No card minimizado em Manutenção Pendente, o botão compacto **Pegar** executa a ação sem abrir o modal.
 - **Editar máquinas**: somente o técnico responsável, enquanto o card está em andamento e desbloqueado.
 - **Finalizar**: exige relatório, **Serviço realizado** e status `done`, `not_repairable` (Inservível) ou `pending` em todas as máquinas. É necessário ao menos uma máquina concluída ou inservível. As máquinas pendentes são reunidas em um novo card na lista **Manutenção Pendente**; o card atual é finalizado com as demais máquinas, sem passar por aprovação. Quando todos os cards de uma separação estiverem finalizados, reúne as máquinas no card de origem, arquiva os cards separados e libera somente a origem para Retirada. O Chamado continua passando por aprovação antes de ir para Concluído.
+- **Numeração**: cada card principal recebe um número sequencial próprio no quadro (`#1`, `#2`, `#3`...), independente do id interno, que também é usado pelos cards de aprovação. Separações e aprovações continuam esse número (`#3/2`).
 - **Histórico da separação**: no card reunido, o cabeçalho mostra os cards da separação (ex.: `30/1`, `30/2`). Ao clicar em um deles, o card é exibido como estava durante a separação, somente leitura, com técnico, máquinas e histórico próprios, e um botão para voltar ao card completo. Cada máquina mostra o técnico e o card em que foi feita, e o histórico do card reunido junta os eventos de todos os cards, identificando a origem de cada um.
 - **Confirmar retirada**: move o card de origem para Concluído e grava a data de retirada.
 - **Separar card**: seleciona máquinas e cria uma aprovação com o próximo número visual. Se aprovada, cria um card irmão com o número seguinte; se recusada, nenhuma máquina é movida. A separação fica bloqueada quando algum membro da família está em aprovação ou retirada.
@@ -175,7 +176,7 @@ A aba **Excluídos** mostra somente exclusões concluídas. Solicitações pende
 
 O botão **Histórico** fica disponível para todos os membros do quadro e abre um modal com os eventos de todos os cards, inclusive excluídos.
 
-- Filtre por ID do card (`123`, `#123`, `123/1` ou `123/2`), usuário do quadro, texto da máquina (nome, número de série ou ID), modelo, tipo de atualização, data inicial e data final. Os filtros podem ser combinados; máquina e modelo incluem o histórico do card de aprovação vinculado.
+- Filtre pelo código do card (`12`, `#12`, `12/1` ou `12/2`), usuário do quadro, texto da máquina (nome, número de série ou ID), modelo, tipo de atualização, data inicial e data final. Os filtros podem ser combinados; máquina e modelo incluem o histórico do card de aprovação vinculado.
 - A tabela mostra data/hora, card, ação, usuário e detalhes.
 - Os resultados são paginados, com 50 eventos por página.
 - **Limpar** remove os filtros e volta à primeira página.
