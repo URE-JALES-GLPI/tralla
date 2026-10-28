@@ -2479,11 +2479,20 @@
             body += '<section class="tralla-detail-section">'
                 + '<h3><i class="ti ti-file-text"></i> Descrição</h3>'
                 + (permissions.edit_description
-                    ? '<div class="tralla-field"><label for="tralla-detail-description">Descrição do card</label>'
+                    ? '<div data-description-view>'
+                        + '<div class="tralla-detail-description">'
+                        + (card.description ? esc(card.description) : '<span class="tralla-empty-mini">Sem descrição.</span>')
+                        + '</div><div class="tralla-detail-edit-actions">'
+                        + '<button type="button" class="tralla-btn tralla-btn-ghost" data-edit-description>'
+                        + '<i class="ti ti-pencil"></i> Editar descrição</button></div></div>'
+                        + '<div data-description-editor hidden>'
+                        + '<div class="tralla-field"><label for="tralla-detail-description">Descrição do card</label>'
                         + '<textarea id="tralla-detail-description" rows="4" maxlength="2000"'
                         + ' placeholder="Descreva este atendimento...">' + esc(card.description || '') + '</textarea></div>'
-                        + '<div class="tralla-detail-edit-actions"><button type="button" class="tralla-btn tralla-btn-primary"'
-                        + ' data-save-description><i class="ti ti-device-floppy"></i> Salvar descrição</button></div>'
+                        + '<div class="tralla-detail-edit-actions">'
+                        + '<button type="button" class="tralla-btn tralla-btn-ghost" data-cancel-description>Cancelar</button>'
+                        + '<button type="button" class="tralla-btn tralla-btn-primary" data-save-description>'
+                        + '<i class="ti ti-device-floppy"></i> Salvar descrição</button></div></div>'
                     : '<div class="tralla-detail-description">' + (card.description ? esc(card.description) : '<span class="tralla-empty-mini">Sem descrição.</span>') + '</div>')
                 + '</section>';
         }
@@ -4903,6 +4912,20 @@
         var saveButton = event.target.closest('[data-save-card]');
         if (saveButton) {
             saveCard(saveButton);
+            return;
+        }
+        var editDescriptionButton = event.target.closest('[data-edit-description]');
+        if (editDescriptionButton) {
+            modalRoot.querySelector('[data-description-view]').hidden = true;
+            modalRoot.querySelector('[data-description-editor]').hidden = false;
+            modalRoot.querySelector('#tralla-detail-description').focus();
+            return;
+        }
+        var cancelDescriptionButton = event.target.closest('[data-cancel-description]');
+        if (cancelDescriptionButton) {
+            modalRoot.querySelector('#tralla-detail-description').value = activeCard.description || '';
+            modalRoot.querySelector('[data-description-editor]').hidden = true;
+            modalRoot.querySelector('[data-description-view]').hidden = false;
             return;
         }
         var saveDescriptionButton = event.target.closest('[data-save-description]');
