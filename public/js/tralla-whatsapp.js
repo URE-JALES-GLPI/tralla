@@ -92,6 +92,70 @@
         }, 4200);
     }
 
+    /**
+     * Confirmação no padrão do Tralla (mesma marcação do diálogo do Kanban),
+     * no lugar do confirm() do navegador. Resolve true ao confirmar.
+     */
+    function confirmDialog(config) {
+        return new Promise(function (resolve) {
+            var uid = 'tralla-wa-dialog-' + Date.now();
+            var tone = config.tone === 'danger' ? 'danger' : 'primary';
+            var previousFocus = document.activeElement;
+            var layer = document.createElement('div');
+            layer.className = 'tralla-dialog-layer';
+            layer.innerHTML = '<div class="tralla-dialog-backdrop" data-dialog-backdrop></div>'
+                + '<div class="tralla-modal tralla-dialog tralla-dialog-' + tone + '" role="alertdialog" aria-modal="true"'
+                + ' aria-labelledby="' + uid + '-title" aria-describedby="' + uid + '-message">'
+                + '<div class="tralla-dialog-head">'
+                + '<span class="tralla-dialog-icon" aria-hidden="true"><i class="ti ' + esc(config.icon || 'ti-info-circle') + '"></i></span>'
+                + '<div class="tralla-dialog-copy">'
+                + '<h2 class="tralla-dialog-title" id="' + uid + '-title">' + esc(config.title || 'Confirmar') + '</h2>'
+                + '<p class="tralla-dialog-message" id="' + uid + '-message">' + esc(config.message || '') + '</p>'
+                + '</div></div>'
+                + '<div class="tralla-dialog-actions">'
+                + '<button type="button" class="tralla-btn tralla-btn-ghost" data-dialog-cancel>' + esc(config.cancelLabel || 'Cancelar') + '</button>'
+                + '<button type="button" class="tralla-btn ' + (tone === 'danger' ? 'tralla-btn-danger' : 'tralla-btn-primary')
+                + '" data-dialog-confirm>' + esc(config.confirmLabel || 'Confirmar') + '</button>'
+                + '</div></div>';
+            document.body.appendChild(layer);
+            document.body.classList.add('tralla-dialog-open');
+
+            var pressedOutside = false;
+            function finish(result) {
+                document.removeEventListener('keydown', onKeydown, true);
+                layer.remove();
+                if (!document.querySelector('.tralla-dialog-layer')) {
+                    document.body.classList.remove('tralla-dialog-open');
+                }
+                if (previousFocus && typeof previousFocus.focus === 'function' && document.contains(previousFocus)) {
+                    previousFocus.focus();
+                }
+                resolve(result);
+            }
+            function onKeydown(event) {
+                if (event.key === 'Escape' || event.key === 'Enter') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    finish(event.key === 'Enter');
+                }
+            }
+            document.addEventListener('keydown', onKeydown, true);
+            layer.addEventListener('mousedown', function (event) {
+                pressedOutside = event.target.hasAttribute('data-dialog-backdrop');
+            });
+            layer.addEventListener('click', function (event) {
+                if (event.target.closest('[data-dialog-confirm]')) {
+                    finish(true);
+                } else if (event.target.closest('[data-dialog-cancel]')
+                    || (pressedOutside && event.target.hasAttribute('data-dialog-backdrop'))) {
+                    finish(false);
+                }
+                pressedOutside = false;
+            });
+            layer.querySelector('[data-dialog-confirm]').focus();
+        });
+    }
+
     function show(html, wide) {
         root.innerHTML = '<div class="tralla-modal-backdrop" data-wa-backdrop>'
             + '<div class="tralla-modal' + (wide ? ' is-wide' : '') + '" role="dialog" aria-modal="true">' + html + '</div></div>';
@@ -507,8 +571,10 @@
             + (card.workflow_type === 'call' ? '<span class="tralla-card-call-badge">Chamado</span>' : '')
             + '<h2 class="tralla-detail-title">' + esc(card.name) + '</h2>'
             + '<div class="tralla-detail-sub">' + sub + '</div>'
-            + '</div><button type="button" class="tralla-icon-btn" data-wa-close aria-label="Fechar">'
-            + '<i class="ti ti-x"></i></button></div>';
+            + '</div><div class="tralla-wa-head-actions">'
+            + '<button type="button" class="tralla-btn tralla-btn-ghost" data-wa-back><i class="ti ti-arrow-left"></i> Voltar</button>'
+            + '<button type="button" class="tralla-icon-btn" data-wa-close aria-label="Fechar">'
+            + '<i class="ti ti-x"></i></button></div></div>';
 
         var main = '<section class="tralla-detail-section">'
             + '<h3><i class="ti ti-file-text"></i> Descrição</h3>'
@@ -615,6 +681,15 @@
             return;
         }
         var label = select.options[select.selectedIndex].textContent;
+        var confirmed = await confirmDialog({
+            icon: 'ti-arrows-exchange',
+            title: 'Transferir o card ' + (button.dataset.waCode || '') + '?',
+            message: 'O card passa a ficar vinculado a ' + label + '. A conversa atual continua no card.',
+            confirmLabel: 'Transferir'
+        });
+        if (!confirmed) {
+            return;
+        }
         button.disabled = true;
         try {
             var result = await post('transfer', { card_id: button.dataset.waTransferConfirm, target_chat_id: select.value });
@@ -665,7 +740,14 @@
     async function finalizeCard(button) {
         var cardId = Number(button.dataset.waFinalize);
         var code = button.dataset.waCode || '';
-        if (!window.confirm('Finalizar o card ' + code + ' no Tralla?\n\nO chamado vai direto para Concluído, sem aprovação.')) {
+        var confirmed = await confirmDialog({
+            icon: 'ti-flag-check',
+            title: 'Finalizar o card ' + code + '?',
+            message: 'O chamado vai direto para Manutenção Concluído, sem aprovação. '
+                + 'O relatório do atendimento precisa estar preenchido.',
+            confirmLabel: 'Finalizar card'
+        });
+        if (!confirmed) {
             return;
         }
         button.disabled = true;
@@ -686,6 +768,27 @@
         }
     }
 
+    /** Volta para a lista; na tela do card, avisa antes de descartar alterações não salvas. */
+    async function goBack() {
+        var description = root.querySelector('#tralla-wa-description');
+        var report = root.querySelector('#tralla-wa-report');
+        var dirty = activeCard && description && report
+            && (description.value.trim() !== String(activeCard.description || '').trim()
+                || report.value.trim() !== String(activeCard.service_report || '').trim());
+        if (dirty && !(await confirmDialog({
+            icon: 'ti-alert-triangle',
+            tone: 'danger',
+            title: 'Descartar alterações?',
+            message: 'A descrição ou o relatório foram alterados e não foram salvos.',
+            confirmLabel: 'Descartar e voltar'
+        }))) {
+            return;
+        }
+        activeCard = null;
+        window.clearInterval(clockTimer);
+        showList();
+    }
+
     /* ----------------------------------------------------------- eventos */
 
     function onClick(event) {
@@ -700,9 +803,7 @@
             return;
         }
         if (target.closest('[data-wa-back]')) {
-            activeCard = null;
-            window.clearInterval(clockTimer);
-            showList();
+            goBack();
             return;
         }
         if (target.closest('[data-wa-create]')) {

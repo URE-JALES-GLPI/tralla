@@ -2966,6 +2966,13 @@ body[data-theme="dark"] .tralla-add-card:disabled:hover,
     max-width: 55%;
 }
 
+.tralla-wa-head-actions {
+    align-items: center;
+    display: flex;
+    flex: none;
+    gap: var(--tr-space-2);
+}
+
 .tralla-wa-empty {
     align-items: center;
     color: var(--tr-muted);
