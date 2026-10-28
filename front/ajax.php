@@ -321,6 +321,14 @@ try {
                 'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id']),
             ]]);
 
+        case 'withdrawal_notice_toggle':
+            tralla_ajax_require(UPDATE);
+            $detail = PluginTrallaCard::toggleWithdrawalNotice(tralla_post_int('id'), $userId);
+            tralla_json(['ok' => true, 'data' => [
+                'card' => $detail,
+                'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id']),
+            ]]);
+
         case 'call_report_update':
             tralla_ajax_require(UPDATE);
             $detail = PluginTrallaCard::updateCallReport(tralla_post_int('id'), tralla_post_string('report'), $userId, $isAdmin);

@@ -134,6 +134,7 @@ function plugin_tralla_install(): bool
                 `date_withdrawn`          DATETIME     DEFAULT NULL,
                 `pending_notified`        TINYINT(1)   NOT NULL DEFAULT '0',
                 `withdrawal_reminded_at`  DATETIME     DEFAULT NULL,
+                `withdrawal_notice_marked` TINYINT(1) NOT NULL DEFAULT '0',
                 `assignature_sent`        TINYINT(1)   NOT NULL DEFAULT '0',
                 `rejection_reason`        TEXT         DEFAULT NULL,
                 `users_id_approver`       INT {$sign} NOT NULL DEFAULT '0',
@@ -193,6 +194,7 @@ function plugin_tralla_install(): bool
         'deletion_previous_is_locked' => 'TINYINT(1)   NOT NULL DEFAULT 0',
         'priority'                    => "VARCHAR(2)   NOT NULL DEFAULT '' COMMENT 'P1..P5'",
         'date_sla_start'              => 'DATETIME     DEFAULT NULL',
+        'withdrawal_notice_marked'    => "TINYINT(1) NOT NULL DEFAULT '0'",
     ];
     $added_is_deleted = false;
     $added_approval_kind = false;

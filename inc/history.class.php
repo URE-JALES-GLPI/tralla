@@ -512,6 +512,8 @@ class PluginTrallaHistory extends CommonDBTM
             'card_created'          => 'Card criado',
             'card_updated'          => 'Card atualizado',
             'card_description_updated' => 'Descrição atualizada',
+            'withdrawal_notice_marked' => 'Aviso de retirada marcado',
+            'withdrawal_notice_cleared' => 'Aviso de retirada desmarcado',
             'card_deleted'          => 'Card excluído',
             'card_deletion_requested' => 'Exclusão solicitada',
             'card_deletion_approved'  => 'Exclusão aprovada',

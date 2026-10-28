@@ -736,7 +736,7 @@
     function machineDisplayTitle(machine, sequence) {
         var model = String((machine && machine.model_name) || '').trim();
         if (model !== '') {
-            return model + (sequence ? ' · unidade ' + sequence : '');
+            return model + (sequence ? ' #' + sequence : '');
         }
 
         return 'Máquina #' + Number((machine && machine.id) || 0);
@@ -1325,6 +1325,17 @@
             ? '<button type="button" class="tralla-card-take" data-card-take="' + cardId + '" title="Pegar para mim">'
                 + '<i class="ti ti-hand-stop" aria-hidden="true"></i> Pegar</button>'
             : '');
+        var noticeButton = !departing && isMaintenance && card.status === 'withdrawal'
+            && Number(card.stage) === 1 && card.permissions && card.permissions.toggle_withdrawal_notice
+            ? '<button type="button" class="tralla-card-notice'
+                + (Number(card.withdrawal_notice_marked) ? ' is-marked' : '')
+                + '" data-card-notice="' + cardId + '" aria-pressed="'
+                + (Number(card.withdrawal_notice_marked) ? 'true' : 'false') + '" title="'
+                + (Number(card.withdrawal_notice_marked) ? 'Desmarcar aviso de retirada' : 'Marcar aviso de retirada')
+                + '" aria-label="' + (Number(card.withdrawal_notice_marked)
+                    ? 'Desmarcar aviso de retirada' : 'Marcar aviso de retirada') + '">'
+                + '<i class="ti ti-bell" aria-hidden="true"></i></button>'
+            : '';
         // Botão "Assinar" removido dos cards do quadro; a assinatura continua no detalhe do card.
         var signButton = '';
         var termButton = card.assignature_term_url
@@ -1360,10 +1371,11 @@
                 ? '<div class="tralla-update-card-progress">'
                     + Number(card.update_progress.done || 0) + '/' + Number(card.update_progress.total || 0)
                     + ' itens</div>' : '')
-            + ((badges || tech || takeButton || signButton)
+            + ((badges || tech || takeButton || signButton || noticeButton)
                 ? '<div class="tralla-card-footer">'
                     + '<div class="tralla-card-badges">' + badges + '</div>'
                     + tech
+                    + noticeButton
                     + takeButton
                     + signButton
                     + '</div>'
@@ -2726,6 +2738,19 @@
             var data = await api('take_card', { id: cardId });
             applyState(data);
             toast('Card atribuído a você.', 'success');
+        } catch (error) {
+            toast(error.message, 'error');
+            setBusy(button, false);
+        }
+    }
+
+    async function toggleWithdrawalNotice(cardId, button) {
+        setBusy(button, true);
+        try {
+            var data = await api('withdrawal_notice_toggle', { id: cardId });
+            applyState(data);
+            toast(Number(data.card.withdrawal_notice_marked)
+                ? 'Aviso de retirada marcado.' : 'Aviso de retirada desmarcado.', 'success');
         } catch (error) {
             toast(error.message, 'error');
             setBusy(button, false);
@@ -4691,6 +4716,14 @@
             return;
         }
 
+        var noticeButton = event.target.closest('[data-card-notice]');
+        if (noticeButton) {
+            event.preventDefault();
+            event.stopPropagation();
+            toggleWithdrawalNotice(Number(noticeButton.dataset.cardNotice), noticeButton);
+            return;
+        }
+
         var updateTakeButton = event.target.closest('[data-update-take]');
         if (updateTakeButton) {
             event.preventDefault();
@@ -4713,7 +4746,7 @@
         if (event.key !== 'Enter' && event.key !== ' ') {
             return;
         }
-        if (event.target.closest('[data-card-take], [data-update-take], .tralla-card-term, .tralla-card-sign')) {
+        if (event.target.closest('[data-card-take], [data-card-notice], [data-update-take], .tralla-card-term, .tralla-card-sign')) {
             return;
         }
         var cardElement = event.target.closest('.tralla-card');

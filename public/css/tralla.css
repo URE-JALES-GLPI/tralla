@@ -1670,6 +1670,34 @@ body[data-theme="dark"] .tralla-card-id-chip,
     margin-left: 0;
 }
 
+.tralla-card-notice {
+    align-items: center;
+    background: var(--tr-surface-2);
+    border: 1px solid var(--tr-border);
+    border-radius: var(--tr-radius-sm);
+    color: var(--tr-muted);
+    cursor: pointer;
+    display: inline-flex;
+    flex: 0 0 auto;
+    justify-content: center;
+    min-height: 30px;
+    min-width: 30px;
+    padding: 4px;
+}
+
+.tralla-card-notice .ti { font-size: 17px; }
+.tralla-card-notice:hover { border-color: #eab308; color: #a16207; }
+.tralla-card-notice.is-marked {
+    background: #fef3c7;
+    border-color: #eab308;
+    color: #92400e;
+}
+
+.tralla-card-notice:focus-visible {
+    outline: 3px solid color-mix(in srgb, #eab308 40%, transparent);
+    outline-offset: 2px;
+}
+
 .tralla-card-take:focus-visible {
     outline: 3px solid color-mix(in srgb, var(--tr-primary) 35%, transparent);
     outline-offset: 2px;

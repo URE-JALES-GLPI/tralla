@@ -556,6 +556,9 @@ class PluginTrallaCard extends CommonDBTM
             'approve'          => $canApprove,
             'reject'           => $canApprove,
             'withdraw'         => $canConfirm,
+            'toggle_withdrawal_notice' => $isMember && $canUpdate && $boardType === 'maintenance'
+                && $stage === 1 && $status === 'withdrawal'
+                && empty($card['is_archived']) && empty($card['is_deleted']),
             'request_deletion' => $canRequestDeletion,
             'move'             => $isMember && $boardType === 'normal' && $canUpdate,
         ];
@@ -981,6 +984,40 @@ class PluginTrallaCard extends CommonDBTM
             }
             PluginTrallaHistory::log($id, $userId, 'card_description_updated',
                 'Descrição atualizada pelo SuperAdmin do quadro: ' . ($description !== '' ? $description : '(vazia)'));
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
+        }
+
+        return self::getCardDetail($id, $userId);
+    }
+
+    public static function toggleWithdrawalNotice(int $id, int $userId = 0): array
+    {
+        global $DB;
+
+        $userId = $userId ?: (int) Session::getLoginUserID();
+        $card = self::getCard($id);
+        if ($card === null) {
+            throw new RuntimeException('Card não encontrado.');
+        }
+        self::assertBoardAccess($card);
+
+        $DB->beginTransaction();
+        try {
+            self::lockCardRow($id);
+            $card = self::getCard($id);
+            if ($card === null || empty(self::permissionsFor($card, self::getBoardType((int) $card['plugin_tralla_boards_id']), $userId, false)['toggle_withdrawal_notice'])) {
+                throw new RuntimeException('Este card não está disponível para marcar o aviso de retirada.');
+            }
+            $marked = empty($card['withdrawal_notice_marked']) ? 1 : 0;
+            $DB->update('glpi_plugin_tralla_cards', [
+                'withdrawal_notice_marked' => $marked,
+                'date_mod' => tralla_now(),
+            ], ['id' => $id]);
+            PluginTrallaHistory::log($id, $userId, $marked ? 'withdrawal_notice_marked' : 'withdrawal_notice_cleared',
+                $marked ? 'Aviso de retirada marcado no quadro.' : 'Marca de aviso de retirada removida.');
             $DB->commit();
         } catch (Throwable $e) {
             $DB->rollBack();
@@ -3126,6 +3163,7 @@ class PluginTrallaCard extends CommonDBTM
             $DB->update('glpi_plugin_tralla_cards', [
                 'plugin_tralla_lists_id' => (int) $list['id'],
                 'status' => 'withdrawal',
+                'withdrawal_notice_marked' => 0,
                 'is_locked' => 0,
                 'date_mod' => $now,
                 'rank' => self::nextRankForList((int) $list['id']),
