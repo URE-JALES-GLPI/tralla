@@ -77,18 +77,12 @@ Modelos arquivados continuam visíveis em cards e relatórios antigos, mas não 
 ### 4. Fluxo de manutenção
 
 ```text
-Pendente --Pegar--> Em Andamento --Finalizar--> Aprovação (/2)
-                                                        |
-                                              Aprovar --+--> Retirada --Confirmar--> Concluído
-                                                        |
-                                              Reprovar -+--> Em Andamento
+Pendente --Pegar--> Em Andamento --Finalizar--> Retirada --Confirmar--> Concluído
 ```
 
 - **Pegar**: grava o técnico responsável e move o card para Em Andamento. No card minimizado em Manutenção Pendente, o botão compacto **Pegar** executa a ação sem abrir o modal.
 - **Editar máquinas**: somente o técnico responsável, enquanto o card está em andamento e desbloqueado.
-- **Finalizar**: exige relatório, **Serviço realizado** e status `done`, `not_repairable` (Inservível) ou `pending` em todas as máquinas. É necessário ao menos uma máquina concluída ou inservível. As máquinas pendentes são reunidas em um novo card na lista **Manutenção Pendente**; o card atual segue para aprovação com as demais máquinas.
-- **Aprovar finalização**: arquiva o card de aprovação. Quando todos os cards de uma separação estiverem aprovados, reúne as máquinas no card de origem, arquiva os cards separados e libera somente a origem para Retirada.
-- **Reprovar**: devolve o `/1` para Em Andamento com o motivo registrado e arquiva o `/2`.
+- **Finalizar**: exige relatório, **Serviço realizado** e status `done`, `not_repairable` (Inservível) ou `pending` em todas as máquinas. É necessário ao menos uma máquina concluída ou inservível. As máquinas pendentes são reunidas em um novo card na lista **Manutenção Pendente**; o card atual é finalizado com as demais máquinas, sem passar por aprovação. Quando todos os cards de uma separação estiverem finalizados, reúne as máquinas no card de origem, arquiva os cards separados e libera somente a origem para Retirada. O Chamado continua passando por aprovação antes de ir para Concluído.
 - **Confirmar retirada**: move o card de origem para Concluído e grava a data de retirada.
 - **Separar card**: seleciona máquinas e cria uma aprovação com o próximo número visual. Se aprovada, cria um card irmão com o número seguinte; se recusada, nenhuma máquina é movida. A separação fica bloqueada quando algum membro da família está em aprovação ou retirada.
 - **Solicitar edição**: técnico ou admin com atualização solicita alteração de nome e máquinas; cria um card de aprovação com o próximo número visual. Aprovar aplica as alterações; reprovar descarta.

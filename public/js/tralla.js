@@ -3080,10 +3080,10 @@
                 data = await api('finalize_card', { id: cardId });
                 applyState(data);
                 toast(departingCard.workflow_type === 'call'
-                    ? 'Chamado finalizado e enviado para aprovação.' : data.pending_card
-                    ? 'Manutenção enviada para aprovação. Máquinas pendentes no card ' + displayCardCode(data.pending_card.code, data.pending_card.id) + '.'
-                    : 'Manutenção finalizada e enviada para aprovação.', 'success');
-                await openCard(data.approval ? data.approval.id : cardId);
+                    ? 'Chamado finalizado e enviado para aprovação.'
+                    : (data.family_ready ? 'Manutenção finalizada e enviada para Retirada.' : 'Manutenção finalizada; aguardando os demais cards da família.')
+                        + (data.pending_card ? ' Máquinas pendentes no card ' + displayCardCode(data.pending_card.code, data.pending_card.id) + '.' : ''), 'success');
+                await openCard(data.approval ? data.approval.id : data.card.id);
             } else if (action === 'approve') {
                 var approvalPosition = isCallReleaseApproval
                     ? approvalCardsInBoard().findIndex(function (item) { return Number(item.id) === Number(cardId); })

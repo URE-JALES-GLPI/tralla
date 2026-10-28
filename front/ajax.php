@@ -512,6 +512,7 @@ try {
                 'data' => [
                     'card'     => $result['card'],
                     'approval' => $result['approval'],
+                    'family_ready' => $result['family_ready'],
                     'pending_card' => $result['pending_card'],
                     'state'    => tralla_ajax_state((int) $result['card']['plugin_tralla_boards_id']),
                 ],
