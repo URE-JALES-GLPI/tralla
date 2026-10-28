@@ -615,7 +615,11 @@ class PluginTrallaCard extends CommonDBTM
         $description = trim(strip_tags((string) ($data['description'] ?? '')));
         $callCategory = trim((string) ($data['call_category'] ?? ''));
         $callSubcategory = trim((string) ($data['call_subcategory'] ?? ''));
-        if ($boardType === 'maintenance'
+        if ($boardType === 'maintenance' && $workflowType !== 'call') {
+            // Categoria e subcategoria só se aplicam a chamados.
+            $callCategory = '';
+            $callSubcategory = '';
+        } elseif ($boardType === 'maintenance'
             && !tralla_valid_call_category($callCategory, $callSubcategory)) {
             throw new RuntimeException('Selecione uma categoria e subcategoria válidas.');
         }
