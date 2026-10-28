@@ -91,8 +91,14 @@ class PluginTrallaTicketSync
             throw new RuntimeException('O chamado GLPI vinculado #' . $ticketId . ' não existe mais.');
         }
         if ($ticketId > 0 && (int) ($ticket->fields['is_deleted'] ?? 0) === 1) {
-            $DB->update('glpi_plugin_tralla_history', ['ticket_followups_id' => 2147483647], ['id' => $historyId]);
-            return true;
+            if ((string) $primary['status'] === 'deleted') {
+                $DB->update('glpi_plugin_tralla_history', ['ticket_followups_id' => 2147483647], ['id' => $historyId]);
+                return true;
+            }
+            if (!$ticket->restore(['id' => $ticketId])) {
+                throw new RuntimeException('Não foi possível restaurar o chamado #' . $ticketId . '.');
+            }
+            $ticket->getFromDB($ticketId);
         }
         if ($ticketId <= 0) {
             $code = tralla_display_code($primary, 'maintenance');
