@@ -142,7 +142,7 @@ class PluginTrallaTicketSync
             $followupId = (int) $followup->add([
                 'itemtype' => 'Ticket',
                 'items_id' => $ticketId,
-                'content' => $text . "\n[Tralla evento #" . $historyId . ']",
+                'content' => $text . "\n[Tralla evento #" . $historyId . ']',
                 'users_id' => (int) ($event['users_id'] ?? 0),
                 'is_private' => 0,
             ]);
