@@ -60,8 +60,22 @@ if (isset($_POST['ticket_sync_existing'])) {
     require_once GLPI_ROOT . '/plugins/tralla/inc/ticket.class.php';
     PluginTrallaConfig::set('ticket_sync_enabled', '1');
     PluginTrallaConfig::set('ticket_sync_start_history_id', '0');
+    foreach (array_keys(tralla_priorities()) as $priority) {
+        foreach (['tto' => SLM::TTO, 'ttr' => SLM::TTR] as $kind => $type) {
+            $slaId = max(0, (int) ($_POST['ticket_sla_' . $kind . '_' . $priority] ?? 0));
+            $sla = new SLA();
+            if ($slaId > 0 && (!$sla->getFromDB($slaId) || (int) $sla->fields['type'] !== $type)) {
+                Session::addMessageAfterRedirect('O SLA selecionado para ' . $priority . ' é inválido.', false, ERROR);
+                Html::back();
+            }
+            PluginTrallaConfig::set('ticket_sla_' . $kind . '_' . $priority, (string) $slaId);
+        }
+    }
+    PluginTrallaConfig::clearCache();
     $synced = PluginTrallaTicketSync::syncPending(200);
-    Session::addMessageAfterRedirect($synced . ' movimentações sincronizadas. As restantes serão processadas pelo cron do GLPI.', true);
+    $reconciled = PluginTrallaTicketSync::reconcileLinked();
+    Session::addMessageAfterRedirect($synced . ' movimentações sincronizadas; ' . $reconciled
+        . ' chamados existentes atualizados. Eventos restantes serão processados pelo cron do GLPI.', true);
     Html::back();
 }
 

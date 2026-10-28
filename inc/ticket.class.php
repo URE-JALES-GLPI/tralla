@@ -56,6 +56,35 @@ class PluginTrallaTicketSync
         return $synced;
     }
 
+    /** Reaplica status, prioridade e SLAs aos chamados já vinculados. */
+    public static function reconcileLinked(): int
+    {
+        global $DB;
+        $updated = 0;
+        foreach ($DB->request([
+            'SELECT' => ['c.id AS id'],
+            'FROM' => 'glpi_plugin_tralla_cards AS c',
+            'INNER JOIN' => [
+                'glpi_plugin_tralla_boards AS b' => ['ON' => ['c' => 'plugin_tralla_boards_id', 'b' => 'id']],
+            ],
+            'WHERE' => ['c.stage' => 1, 'c.tickets_id' => ['>', 0], 'b.type' => 'maintenance', 'c.is_deleted' => 0],
+        ]) as $row) {
+            try {
+                $card = PluginTrallaCard::getCard((int) $row['id']);
+                if ($card === null) { continue; }
+                $ticket = new Ticket();
+                $ticketId = (int) $card['tickets_id'];
+                if (!$ticket->getFromDB($ticketId)) { continue; }
+                if (self::updateTicket($ticket, $card, $ticketId, self::entityFor($card))) {
+                    $updated++;
+                }
+            } catch (Throwable $e) {
+                error_log('[Tralla] Falha ao reconciliar chamado do card #' . (int) $row['id'] . ': ' . $e->getMessage());
+            }
+        }
+        return $updated;
+    }
+
     private static function syncEvent(int $historyId): bool
     {
         global $DB, $CFG_GLPI;
@@ -157,6 +186,16 @@ class PluginTrallaTicketSync
             throw new RuntimeException('Não foi possível registrar acompanhamento no chamado #' . $ticketId . '.');
         }
         $ticket->getFromDB($ticketId);
+        self::updateTicket($ticket, $primary, $ticketId, $entityId);
+        if ((string) $primary['status'] === 'deleted' && !$ticket->delete(['id' => $ticketId])) {
+            throw new RuntimeException('Não foi possível enviar o chamado #' . $ticketId . ' para a lixeira.');
+        }
+        $DB->update('glpi_plugin_tralla_history', ['ticket_followups_id' => $followupId], ['id' => $historyId]);
+        return true;
+    }
+
+    private static function updateTicket(Ticket $ticket, array $primary, int $ticketId, int $entityId): bool
+    {
         $changes = [];
         $expectedName = '[Tralla ' . tralla_display_code($primary, 'maintenance') . '] ' . (string) $primary['name'];
         if ((string) $ticket->fields['name'] !== $expectedName) {
@@ -181,16 +220,17 @@ class PluginTrallaTicketSync
             }
         }
         if ($changes !== [] && (string) $primary['status'] !== 'deleted') {
+            if ((!empty($changes['slas_id_tto']) || !empty($changes['slas_id_ttr']))
+                && !Session::haveRight(SLM::$rightname, SLM::RIGHT_ASSIGN)) {
+                throw new RuntimeException('Sem permissão para atribuir SLA ao chamado #' . $ticketId . '.');
+            }
             $changes['id'] = $ticketId;
             if (!$ticket->update($changes)) {
                 throw new RuntimeException('Não foi possível atualizar status/SLA do chamado #' . $ticketId . '.');
             }
+            return true;
         }
-        if ((string) $primary['status'] === 'deleted' && !$ticket->delete(['id' => $ticketId])) {
-            throw new RuntimeException('Não foi possível enviar o chamado #' . $ticketId . ' para a lixeira.');
-        }
-        $DB->update('glpi_plugin_tralla_history', ['ticket_followups_id' => $followupId], ['id' => $historyId]);
-        return true;
+        return false;
     }
 
     private static function entityFor(array $card): int
@@ -254,10 +294,14 @@ class PluginTrallaTicketSync
 
     private static function ticketStatus(array $card): int
     {
-        return match ((string) ($card['status'] ?? 'pending')) {
+        $status = (string) ($card['status'] ?? 'pending');
+        if ($status === 'deletion_pending') {
+            $status = (string) (($card['deletion_previous_status'] ?? '') ?: 'in_progress');
+        }
+        return match ($status) {
             'in_progress' => Ticket::ASSIGNED,
-            'waiting_approval', 'approved', 'withdrawal', 'deletion_pending' => Ticket::WAITING,
-            'done' => Ticket::SOLVED,
+            'waiting_approval' => Ticket::ASSIGNED,
+            'approved', 'withdrawal', 'done' => Ticket::SOLVED,
             'deleted' => Ticket::CLOSED,
             default => Ticket::INCOMING,
         };
