@@ -80,11 +80,19 @@ class PluginTrallaTicketSync
         if ($primary === null) {
             return false;
         }
-        $entityId = self::entityFor($primary);
         $ticketId = (int) ($primary['tickets_id'] ?? 0);
+        if ((string) $primary['status'] === 'deleted' && $ticketId <= 0) {
+            $DB->update('glpi_plugin_tralla_history', ['ticket_followups_id' => 2147483647], ['id' => $historyId]);
+            return true;
+        }
+        $entityId = self::entityFor($primary);
         $ticket = new Ticket();
         if ($ticketId > 0 && !$ticket->getFromDB($ticketId)) {
             throw new RuntimeException('O chamado GLPI vinculado #' . $ticketId . ' não existe mais.');
+        }
+        if ($ticketId > 0 && (int) ($ticket->fields['is_deleted'] ?? 0) === 1) {
+            $DB->update('glpi_plugin_tralla_history', ['ticket_followups_id' => 2147483647], ['id' => $historyId]);
+            return true;
         }
         if ($ticketId <= 0) {
             $code = tralla_display_code($primary, 'maintenance');
@@ -139,8 +147,6 @@ class PluginTrallaTicketSync
         if ($followupId <= 0) {
             throw new RuntimeException('Não foi possível registrar acompanhamento no chamado #' . $ticketId . '.');
         }
-        $DB->update('glpi_plugin_tralla_history', ['ticket_followups_id' => $followupId], ['id' => $historyId]);
-
         $ticket->getFromDB($ticketId);
         $changes = [];
         $expectedName = '[Tralla ' . tralla_display_code($primary, 'maintenance') . '] ' . (string) $primary['name'];
@@ -165,12 +171,16 @@ class PluginTrallaTicketSync
                 }
             }
         }
-        if ($changes !== []) {
+        if ($changes !== [] && (string) $primary['status'] !== 'deleted') {
             $changes['id'] = $ticketId;
             if (!$ticket->update($changes)) {
                 throw new RuntimeException('Não foi possível atualizar status/SLA do chamado #' . $ticketId . '.');
             }
         }
+        if ((string) $primary['status'] === 'deleted' && !$ticket->delete(['id' => $ticketId])) {
+            throw new RuntimeException('Não foi possível enviar o chamado #' . $ticketId . ' para a lixeira.');
+        }
+        $DB->update('glpi_plugin_tralla_history', ['ticket_followups_id' => $followupId], ['id' => $historyId]);
         return true;
     }
 
