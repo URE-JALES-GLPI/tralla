@@ -3708,7 +3708,11 @@
 
     function modelOptions(selected) {
         var options = '<option value="">Selecione um modelo...</option>';
-        (state.models || []).forEach(function (model) {
+        (state.models || []).slice().sort(function (left, right) {
+            return String(left.name || '').localeCompare(String(right.name || ''), 'pt-BR', {
+                sensitivity: 'base', numeric: true
+            }) || Number(left.id) - Number(right.id);
+        }).forEach(function (model) {
             options += '<option value="' + Number(model.id) + '"'
                 + (String(model.id) === String(selected) ? ' selected' : '') + '>'
                 + esc(model.name) + '</option>';
