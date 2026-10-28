@@ -538,6 +538,8 @@ class PluginTrallaHistory extends CommonDBTM
             'priority_set'          => 'Prioridade definida',
             'call_report_updated'   => 'Relatório do chamado atualizado',
             'whatsapp_link_transferred' => 'Vínculo do WhatsApp transferido',
+            'whatsapp_watch_created'    => 'Acompanhamento criado em Aprovação',
+            'whatsapp_watch_closed'     => 'Acompanhamento encerrado',
             'machine_added'         => 'Máquina adicionada',
             'machine_updated'       => 'Máquina atualizada',
             'machine_deleted'       => 'Máquina removida',

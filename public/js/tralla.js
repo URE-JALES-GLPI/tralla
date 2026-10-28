@@ -619,6 +619,7 @@
         pending: 'pending',
         in_progress: 'is-in-progress',
         waiting_approval: 'approval',
+        whatsapp_watch: 'approval',
         withdrawal: 'withdrawal',
         done: 'done',
         approved: 'done',
@@ -2117,6 +2118,17 @@
         var parentLine = card.parent
             ? '<small>Card de origem: ' + esc(displayCardCode(card.parent.code, card.parent.id)) + ' — ' + esc(card.parent.name) + '</small>'
             : '';
+
+        if (kind === 'whatsapp') {
+            return '<div class="tralla-approval-banner is-call-release">'
+                + '<i class="ti ti-brand-whatsapp"></i>'
+                + '<div class="tralla-approval-content"><strong>Acompanhamento do chamado aberto pelo WhatsApp</strong>'
+                + parentLine
+                + '<small>Só para acompanhamento: não há aprovação e o card de origem segue em atendimento. '
+                + 'Este card sai daqui quando o de origem for concluído.</small></div>'
+                + openParent
+                + '</div>';
+        }
 
         if (kind === 'deletion') {
             var reason = card.deletion_reason

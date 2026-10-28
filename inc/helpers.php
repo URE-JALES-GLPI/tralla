@@ -113,6 +113,7 @@ if (!function_exists('tralla_status_labels')) {
             'pending'          => 'Pendente',
             'in_progress'      => 'Em andamento',
             'waiting_approval' => 'Aguardando aprovação',
+            'whatsapp_watch'   => 'Acompanhamento',
             'withdrawal'       => 'Aguardando retirada',
             'done'             => 'Concluído',
             'approved'         => 'Aprovado',
@@ -399,6 +400,7 @@ if (!function_exists('tralla_approval_kind_labels')) {
             'edit'        => 'Aprovação de edição',
             'split'       => 'Aprovação de separação',
             'call_release' => 'Liberação e prioridade',
+            'whatsapp'    => 'Acompanhamento (WhatsApp)',
         ];
     }
 }

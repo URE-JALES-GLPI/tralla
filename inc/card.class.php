@@ -1167,12 +1167,18 @@ class PluginTrallaCard extends CommonDBTM
                 'code_number'        => (int) ($numberRow['max_number'] ?? 0) + 1,
             ], ['id' => $cardId]);
 
+            $watchCode = self::createWhatsappWatch($cardId, $boards_id, $userId, $now);
+
             $origin = trim((string) ($data['whatsapp_protocol'] ?? ''));
             PluginTrallaHistory::log($cardId, $userId, 'card_created',
                 'Chamado criado pelo WhatsApp' . ($origin !== '' ? ' (atendimento ' . $origin . ')' : '') . '.');
             PluginTrallaHistory::log($cardId, $userId, 'priority_set',
                 'Prioridade ' . (tralla_priorities()[$priority]['label'] ?? $priority) . ' definida por quem abriu; SLA iniciado.');
             PluginTrallaHistory::log($cardId, $userId, 'card_taken', 'Card pego por ' . tralla_user_name($userId) . '.');
+            if ($watchCode !== '') {
+                PluginTrallaHistory::log($cardId, $userId, 'whatsapp_watch_created',
+                    'Card ' . $watchCode . ' criado em Manutenção Aprovação só para acompanhamento; este card segue livre.');
+            }
             $DB->commit();
         } catch (Throwable $e) {
             $DB->rollBack();
@@ -1180,6 +1186,130 @@ class PluginTrallaCard extends CommonDBTM
         }
 
         return self::getCardDetail($cardId, $userId);
+    }
+
+    /**
+     * Card de acompanhamento em "Manutenção Aprovação" para o chamado aberto
+     * pelo WhatsApp. Não bloqueia o card em andamento (não preenche
+     * approval_cards_id), não tem aprovar/reprovar (status próprio) e é
+     * arquivado quando o card de origem é concluído.
+     *
+     * @return string código do card criado, ou '' se o quadro não tem a lista
+     */
+    private static function createWhatsappWatch(int $cardId, int $boardId, int $userId, string $now): string
+    {
+        global $DB;
+
+        $list = PluginTrallaBoard::findListByCategory($boardId, 'maintenance_approval');
+        $card = self::getCard($cardId);
+        if ($list === null || $card === null) {
+            return '';
+        }
+        $DB->insert('glpi_plugin_tralla_cards', [
+            'plugin_tralla_boards_id' => $boardId,
+            'plugin_tralla_lists_id'  => (int) $list['id'],
+            'entities_id'             => (int) $card['entities_id'],
+            'name'                    => (string) $card['name'],
+            'description'             => (string) $card['description'],
+            'call_category'           => (string) $card['call_category'],
+            'call_subcategory'        => (string) $card['call_subcategory'],
+            'rank'                    => self::nextRankForList((int) $list['id']),
+            'users_id'                => $userId,
+            'technician_id'           => $userId,
+            'stage'                   => 2,
+            'parent_cards_id'         => $cardId,
+            'family_cards_id'         => $cardId,
+            'code_root_cards_id'      => $cardId,
+            'family_seq'              => self::nextCodeSequence($cardId),
+            'approval_kind'           => 'whatsapp',
+            'workflow_type'           => 'call',
+            'status'                  => 'whatsapp_watch',
+            'is_locked'               => 0,
+            'is_archived'             => 0,
+            'source'                  => 'whatsapp',
+            'priority'                => (string) $card['priority'],
+            'date_creation'           => $now,
+            'date_mod'                => $now,
+        ]);
+        $watchId = (int) $DB->insertId();
+        PluginTrallaHistory::log($watchId, $userId, 'whatsapp_watch_created',
+            'Acompanhamento do chamado aberto pelo WhatsApp. O card de origem está em atendimento.');
+        tralla_code_cache(true);
+
+        return tralla_display_code(self::getCard($watchId) ?? [], 'maintenance');
+    }
+
+    /** IDs dos cards de acompanhamento ainda ativos de um card do WhatsApp. */
+    private static function whatsappWatchIds(int $cardId): array
+    {
+        global $DB;
+
+        $ids = [];
+        foreach ($DB->request([
+            'SELECT' => ['id'],
+            'FROM'   => 'glpi_plugin_tralla_cards',
+            'WHERE'  => [
+                'parent_cards_id' => $cardId,
+                'stage'           => 2,
+                'approval_kind'   => 'whatsapp',
+                'is_archived'     => 0,
+            ],
+        ]) as $row) {
+            $ids[] = (int) $row['id'];
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Conclui direto (sem aprovação) um chamado aberto pelo WhatsApp e encerra
+     * o acompanhamento em Aprovação. Exige o relatório do atendimento.
+     */
+    private static function concludeWhatsappCall(int $id, int $userId): void
+    {
+        global $DB;
+
+        $card = self::getCard($id);
+        if ($card === null) {
+            throw new RuntimeException('Card não encontrado.');
+        }
+        $list = PluginTrallaBoard::findListByCategory((int) $card['plugin_tralla_boards_id'], 'maintenance_done');
+        if ($list === null) {
+            throw new RuntimeException('O quadro não possui a lista "Manutenção Concluído".');
+        }
+
+        $DB->beginTransaction();
+        try {
+            self::lockCardRow($id);
+            $card = self::getCard($id);
+            if ($card === null || !tralla_can_transition($card, 'finalize', 'maintenance')) {
+                throw new RuntimeException('Este card não está em andamento.');
+            }
+            if (trim((string) ($card['service_report'] ?? '')) === '') {
+                throw new RuntimeException('Preencha o relatório do atendimento antes de finalizar.');
+            }
+            $now = tralla_now();
+            $DB->update('glpi_plugin_tralla_cards', [
+                'plugin_tralla_lists_id' => (int) $list['id'],
+                'status'                 => 'done',
+                'is_locked'              => 0,
+                'date_finalized'         => $now,
+                'date_approved'          => $now,
+                'date_mod'               => $now,
+                'rank'                   => self::nextRankForList((int) $list['id']),
+            ], ['id' => $id]);
+            foreach (self::whatsappWatchIds($id) as $watchId) {
+                $DB->update('glpi_plugin_tralla_cards', ['is_archived' => 1, 'date_mod' => $now], ['id' => $watchId]);
+                PluginTrallaHistory::log($watchId, $userId, 'whatsapp_watch_closed', 'Card de origem concluído; acompanhamento encerrado.');
+            }
+            PluginTrallaHistory::log($id, $userId, 'card_finalized',
+                'Chamado aberto pelo WhatsApp finalizado por ' . tralla_user_name($userId)
+                . ' e concluído direto, sem aprovação.');
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
+        }
     }
 
     /**
@@ -1311,6 +1441,11 @@ class PluginTrallaCard extends CommonDBTM
         if ($changes !== []) {
             $DB->update('glpi_plugin_tralla_cards', $changes + ['date_mod' => tralla_now()], ['id' => $id]);
             if (isset($changes['description'])) {
+                foreach (self::whatsappWatchIds($id) as $watchId) {
+                    $DB->update('glpi_plugin_tralla_cards', ['description' => $description], ['id' => $watchId]);
+                }
+            }
+            if (isset($changes['description'])) {
                 PluginTrallaHistory::log($id, $userId, 'card_description_updated',
                     tralla_history_change('Descrição', (string) $card['description'], $description) . ' (pelo WhatsApp)');
             }
@@ -1359,7 +1494,7 @@ class PluginTrallaCard extends CommonDBTM
         return self::getCardDetail($id, $userId) + ['previous_chats_id' => $current];
     }
 
-    /** Finaliza pela tela do WhatsApp, com as mesmas regras do Kanban (Chamado segue para aprovação). */
+    /** Finaliza pela tela do WhatsApp: o chamado vai direto para Concluído, sem aprovação. */
     public static function finalizeFromWhatsapp(int $id, array $chatIds, int $userId = 0): array
     {
         $userId = $userId > 0 ? $userId : (int) Session::getLoginUserID();
@@ -1530,6 +1665,9 @@ class PluginTrallaCard extends CommonDBTM
 
         $DB->beginTransaction();
         try {
+            if ((int) $card['stage'] === 1) {
+                $ids = array_merge($ids, self::whatsappWatchIds($id));
+            }
             foreach ($ids as $cardId) {
                 $DB->update('glpi_plugin_tralla_cards', [
                     'description' => $description,
@@ -1902,6 +2040,22 @@ class PluginTrallaCard extends CommonDBTM
         $boardType = self::getBoardType($boards_id);
         if (!tralla_can_transition($card, 'finalize', $boardType)) {
             throw new RuntimeException('Este card não está em andamento.');
+        }
+
+        // Chamado aberto pelo WhatsApp: conclui direto, sem aprovação (também pelo Kanban).
+        if ((string) ($card['source'] ?? '') === 'whatsapp'
+            && (string) ($card['workflow_type'] ?? '') === 'call'
+            && PluginTrallaMachine::getMachinesForCard($id) === []) {
+            if (empty(self::permissionsFor($card, $boardType, $userId, $isAdmin)['edit_machines'])) {
+                throw new RuntimeException('Somente o técnico responsável pode finalizar o card.');
+            }
+            self::concludeWhatsappCall($id, $userId);
+            return [
+                'card'         => self::getCardDetail($id, $userId),
+                'approval'     => null,
+                'family_ready' => false,
+                'pending_card' => null,
+            ];
         }
 
         $pendingCardId = 0;

@@ -2960,7 +2960,10 @@ body[data-theme="dark"] .tralla-add-card:disabled:hover,
 .tralla-wa-card-actions {
     display: flex;
     flex: none;
+    flex-wrap: wrap;
     gap: var(--tr-space-2);
+    justify-content: flex-end;
+    max-width: 55%;
 }
 
 .tralla-wa-empty {

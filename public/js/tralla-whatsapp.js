@@ -2,11 +2,12 @@
  * [URE] Tralla — cards do contato abertos pelo WhatsAppSimples.
  *
  * Três telas no padrão do Kanban:
- * - Cards do contato: chamados ainda não concluídos, com Editar e Finalizar, e "Criar card";
+ * - Cards do contato: chamados ainda não concluídos, com Editar, Transferir e Finalizar, e "Criar card";
  * - Novo card: o modal do Kanban restrito a Chamado, com a prioridade escolhida por quem abre
  *   (o card nasce direto em Manutenção Em Andamento);
  * - Card: descrição e relatório do atendimento editáveis, SLA, detalhes e conversa do WhatsApp;
- * - Transferir: vincula o card a outra conversa (a anterior continua na conversa do card).
+ * - Transferir: vincula o card a outra conversa (a anterior continua na conversa do card);
+ * - Finalizar: o chamado vai direto para Concluído, sem aprovação.
  *
  * Os dados passam pelo WhatsAppSimples, que valida o atendimento e vincula a conversa.
  *
@@ -31,6 +32,7 @@
     var options = null;
     var settings = null;
     var activeCard = null;
+    var listedCards = {};
     var clockTimer = null;
     var pressedOnBackdrop = false;
 
@@ -163,6 +165,10 @@
             return;
         }
         var cards = result.cards || [];
+        listedCards = {};
+        cards.forEach(function (card) {
+            listedCards[card.id] = card;
+        });
         var body = cards.length
             ? cards.map(function (card) {
                 return '<section class="tralla-detail-section tralla-wa-card-row">'
@@ -177,6 +183,10 @@
                     + '<button type="button" class="tralla-btn tralla-btn-ghost" data-wa-open-card="' + Number(card.id) + '">'
                     + '<i class="ti ' + (card.wa && card.wa.edit ? 'ti-pencil' : 'ti-eye') + '"></i> '
                     + (card.wa && card.wa.edit ? 'Editar' : 'Ver') + '</button>'
+                    + (card.wa && card.wa.edit
+                        ? '<button type="button" class="tralla-btn tralla-btn-ghost" data-wa-transfer="' + Number(card.id) + '">'
+                            + '<i class="ti ti-arrows-exchange"></i> Transferir</button>'
+                        : '')
                     + (card.wa && card.wa.finalize
                         ? '<button type="button" class="tralla-btn tralla-btn-primary" data-wa-finalize="' + Number(card.id)
                             + '" data-wa-code="' + esc(displayCode(card.code, card.id)) + '"><i class="ti ti-flag-check"></i> Finalizar</button>'
@@ -540,10 +550,6 @@
                 ? '<button type="button" class="tralla-btn tralla-btn-primary" data-wa-finalize="' + Number(card.id)
                     + '" data-wa-code="' + esc(displayCode(card.code, card.id)) + '"><i class="ti ti-flag-check"></i> Finalizar card</button>'
                 : '')
-            + (wa.edit
-                ? '<button type="button" class="tralla-btn tralla-btn-ghost" data-wa-transfer>'
-                    + '<i class="ti ti-arrows-exchange"></i> Transferir para outra conversa</button>'
-                : '')
             + '<a class="tralla-btn tralla-btn-ghost" href="' + esc(card.url || '#') + '" target="_blank" rel="noopener noreferrer">'
             + '<i class="ti ti-external-link"></i> Abrir no Tralla</a>'
             + '<button type="button" class="tralla-btn tralla-btn-ghost" data-wa-back><i class="ti ti-arrow-left"></i> Voltar aos cards</button>'
@@ -560,17 +566,16 @@
 
     /* ------------------------------------------------------- transferir */
 
-    async function showTransfer() {
-        var card = activeCard;
-        if (!card || !(await saveCard(false))) {
+    async function showTransfer(cardId) {
+        var card = listedCards[cardId];
+        if (!card) {
             return;
         }
-        window.clearInterval(clockTimer);
         showLoading('Transferir card');
         var result = await get('targets');
         if (!result || !result.success) {
             toast((result && result.error) || 'Não foi possível carregar as conversas.', 'error');
-            showCard(card.id);
+            showList();
             return;
         }
         var targets = result.targets || [];
@@ -594,8 +599,8 @@
             + 'e a transferência fica no histórico.</span></p>'
             + '</div>'
             + '<div class="tralla-modal-actions">'
-            + '<button type="button" class="tralla-btn tralla-btn-ghost" data-wa-open-card="' + Number(card.id) + '">'
-            + '<i class="ti ti-arrow-left"></i> Voltar ao card</button>'
+            + '<button type="button" class="tralla-btn tralla-btn-ghost" data-wa-back>'
+            + '<i class="ti ti-arrow-left"></i> Voltar aos cards</button>'
             + (targets.length
                 ? '<button type="button" class="tralla-btn tralla-btn-primary" data-wa-transfer-confirm="' + Number(card.id)
                     + '" data-wa-code="' + esc(displayCode(card.code, card.id)) + '"><i class="ti ti-arrows-exchange"></i> Transferir</button>'
@@ -660,7 +665,7 @@
     async function finalizeCard(button) {
         var cardId = Number(button.dataset.waFinalize);
         var code = button.dataset.waCode || '';
-        if (!window.confirm('Finalizar o card ' + code + ' no Tralla?\n\nO chamado segue para Aprovação, como no quadro.')) {
+        if (!window.confirm('Finalizar o card ' + code + ' no Tralla?\n\nO chamado vai direto para Concluído, sem aprovação.')) {
             return;
         }
         button.disabled = true;
@@ -673,7 +678,7 @@
                 toast((result && result.error) || 'Não foi possível finalizar o card.', 'error');
                 return;
             }
-            toast('Card ' + code + ' finalizado: ' + (result.card.status_label || 'enviado para aprovação') + '.', 'success');
+            toast('Card ' + code + ' finalizado e concluído no Tralla.', 'success');
             changed();
             showList();
         } finally {
@@ -709,8 +714,9 @@
             showCard(Number(open.dataset.waOpenCard));
             return;
         }
-        if (target.closest('[data-wa-transfer]')) {
-            showTransfer();
+        var transferOpen = target.closest('[data-wa-transfer]');
+        if (transferOpen) {
+            showTransfer(Number(transferOpen.dataset.waTransfer));
             return;
         }
         var transfer = target.closest('[data-wa-transfer-confirm]');
