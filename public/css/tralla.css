@@ -1287,7 +1287,8 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
     box-shadow: 0 3px 9px color-mix(in srgb, var(--tr-primary) 25%, transparent);
     min-width: 160px;
 }
-#tralla-edit-form {
+#tralla-edit-form,
+#tralla-split-form {
     flex: 1 1 auto;
     gap: 0;
     max-height: inherit;
@@ -1296,13 +1297,17 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
     width: 100%;
 }
 #tralla-edit-form .tralla-modal-head,
-#tralla-edit-form .tralla-modal-actions { flex: 0 0 auto; }
-#tralla-edit-form .tralla-modal-body {
+#tralla-edit-form .tralla-modal-actions,
+#tralla-split-form .tralla-modal-head,
+#tralla-split-form .tralla-modal-actions { flex: 0 0 auto; }
+#tralla-edit-form .tralla-modal-body,
+#tralla-split-form .tralla-modal-body {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
 }
-#tralla-edit-form .tralla-modal-actions {
+#tralla-edit-form .tralla-modal-actions,
+#tralla-split-form .tralla-modal-actions {
     background: var(--tr-surface);
     border-top: 1px solid var(--tr-border);
     padding-top: 16px;
