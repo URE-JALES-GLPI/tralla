@@ -481,6 +481,10 @@ class PluginTrallaCard extends CommonDBTM
         $canEditCard = $isMember
             && $boardType === 'normal'
             && $canUpdate;
+        $canEditDescription = $isAdmin
+            && $boardType === 'maintenance'
+            && empty($card['is_deleted'])
+            && empty($card['is_archived']);
 
         $canSplit = $isMember
             && !$isCall
@@ -540,6 +544,7 @@ class PluginTrallaCard extends CommonDBTM
         return [
             'view'             => true,
             'edit_card'        => $canEditCard,
+            'edit_description' => $canEditDescription,
             'edit_machines'    => $canEditMachines,
             'add_machine'      => $canEditMachines && !$isCall,
             'delete_machine'   => $canEditMachines && !$isCall,
@@ -928,6 +933,59 @@ class PluginTrallaCard extends CommonDBTM
 
         $DB->update('glpi_plugin_tralla_cards', $fields, ['id' => $id]);
         PluginTrallaHistory::log($id, $userId ?: (int) Session::getLoginUserID(), 'card_updated', 'Dados do card atualizados.');
+
+        return self::getCardDetail($id, $userId);
+    }
+
+    public static function updateDescription(int $id, string $description, int $userId = 0): array
+    {
+        global $DB;
+
+        $userId = $userId ?: (int) Session::getLoginUserID();
+        $card = self::getCard($id);
+        if ($card === null) {
+            throw new RuntimeException('Card não encontrado.');
+        }
+        self::assertBoardAccess($card);
+        if (empty(self::permissionsFor($card, self::getBoardType((int) $card['plugin_tralla_boards_id']), $userId, false)['edit_description'])) {
+            throw new RuntimeException('Somente um SuperAdmin deste quadro pode editar a descrição.');
+        }
+
+        $description = trim(strip_tags($description));
+        if (mb_strlen($description) > 2000) {
+            throw new RuntimeException('A descrição deve ter no máximo 2000 caracteres.');
+        }
+        $now = tralla_now();
+        $ids = [$id];
+        if ((int) $card['stage'] === 2 && (int) $card['parent_cards_id'] > 0) {
+            $parent = self::getCard((int) $card['parent_cards_id']);
+            if ($parent !== null && (int) $parent['plugin_tralla_boards_id'] === (int) $card['plugin_tralla_boards_id']
+                && empty($parent['is_deleted']) && empty($parent['is_archived'])) {
+                $ids[] = (int) $parent['id'];
+            }
+        } elseif ((int) $card['stage'] === 1 && (int) $card['approval_cards_id'] > 0) {
+            $approval = self::getCard((int) $card['approval_cards_id']);
+            if ($approval !== null && (int) $approval['parent_cards_id'] === $id
+                && empty($approval['is_deleted']) && empty($approval['is_archived'])) {
+                $ids[] = (int) $approval['id'];
+            }
+        }
+
+        $DB->beginTransaction();
+        try {
+            foreach ($ids as $cardId) {
+                $DB->update('glpi_plugin_tralla_cards', [
+                    'description' => $description,
+                    'date_mod' => $now,
+                ], ['id' => $cardId]);
+            }
+            PluginTrallaHistory::log($id, $userId, 'card_description_updated',
+                'Descrição atualizada pelo SuperAdmin do quadro: ' . ($description !== '' ? $description : '(vazia)'));
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
+        }
 
         return self::getCardDetail($id, $userId);
     }

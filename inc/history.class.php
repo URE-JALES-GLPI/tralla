@@ -511,6 +511,7 @@ class PluginTrallaHistory extends CommonDBTM
             'board_created'         => 'Quadro criado',
             'card_created'          => 'Card criado',
             'card_updated'          => 'Card atualizado',
+            'card_description_updated' => 'Descrição atualizada',
             'card_deleted'          => 'Card excluído',
             'card_deletion_requested' => 'Exclusão solicitada',
             'card_deletion_approved'  => 'Exclusão aprovada',

@@ -2478,7 +2478,13 @@
         } else {
             body += '<section class="tralla-detail-section">'
                 + '<h3><i class="ti ti-file-text"></i> Descrição</h3>'
-                + '<div class="tralla-detail-description">' + (card.description ? esc(card.description) : '<span class="tralla-empty-mini">Sem descrição.</span>') + '</div>'
+                + (permissions.edit_description
+                    ? '<div class="tralla-field"><label for="tralla-detail-description">Descrição do card</label>'
+                        + '<textarea id="tralla-detail-description" rows="4" maxlength="2000"'
+                        + ' placeholder="Descreva este atendimento...">' + esc(card.description || '') + '</textarea></div>'
+                        + '<div class="tralla-detail-edit-actions"><button type="button" class="tralla-btn tralla-btn-primary"'
+                        + ' data-save-description><i class="ti ti-device-floppy"></i> Salvar descrição</button></div>'
+                    : '<div class="tralla-detail-description">' + (card.description ? esc(card.description) : '<span class="tralla-empty-mini">Sem descrição.</span>') + '</div>')
                 + '</section>';
         }
 
@@ -2662,6 +2668,25 @@
             });
             applyState(data);
             toast('Card atualizado.', 'success');
+            await openCard(activeCard.id);
+            shouldRefreshBoard = false;
+        } catch (error) {
+            toast(error.message, 'error');
+            setBusy(button, false);
+        }
+    }
+
+    async function saveDescription(button) {
+        if (!activeCard) { return; }
+        var field = modalRoot.querySelector('#tralla-detail-description');
+        if (!field) { return; }
+        setBusy(button, true);
+        try {
+            var data = await api('card_description_update', {
+                id: activeCard.id, description: field.value
+            });
+            applyState(data);
+            toast('Descrição atualizada.', 'success');
             await openCard(activeCard.id);
             shouldRefreshBoard = false;
         } catch (error) {
@@ -4878,6 +4903,11 @@
         var saveButton = event.target.closest('[data-save-card]');
         if (saveButton) {
             saveCard(saveButton);
+            return;
+        }
+        var saveDescriptionButton = event.target.closest('[data-save-description]');
+        if (saveDescriptionButton) {
+            saveDescription(saveDescriptionButton);
             return;
         }
         var saveCallButton = event.target.closest('[data-save-call-report]');
