@@ -12,6 +12,8 @@ check('admin reaches member', tralla_role_at_least('admin', 'member') === true);
 check('superadmin reaches admin', tralla_role_at_least('superadmin', 'admin') === true);
 check('invalid role normalizes empty', tralla_normalize_board_role('owner') === '');
 check('role label', tralla_board_role_label('admin') === 'Admin');
+check('person name is first then last', tralla_person_name('Leonardo', 'Poiatti Facao', 'leo') === 'Leonardo Poiatti Facao');
+check('person name falls back to login', tralla_person_name('', '', 'tablet') === 'tablet');
 check('tablet role normalizes', tralla_normalize_board_role('Tablet') === 'tablet');
 check('tablet is below member', tralla_role_at_least('tablet', 'member') === false);
 check('tablet only on maintenance boards', isset(tralla_board_role_labels('maintenance')['tablet'])

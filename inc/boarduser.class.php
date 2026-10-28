@@ -374,8 +374,6 @@ class PluginTrallaBoardUser
 
     private static function displayName(array $member): string
     {
-        $name = trim((string) $member['realname'] . ' ' . (string) $member['firstname']);
-
-        return $name !== '' ? $name : (string) $member['name'];
+        return tralla_person_name((string) $member['firstname'], (string) $member['realname'], (string) $member['name']);
     }
 }

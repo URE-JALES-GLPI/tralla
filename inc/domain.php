@@ -22,6 +22,16 @@ if (!function_exists('tralla_finalization_partition')) {
     }
 }
 
+if (!function_exists('tralla_person_name')) {
+    /** Nome de exibição: primeiro nome e depois sobrenome; sem nenhum dos dois, o login. */
+    function tralla_person_name(string $firstname, string $realname, string $login = ''): string
+    {
+        $name = trim(trim($firstname) . ' ' . trim($realname));
+
+        return $name !== '' ? $name : trim($login);
+    }
+}
+
 if (!function_exists('tralla_role_rank')) {
     function tralla_role_rank(string $role): int
     {

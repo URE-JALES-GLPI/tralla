@@ -66,10 +66,11 @@ class PluginTrallaHistory extends CommonDBTM
             if ((int) ($member['is_deleted'] ?? 0) === 1) {
                 continue;
             }
-            $name = trim((string) ($member['realname'] ?? '') . ' ' . (string) ($member['firstname'] ?? ''));
             $users[] = [
                 'id' => (int) $member['users_id'],
-                'name' => $name !== '' ? $name : (string) ($member['name'] ?? ''),
+                'name' => tralla_person_name(
+                    (string) ($member['firstname'] ?? ''), (string) ($member['realname'] ?? ''), (string) ($member['name'] ?? '')
+                ),
             ];
         }
 
@@ -312,7 +313,7 @@ class PluginTrallaHistory extends CommonDBTM
                 $userName = '';
                 if ((int) ($row['user_deleted'] ?? 0) !== 1) {
                     $userName = trim(
-                        (string) ($row['user_realname'] ?? '') . ' ' . (string) ($row['user_firstname'] ?? '')
+                        (string) ($row['user_firstname'] ?? '') . ' ' . (string) ($row['user_realname'] ?? '')
                     );
                     if ($userName === '') {
                         $userName = (string) ($row['user_login'] ?? '');
@@ -465,7 +466,7 @@ class PluginTrallaHistory extends CommonDBTM
             $userName = '';
             if ((int) ($row['users_id'] ?? 0) > 0 && (int) ($row['user_deleted'] ?? 0) !== 1) {
                 $userName = trim(
-                    (string) ($row['user_realname'] ?? '') . ' ' . (string) ($row['user_firstname'] ?? '')
+                    (string) ($row['user_firstname'] ?? '') . ' ' . (string) ($row['user_realname'] ?? '')
                 );
                 if ($userName === '') {
                     $userName = (string) ($row['user_login'] ?? '');

@@ -594,7 +594,11 @@ if (!function_exists('tralla_user_profile')) {
         try {
             $user = new User();
             if ($user->getFromDB($users_id)) {
-                $profile['name'] = (string) $user->getFriendlyName();
+                $profile['name'] = tralla_person_name(
+                    (string) ($user->fields['firstname'] ?? ''),
+                    (string) ($user->fields['realname'] ?? ''),
+                    (string) ($user->fields['name'] ?? '')
+                );
                 $picture = trim((string) ($user->fields['picture'] ?? ''));
                 if ($picture !== '') {
                     try {

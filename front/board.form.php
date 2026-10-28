@@ -287,10 +287,7 @@ echo "<script>document.title = 'Tralla';</script>";
                         $lastSuperadminAttr = $lastSuperadmin
                             ? ' disabled title="' . tralla_h($lastSuperadminTitle) . '"'
                             : '';
-                        $glpiName = trim((string) $member['realname'] . ' ' . (string) $member['firstname']);
-                        if ($glpiName === '') {
-                            $glpiName = trim((string) $member['name']);
-                        }
+                        $glpiName = tralla_person_name((string) $member['firstname'], (string) $member['realname'], (string) $member['name']);
                         $isRemoved = (int) $member['is_deleted'] === 1 || $glpiName === '';
                         $displayName = $isRemoved ? 'Usuário removido' : $glpiName;
                         $login = trim((string) $member['name']);
@@ -372,10 +369,7 @@ echo "<script>document.title = 'Tralla';</script>";
                             <?php if ((string) $member['role'] === 'tablet') { continue; } ?>
                             <?php
                             $approverUsersId = (int) $member['users_id'];
-                            $approverName = trim((string) $member['realname'] . ' ' . (string) $member['firstname']);
-                            if ($approverName === '') {
-                                $approverName = trim((string) $member['name']);
-                            }
+                            $approverName = tralla_person_name((string) $member['firstname'], (string) $member['realname'], (string) $member['name']);
                             if ((int) $member['is_deleted'] === 1 || $approverName === '') {
                                 $approverName = 'Usuário removido';
                             }
