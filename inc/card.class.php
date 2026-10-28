@@ -589,7 +589,8 @@ class PluginTrallaCard extends CommonDBTM
         $boardId = (int) ($card['plugin_tralla_boards_id'] ?? 0);
         $role = PluginTrallaBoard::roleFor($boardId, $userId);
         $isAdmin = $role === 'superadmin';
-        $isMember = $role !== '';
+        $isTablet = $role === 'tablet';
+        $isMember = $role !== '' && !$isTablet;
         $status = (string) ($card['status'] ?? '');
         $isCall = (string) ($card['workflow_type'] ?? 'maintenance') === 'call';
         $stage = (int) ($card['stage'] ?? 1);
@@ -665,7 +666,8 @@ class PluginTrallaCard extends CommonDBTM
             && !$locked
             && $canUpdate;
 
-        $canRequestCallRelease = (PluginTrallaBoardUser::getRole($boardId, $userId) === 'superadmin'
+        $canRequestCallRelease = $isMember
+            && (PluginTrallaBoardUser::getRole($boardId, $userId) === 'superadmin'
                 || (int) ($card['users_id'] ?? 0) === $userId)
             && $boardType === 'maintenance'
             && $stage === 1
@@ -696,8 +698,19 @@ class PluginTrallaCard extends CommonDBTM
             $isAdmin
         );
 
+        $canTabletEdit = $isTablet
+            && $boardType === 'maintenance'
+            && !$isCall
+            && $stage === 1
+            && in_array($status, ['pending', 'in_progress', 'withdrawal'], true)
+            && !$locked
+            && (int) ($card['approval_cards_id'] ?? 0) === 0
+            && empty($card['is_archived'])
+            && empty($card['is_deleted']);
+
         return [
             'view'             => true,
+            'tablet_edit'      => $canTabletEdit,
             'edit_card'        => $canEditCard,
             'edit_description' => $canEditDescription,
             'edit_machines'    => $canEditMachines,
@@ -1990,87 +2003,12 @@ class PluginTrallaCard extends CommonDBTM
                     throw new RuntimeException('Payload da edição inválido.');
                 }
 
-                $proposedName = tralla_normalize_label($payload['name'] ?? '');
-                if ($proposedName === '') {
-                    throw new RuntimeException('Informe o nome do card.');
-                }
-
-                $machinesPayload = is_array($payload['machines'] ?? null) ? $payload['machines'] : [];
-                $newPayload = is_array($payload['new_machines'] ?? null) ? $payload['new_machines'] : [];
-
-                $currentMachines = PluginTrallaMachine::getMachinesForCard($parentId);
-                $currentById = [];
-                foreach ($currentMachines as $machine) {
-                    $currentById[(int) $machine['id']] = $machine;
-                }
-
-                $keptIds = [];
-                foreach ($machinesPayload as $entry) {
-                    if (!is_array($entry)) {
-                        continue;
-                    }
-                    $machineId = (int) ($entry['id'] ?? 0);
-                    if ($machineId <= 0 || !isset($currentById[$machineId])) {
-                        throw new RuntimeException('Máquina da edição não pertence ao card.');
-                    }
-                    if (isset($keptIds[$machineId])) {
-                        throw new RuntimeException('Máquina repetida na edição.');
-                    }
-                    $keptIds[$machineId] = true;
-
-                    $status = (string) ($entry['status'] ?? '');
-                    if ($status !== '' && !array_key_exists($status, tralla_machine_status_choices())) {
-                        throw new RuntimeException('Status de máquina inválido.');
-                    }
-
-                    PluginTrallaMachine::updateMachine($machineId, [
-                        'status'          => $status,
-                        'report'          => tralla_normalize_report($entry['report'] ?? ''),
-                        'service_done'    => !empty($entry['service_done']) ? 1 : 0,
-                        'needs_inventory' => !empty($entry['needs_inventory']) ? 1 : 0,
-                    ]);
-                }
-
-                foreach (array_keys($currentById) as $machineId) {
-                    if (!isset($keptIds[$machineId])) {
-                        PluginTrallaMachine::deleteMachine($machineId);
-                    }
-                }
-
-                $newTotal = count($keptIds);
-                foreach ($newPayload as $entry) {
-                    if (!is_array($entry)) {
-                        continue;
-                    }
-                    $modelId = (int) ($entry['model_id'] ?? 0);
-                    if ($modelId <= 0 || PluginTrallaMachineModel::getModel($modelId, true) === null) {
-                        throw new RuntimeException('Modelo de máquina inválido.');
-                    }
-                    $quantity = filter_var(
-                        $entry['quantity'] ?? 1,
-                        FILTER_VALIDATE_INT,
-                        ['options' => ['min_range' => 1, 'max_range' => self::MAX_MACHINE_QUANTITY]]
-                    );
-                    if ($quantity === false) {
-                        throw new RuntimeException('Quantidade de máquina inválida.');
-                    }
-                    for ($index = 0; $index < (int) $quantity; $index++) {
-                        PluginTrallaMachine::insertForCard($parentId, ['model_id' => $modelId]);
-                    }
-                    $newTotal += (int) $quantity;
-                }
-
-                if ($newTotal < 1) {
-                    throw new RuntimeException('O card deve manter ao menos uma máquina.');
-                }
-
+                self::applyEditPayload($parentId, $payload);
                 $DB->update('glpi_plugin_tralla_cards', [
-                    'name'              => $proposedName,
                     'approval_cards_id' => 0,
                     'is_locked'         => 0,
                     'date_mod'          => $now,
                 ], ['id' => $parentId]);
-                PluginTrallaMachine::refreshCardTotal($parentId);
 
                 $DB->update('glpi_plugin_tralla_cards', [
                     'status'            => 'approved',
@@ -2139,97 +2077,7 @@ class PluginTrallaCard extends CommonDBTM
             throw new RuntimeException('Sem permissão para solicitar edição deste card.');
         }
 
-        $proposedName = tralla_normalize_label($data['name'] ?? '');
-        if ($proposedName === '') {
-            throw new RuntimeException('Informe o nome do card.');
-        }
-
-        $currentMachines = PluginTrallaMachine::getMachinesForCard($id);
-        $currentById = [];
-        foreach ($currentMachines as $machine) {
-            $currentById[(int) $machine['id']] = $machine;
-        }
-
-        $machinesInput = is_array($data['machines'] ?? null) ? $data['machines'] : [];
-        $newInput = is_array($data['new_machines'] ?? null) ? $data['new_machines'] : [];
-        $machines = [];
-        $seen = [];
-        $hasChange = false;
-
-        foreach ($machinesInput as $entry) {
-            if (!is_array($entry)) {
-                throw new RuntimeException('Máquina inválida.');
-            }
-            $machineId = (int) ($entry['id'] ?? 0);
-            if ($machineId <= 0 || !isset($currentById[$machineId])) {
-                throw new RuntimeException('Máquina da edição não pertence ao card.');
-            }
-            if (isset($seen[$machineId])) {
-                throw new RuntimeException('Máquina repetida na edição.');
-            }
-            $seen[$machineId] = true;
-
-            $status = (string) ($entry['status'] ?? '');
-            if ($status !== '' && !array_key_exists($status, tralla_machine_status_choices())) {
-                throw new RuntimeException('Status de máquina inválido.');
-            }
-            $report = tralla_normalize_report($entry['report'] ?? '');
-            $serviceDone = !empty($entry['service_done']) ? 1 : 0;
-            $needsInventory = !empty($entry['needs_inventory']) ? 1 : 0;
-            $current = $currentById[$machineId];
-
-            if ($status !== (string) $current['status']
-                || $report !== trim((string) $current['report'])
-                || $serviceDone !== (int) $current['service_done']
-                || $needsInventory !== (int) $current['needs_inventory']) {
-                $hasChange = true;
-            }
-
-            $machines[] = [
-                'id'              => $machineId,
-                'status'          => $status,
-                'report'          => $report,
-                'service_done'    => $serviceDone,
-                'needs_inventory' => $needsInventory,
-            ];
-        }
-
-        if (count($seen) !== count($currentById)) {
-            $hasChange = true;
-        }
-
-        $newMachines = [];
-        $newTotal = count($seen);
-        foreach ($newInput as $entry) {
-            if (!is_array($entry)) {
-                throw new RuntimeException('Modelo de máquina inválido.');
-            }
-            $modelId = (int) ($entry['model_id'] ?? 0);
-            if ($modelId <= 0 || !PluginTrallaMachineModel::canUseModel($modelId)) {
-                throw new RuntimeException('Modelo de máquina inválido.');
-            }
-            $quantity = filter_var(
-                $entry['quantity'] ?? 1,
-                FILTER_VALIDATE_INT,
-                ['options' => ['min_range' => 1, 'max_range' => self::MAX_MACHINE_QUANTITY]]
-            );
-            if ($quantity === false) {
-                throw new RuntimeException('Quantidade de máquina inválida.');
-            }
-            $newMachines[] = ['model_id' => $modelId, 'quantity' => (int) $quantity];
-            $newTotal += (int) $quantity;
-            $hasChange = true;
-        }
-
-        if ($newTotal < 1) {
-            throw new RuntimeException('O card deve manter ao menos uma máquina.');
-        }
-        if ($proposedName !== (string) $card['name']) {
-            $hasChange = true;
-        }
-        if (!$hasChange) {
-            throw new RuntimeException('Nenhuma alteração para solicitar.');
-        }
+        [$proposedName, $machines, $newMachines, $newTotal] = self::normalizeEditInput($card, $data);
 
         $approvalId = 0;
         $familyRoot = self::familyRoot($card);
@@ -3362,6 +3210,247 @@ class PluginTrallaCard extends CommonDBTM
                 : 'Manutenção concluída; aguardando retirada.');
 
         return true;
+    }
+
+    /**
+     * Valida nome e máquinas de uma edição de card.
+     *
+     * @return array{0: string, 1: array, 2: array, 3: int}
+     */
+    private static function normalizeEditInput(array $card, array $data): array
+    {
+        $proposedName = tralla_normalize_label($data['name'] ?? '');
+        if ($proposedName === '') {
+            throw new RuntimeException('Informe o nome do card.');
+        }
+
+        $currentMachines = PluginTrallaMachine::getMachinesForCard((int) $card['id']);
+        $currentById = [];
+        foreach ($currentMachines as $machine) {
+            $currentById[(int) $machine['id']] = $machine;
+        }
+
+        $machinesInput = is_array($data['machines'] ?? null) ? $data['machines'] : [];
+        $newInput = is_array($data['new_machines'] ?? null) ? $data['new_machines'] : [];
+        $machines = [];
+        $seen = [];
+        $hasChange = false;
+
+        foreach ($machinesInput as $entry) {
+            if (!is_array($entry)) {
+                throw new RuntimeException('Máquina inválida.');
+            }
+            $machineId = (int) ($entry['id'] ?? 0);
+            if ($machineId <= 0 || !isset($currentById[$machineId])) {
+                throw new RuntimeException('Máquina da edição não pertence ao card.');
+            }
+            if (isset($seen[$machineId])) {
+                throw new RuntimeException('Máquina repetida na edição.');
+            }
+            $seen[$machineId] = true;
+
+            $status = (string) ($entry['status'] ?? '');
+            if ($status !== '' && !array_key_exists($status, tralla_machine_status_choices())) {
+                throw new RuntimeException('Status de máquina inválido.');
+            }
+            $report = tralla_normalize_report($entry['report'] ?? '');
+            $serviceDone = !empty($entry['service_done']) ? 1 : 0;
+            $needsInventory = !empty($entry['needs_inventory']) ? 1 : 0;
+            $current = $currentById[$machineId];
+
+            if ($status !== (string) $current['status']
+                || $report !== trim((string) $current['report'])
+                || $serviceDone !== (int) $current['service_done']
+                || $needsInventory !== (int) $current['needs_inventory']) {
+                $hasChange = true;
+            }
+
+            $machines[] = [
+                'id'              => $machineId,
+                'status'          => $status,
+                'report'          => $report,
+                'service_done'    => $serviceDone,
+                'needs_inventory' => $needsInventory,
+            ];
+        }
+
+        if (count($seen) !== count($currentById)) {
+            $hasChange = true;
+        }
+
+        $newMachines = [];
+        $newTotal = count($seen);
+        foreach ($newInput as $entry) {
+            if (!is_array($entry)) {
+                throw new RuntimeException('Modelo de máquina inválido.');
+            }
+            $modelId = (int) ($entry['model_id'] ?? 0);
+            if ($modelId <= 0 || !PluginTrallaMachineModel::canUseModel($modelId)) {
+                throw new RuntimeException('Modelo de máquina inválido.');
+            }
+            $quantity = filter_var(
+                $entry['quantity'] ?? 1,
+                FILTER_VALIDATE_INT,
+                ['options' => ['min_range' => 1, 'max_range' => self::MAX_MACHINE_QUANTITY]]
+            );
+            if ($quantity === false) {
+                throw new RuntimeException('Quantidade de máquina inválida.');
+            }
+            $newMachines[] = ['model_id' => $modelId, 'quantity' => (int) $quantity];
+            $newTotal += (int) $quantity;
+            $hasChange = true;
+        }
+
+        if ($newTotal < 1) {
+            throw new RuntimeException('O card deve manter ao menos uma máquina.');
+        }
+        if ($proposedName !== (string) $card['name']) {
+            $hasChange = true;
+        }
+        if (!$hasChange) {
+            throw new RuntimeException('Nenhuma alteração para salvar.');
+        }
+
+        return [$proposedName, $machines, $newMachines, $newTotal];
+    }
+
+    /** Aplica nome e máquinas de uma edição validada ao card. */
+    private static function applyEditPayload(int $parentId, array $payload): void
+    {
+        global $DB;
+
+        $proposedName = tralla_normalize_label($payload['name'] ?? '');
+        if ($proposedName === '') {
+            throw new RuntimeException('Informe o nome do card.');
+        }
+
+        $machinesPayload = is_array($payload['machines'] ?? null) ? $payload['machines'] : [];
+        $newPayload = is_array($payload['new_machines'] ?? null) ? $payload['new_machines'] : [];
+
+        $currentMachines = PluginTrallaMachine::getMachinesForCard($parentId);
+        $currentById = [];
+        foreach ($currentMachines as $machine) {
+            $currentById[(int) $machine['id']] = $machine;
+        }
+
+        $keptIds = [];
+        foreach ($machinesPayload as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+            $machineId = (int) ($entry['id'] ?? 0);
+            if ($machineId <= 0 || !isset($currentById[$machineId])) {
+                throw new RuntimeException('Máquina da edição não pertence ao card.');
+            }
+            if (isset($keptIds[$machineId])) {
+                throw new RuntimeException('Máquina repetida na edição.');
+            }
+            $keptIds[$machineId] = true;
+
+            $status = (string) ($entry['status'] ?? '');
+            if ($status !== '' && !array_key_exists($status, tralla_machine_status_choices())) {
+                throw new RuntimeException('Status de máquina inválido.');
+            }
+
+            PluginTrallaMachine::updateMachine($machineId, [
+                'status'          => $status,
+                'report'          => tralla_normalize_report($entry['report'] ?? ''),
+                'service_done'    => !empty($entry['service_done']) ? 1 : 0,
+                'needs_inventory' => !empty($entry['needs_inventory']) ? 1 : 0,
+            ]);
+        }
+
+        foreach (array_keys($currentById) as $machineId) {
+            if (!isset($keptIds[$machineId])) {
+                PluginTrallaMachine::deleteMachine($machineId);
+            }
+        }
+
+        $newTotal = count($keptIds);
+        foreach ($newPayload as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+            $modelId = (int) ($entry['model_id'] ?? 0);
+            if ($modelId <= 0 || PluginTrallaMachineModel::getModel($modelId, true) === null) {
+                throw new RuntimeException('Modelo de máquina inválido.');
+            }
+            $quantity = filter_var(
+                $entry['quantity'] ?? 1,
+                FILTER_VALIDATE_INT,
+                ['options' => ['min_range' => 1, 'max_range' => self::MAX_MACHINE_QUANTITY]]
+            );
+            if ($quantity === false) {
+                throw new RuntimeException('Quantidade de máquina inválida.');
+            }
+            for ($index = 0; $index < (int) $quantity; $index++) {
+                PluginTrallaMachine::insertForCard($parentId, ['model_id' => $modelId]);
+            }
+            $newTotal += (int) $quantity;
+        }
+
+        if ($newTotal < 1) {
+            throw new RuntimeException('O card deve manter ao menos uma máquina.');
+        }
+
+        $DB->update('glpi_plugin_tralla_cards', [
+            'name'     => $proposedName,
+            'date_mod' => tralla_now(),
+        ], ['id' => $parentId]);
+        PluginTrallaMachine::refreshCardTotal($parentId);
+    }
+
+    /**
+     * Edição direta do papel Tablet: aplica na hora, sem aprovação, e registra
+     * no histórico cada alteração feita.
+     */
+    public static function tabletEdit(int $id, array $data, int $userId = 0): array
+    {
+        global $DB;
+
+        if ($userId <= 0) {
+            $userId = (int) Session::getLoginUserID();
+        }
+
+        $card = self::getCard($id);
+        if ($card === null) {
+            throw new RuntimeException('Card não encontrado.');
+        }
+        self::assertBoardAccess($card);
+        $boardType = self::getBoardType((int) $card['plugin_tralla_boards_id']);
+
+        $DB->beginTransaction();
+        try {
+            self::lockCardRow($id);
+            $fresh = self::getCard($id);
+            if ($fresh === null) {
+                throw new RuntimeException('Card não encontrado.');
+            }
+            $permissions = self::permissionsFor($fresh, $boardType, $userId, false);
+            if (empty($permissions['tablet_edit'])) {
+                throw new RuntimeException('Sem permissão para editar este card.');
+            }
+
+            [$proposedName, $machines, $newMachines] = self::normalizeEditInput($fresh, $data);
+            $payload = ['name' => $proposedName, 'machines' => $machines, 'new_machines' => $newMachines];
+            $changes = self::buildEditChanges($fresh, $payload);
+            self::applyEditPayload($id, $payload);
+
+            $lines = array_map(static function (array $change): string {
+                $short = static fn (string $text): string => function_exists('mb_strimwidth')
+                    ? mb_strimwidth($text, 0, 300, '…') : substr($text, 0, 300);
+                return $change['label'] . ': ' . $short((string) $change['before']) . ' → ' . $short((string) $change['after']);
+            }, $changes);
+            PluginTrallaHistory::log($id, $userId, 'tablet_edit',
+                'Card editado pelo tablet (sem aprovação).' . ($lines !== [] ? "\n" . implode("\n", $lines) : ''));
+
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
+        }
+
+        return self::getCardDetail($id, $userId);
     }
 
     private static function buildEditChanges(array $card, array $payload): array

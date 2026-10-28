@@ -12,6 +12,10 @@ check('admin reaches member', tralla_role_at_least('admin', 'member') === true);
 check('superadmin reaches admin', tralla_role_at_least('superadmin', 'admin') === true);
 check('invalid role normalizes empty', tralla_normalize_board_role('owner') === '');
 check('role label', tralla_board_role_label('admin') === 'Admin');
+check('tablet role normalizes', tralla_normalize_board_role('Tablet') === 'tablet');
+check('tablet is below member', tralla_role_at_least('tablet', 'member') === false);
+check('tablet only on maintenance boards', isset(tralla_board_role_labels('maintenance')['tablet'])
+    && !isset(tralla_board_role_labels('normal')['tablet']));
 
 check('backfill needs empty board', tralla_should_backfill_creator(0, 5));
 check('backfill skips non-empty board', !tralla_should_backfill_creator(1, 5));

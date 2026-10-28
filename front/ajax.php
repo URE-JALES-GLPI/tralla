@@ -29,11 +29,59 @@ if (!function_exists('tralla_ajax_state')) {
     }
 }
 
+if (!function_exists('tralla_ajax_request_board')) {
+    /** Quadro alvo da requisição, pelo quadro, lista, card ou máquina informados. */
+    function tralla_ajax_request_board(string $action): int
+    {
+        global $DB;
+
+        $boardId = tralla_post_int('boards_id');
+        if ($boardId > 0) {
+            return $boardId;
+        }
+        $lookup = static function (string $table, int $id, string $field) use ($DB): int {
+            if ($id <= 0) {
+                return 0;
+            }
+            $row = $DB->request(['SELECT' => [$field], 'FROM' => $table, 'WHERE' => ['id' => $id], 'LIMIT' => 1])->current();
+            return is_array($row) ? (int) $row[$field] : 0;
+        };
+        $machineCard = $lookup('glpi_plugin_tralla_machines', tralla_post_int('machine_id'), 'plugin_tralla_cards_id');
+        if ($machineCard > 0) {
+            return $lookup('glpi_plugin_tralla_cards', $machineCard, 'plugin_tralla_boards_id');
+        }
+        if (str_starts_with($action, 'list_')) {
+            return $lookup('glpi_plugin_tralla_lists', tralla_post_int('id'), 'plugin_tralla_boards_id');
+        }
+
+        return $lookup('glpi_plugin_tralla_cards', tralla_post_int('id'), 'plugin_tralla_boards_id');
+    }
+}
+
 $action = tralla_post_string('action', tralla_post_string('action_get', ''));
 $userId = (int) Session::getLoginUserID();
 $isAdmin = false; // A permissão especial vem do papel no próprio quadro.
 
 try {
+    // O papel Tablet só visualiza o quadro e edita cards direto; qualquer outra ação é bloqueada.
+    $tabletActions = ['user_profile', 'board_group_create', 'board_group_rename', 'board_group_delete',
+        'board_group_shift', 'board_group_move', 'state', 'board_ping', 'board_poll', 'card_get',
+        'history', 'model_list', 'tablet_edit'];
+    if (!in_array($action, $tabletActions, true)) {
+        $requestBoard = tralla_ajax_request_board($action);
+        $roles = [];
+        foreach ($DB->request([
+            'SELECT' => ['role'],
+            'FROM'   => 'glpi_plugin_tralla_boards_users',
+            'WHERE'  => ['users_id' => $userId] + ($requestBoard > 0 ? ['plugin_tralla_boards_id' => $requestBoard] : []),
+        ]) as $membership) {
+            $roles[(string) $membership['role']] = true;
+        }
+        if (isset($roles['tablet']) && count($roles) === 1) {
+            throw new RuntimeException('O papel Tablet só pode visualizar e editar cards.');
+        }
+    }
+
     switch ($action) {
         case 'user_profile':
             $profileUserId = tralla_post_int('users_id');
@@ -419,6 +467,23 @@ try {
                 'state'    => tralla_ajax_state((int) $result['card']['plugin_tralla_boards_id']),
                 'card'     => $result['card'],
                 'approval' => $result['approval'],
+            ]]);
+
+        case 'tablet_edit':
+            $cardId = tralla_post_int('id');
+            $machines = json_decode(tralla_post_string('machines', '[]'), true);
+            $newMachines = json_decode(tralla_post_string('new_machines', '[]'), true);
+            if (!is_array($machines) || !is_array($newMachines)) {
+                throw new RuntimeException('Dados da edição inválidos.');
+            }
+            $detail = PluginTrallaCard::tabletEdit($cardId, [
+                'name'         => tralla_post_string('name'),
+                'machines'     => $machines,
+                'new_machines' => $newMachines,
+            ], $userId);
+            tralla_json(['ok' => true, 'data' => [
+                'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id']),
+                'card'  => $detail,
             ]]);
 
         case 'deleted_cards':            $boards_id = tralla_post_int('boards_id');

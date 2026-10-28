@@ -305,7 +305,7 @@ class PluginTrallaTicketSync
     {
         global $DB;
         if (!in_array($action, ['card_created', 'card_finalized', 'machine_added', 'machine_deleted',
-            'machine_updated', 'edit_approved', 'approval_approved', 'call_report_updated',
+            'machine_updated', 'edit_approved', 'tablet_edit', 'approval_approved', 'call_report_updated',
             'priority_set', 'call_released', 'withdrawal_confirmed'], true)) {
             return '';
         }

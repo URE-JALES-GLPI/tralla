@@ -105,6 +105,7 @@ Cada quadro tem sua própria lista de membros. A visibilidade é definida pelo v
 | **Membro** (`member`) | Ver quadro e histórico, criar/editar cards, mover cards, pegar cards e solicitar exclusão, conforme os direitos globais. |
 | **Admin** (`admin`) | Tudo de Membro, mais configurar quadro e cores das listas, ver **Excluídos** e restaurar cards. Não gerencia membros. |
 | **SuperAdmin** (`superadmin`) | Tudo de Admin, mais renomear listas, gerenciar membros, arquivar e excluir o quadro. |
+| **Tablet** (`tablet`) | Só em quadros de manutenção. Visualiza o quadro e abre os cards; o único botão é **Editar**, que altera nome e máquinas do card na hora, sem aprovação, e registra cada alteração no histórico. Não pode ser aprovador. |
 
 - Somente **SuperAdmin** adiciona, altera ou remove membros.
 - Somente o **SuperAdmin cadastrado no próprio quadro** pode alterar os títulos das listas. O perfil Super-Admin do GLPI sozinho não concede essa ação.

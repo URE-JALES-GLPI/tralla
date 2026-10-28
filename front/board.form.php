@@ -256,7 +256,7 @@ echo "<script>document.title = 'Tralla';</script>";
                     <div class="tralla-field">
                         <label for="tralla-member-add-role">Papel</label>
                         <select id="tralla-member-add-role" name="role">
-                            <?php foreach (tralla_board_role_labels() as $roleValue => $roleLabel): ?>
+                            <?php foreach (tralla_board_role_labels((string) $board->fields['type']) as $roleValue => $roleLabel): ?>
                                 <option value="<?= tralla_h($roleValue) ?>" <?= $roleValue === 'member' ? 'selected' : '' ?>>
                                     <?= tralla_h($roleLabel) ?>
                                 </option>
@@ -309,7 +309,7 @@ echo "<script>document.title = 'Tralla';</script>";
                             <div class="tralla-member-role">
                                 <?php if ($canGovern): ?>
                                     <select name="role" aria-label="Papel de <?= tralla_h($displayName) ?>"<?= $lastSuperadminAttr ?>>
-                                        <?php foreach (tralla_board_role_labels() as $roleValue => $roleLabel): ?>
+                                        <?php foreach (tralla_board_role_labels((string) $board->fields['type']) as $roleValue => $roleLabel): ?>
                                             <option value="<?= tralla_h($roleValue) ?>" <?= $memberRole === $roleValue ? 'selected' : '' ?>>
                                                 <?= tralla_h($roleLabel) ?>
                                             </option>
@@ -369,6 +369,7 @@ echo "<script>document.title = 'Tralla';</script>";
                     <?= Html::hidden('id', ['value' => (int) $id]) ?>
                     <div class="tralla-approver-grid">
                         <?php foreach ($members as $member): ?>
+                            <?php if ((string) $member['role'] === 'tablet') { continue; } ?>
                             <?php
                             $approverUsersId = (int) $member['users_id'];
                             $approverName = trim((string) $member['realname'] . ' ' . (string) $member['firstname']);

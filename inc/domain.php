@@ -47,18 +47,24 @@ if (!function_exists('tralla_normalize_board_role')) {
     {
         $role = strtolower(trim($role));
 
-        return in_array($role, ['member', 'admin', 'superadmin'], true) ? $role : '';
+        return in_array($role, ['tablet', 'member', 'admin', 'superadmin'], true) ? $role : '';
     }
 }
 
 if (!function_exists('tralla_board_role_labels')) {
-    function tralla_board_role_labels(): array
+    /** O papel Tablet só existe em quadros de manutenção; sem tipo, lista todos os papéis. */
+    function tralla_board_role_labels(string $boardType = ''): array
     {
-        return [
+        $labels = [
             'member'     => 'Membro',
             'admin'      => 'Admin',
             'superadmin' => 'Super Admin',
         ];
+        if ($boardType === '' || $boardType === 'maintenance') {
+            $labels['tablet'] = 'Tablet';
+        }
+
+        return $labels;
     }
 }
 

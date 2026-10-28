@@ -2307,7 +2307,8 @@ body[data-theme="dark"] .tralla-add-card:disabled:hover,
     outline-offset: 2px;
 }
 
-.tralla-page.tralla-form-page .tralla-members {
+.tralla-page.tralla-form-page .tralla-members,
+.tralla-page.tralla-form-page .tralla-approvers {
     max-width: 960px;
 }
 

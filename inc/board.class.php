@@ -281,7 +281,8 @@ class PluginTrallaBoard extends CommonDBTM
             return false;
         }
 
-        return self::roleFor($boardId, $userId) !== '';
+        // O Tablet só visualiza o quadro e edita cards; não opera o quadro.
+        return !in_array(self::roleFor($boardId, $userId), ['', 'tablet'], true);
     }
 
     public static function canAdminBoard(int $boardId, int $userId = 0): bool

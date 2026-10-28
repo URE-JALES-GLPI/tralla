@@ -110,7 +110,7 @@ class PluginTrallaBoardUser
         }
 
         $row = $DB->request([
-            'SELECT' => ['can_approve'],
+            'SELECT' => ['can_approve', 'role'],
             'FROM'   => 'glpi_plugin_tralla_boards_users',
             'WHERE'  => [
                 'plugin_tralla_boards_id' => $boardId,
@@ -119,7 +119,7 @@ class PluginTrallaBoardUser
             'LIMIT'  => 1,
         ])->current();
 
-        return is_array($row) && (int) ($row['can_approve'] ?? 0) === 1;
+        return is_array($row) && (int) ($row['can_approve'] ?? 0) === 1 && (string) $row['role'] !== 'tablet';
     }
 
     /**
@@ -149,7 +149,7 @@ class PluginTrallaBoardUser
             foreach ($DB->request([
                 'SELECT' => ['users_id'],
                 'FROM'   => 'glpi_plugin_tralla_boards_users',
-                'WHERE'  => ['plugin_tralla_boards_id' => $boardId],
+                'WHERE'  => ['plugin_tralla_boards_id' => $boardId, 'NOT' => ['role' => 'tablet']],
             ]) as $row) {
                 $memberIds[(int) $row['users_id']] = true;
             }
@@ -202,6 +202,9 @@ class PluginTrallaBoardUser
         if ($role === '') {
             throw new RuntimeException('Papel inválido.');
         }
+        if ($role === 'tablet' && PluginTrallaCard::getBoardType($boardId) !== 'maintenance') {
+            throw new RuntimeException('O papel Tablet só existe em quadros de manutenção.');
+        }
 
         $user = new User();
         if (!$user->getFromDB($userId)) {
@@ -224,14 +227,14 @@ class PluginTrallaBoardUser
 
             $now = tralla_now();
             if (is_array($current)) {
-                $DB->update(
-                    'glpi_plugin_tralla_boards_users',
-                    [
-                        'role'     => $role,
-                        'date_mod' => $now,
-                    ],
-                    ['id' => (int) $current['id']]
-                );
+                $fields = [
+                    'role'     => $role,
+                    'date_mod' => $now,
+                ];
+                if ($role === 'tablet' && self::hasApproverColumn()) {
+                    $fields['can_approve'] = 0;
+                }
+                $DB->update('glpi_plugin_tralla_boards_users', $fields, ['id' => (int) $current['id']]);
             } else {
                 $DB->insert('glpi_plugin_tralla_boards_users', [
                     'plugin_tralla_boards_id' => $boardId,

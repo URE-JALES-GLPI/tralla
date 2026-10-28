@@ -1911,6 +1911,9 @@
         if (permissions.edit_request) {
             buttons += '<button type="button" class="tralla-btn tralla-btn-ghost" data-card-action="edit">'
                 + '<i class="ti ti-pencil"></i> Solicitar edição</button>';
+        } else if (permissions.tablet_edit) {
+            buttons += '<button type="button" class="tralla-btn tralla-btn-primary" data-card-action="edit">'
+                + '<i class="ti ti-pencil"></i> Editar</button>';
         }
 
         if (permissions.withdraw) {
@@ -3289,9 +3292,10 @@
             return editMachineRow(machine, index + 1);
         }).join('');
 
+        var direct = !!(card.permissions || {}).tablet_edit;
         showModal('<form id="tralla-edit-form" class="tralla-form" novalidate>'
             + '<div class="tralla-modal-head"><div>'
-            + '<h2><i class="ti ti-pencil"></i> Solicitar edição</h2>'
+            + '<h2><i class="ti ti-pencil"></i> ' + (direct ? 'Editar card' : 'Solicitar edição') + '</h2>'
             + '<p>' + esc(displayCardCode(card.code, card.id)) + ' · ' + esc(card.name) + '</p>'
             + '</div>' + modalCloseButton() + '</div>'
             + '<div class="tralla-modal-body">'
@@ -3307,7 +3311,8 @@
             + '<div class="tralla-modal-actions">'
             + '<button type="button" class="tralla-btn tralla-btn-ghost" data-tralla-close>Cancelar</button>'
             + '<button type="submit" class="tralla-btn tralla-btn-primary">'
-            + '<i class="ti ti-send"></i> Solicitar aprovação</button>'
+            + (direct ? '<i class="ti ti-device-floppy"></i> Salvar alterações</button>'
+                : '<i class="ti ti-send"></i> Solicitar aprovação</button>')
             + '</div></form>', true);
 
         if (hasEntities) {
@@ -3371,6 +3376,32 @@
 
         var submit = form.querySelector('button[type="submit"]');
         setBusy(submit, true);
+        if ((activeCard.permissions || {}).tablet_edit) {
+            try {
+                if (!await checkboxConfirmation({
+                    title: 'Editar card',
+                    message: 'As alterações serão aplicadas agora, sem aprovação, e ficarão registradas no histórico do card.',
+                    confirmLabel: 'Salvar alterações'
+                })) {
+                    setBusy(submit, false);
+                    return;
+                }
+                var edited = await api('tablet_edit', {
+                    id: activeCard.id,
+                    name: name,
+                    machines: machines,
+                    new_machines: newMachines
+                });
+                applyState(edited);
+                closeModal();
+                toast('Card editado.', 'success');
+                await openCard(edited.card.id);
+            } catch (error) {
+                toast(error.message, 'error');
+                setBusy(submit, false);
+            }
+            return;
+        }
         try {
             if (!await checkboxConfirmation({
                 title: 'Solicitar edição',

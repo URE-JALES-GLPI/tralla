@@ -543,6 +543,7 @@ class PluginTrallaHistory extends CommonDBTM
             'family_merged'         => 'Máquinas reunidas na origem',
             'edit_requested'        => 'Edição solicitada',
             'edit_approved'         => 'Edição aprovada',
+            'tablet_edit'           => 'Editado pelo tablet',
             'edit_rejected'         => 'Edição recusada',
             'family_withdrawal_ready' => 'Família liberada para retirada',
             'update_schedule'       => 'Atualização movida para Pendente',
