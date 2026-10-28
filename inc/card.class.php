@@ -306,7 +306,7 @@ class PluginTrallaCard extends CommonDBTM
         if ((int) ($card['whatsapp_chats_id'] ?? 0) > 0) {
             // Conversa ao vivo; a cópia gravada só muda quando há novidade e
             // serve de reserva se o WhatsAppSimples sair do ar.
-            $live = tralla_whatsapp_live_transcript((int) $card['whatsapp_chats_id']);
+            $live = tralla_whatsapp_live_transcript(tralla_whatsapp_chat_ids($card));
             if ($live !== null && $live !== (string) ($card['whatsapp_transcript'] ?? '')) {
                 $DB->update('glpi_plugin_tralla_cards', ['whatsapp_transcript' => $live], ['id' => $id]);
                 $card['whatsapp_transcript'] = $live;
@@ -1311,14 +1311,52 @@ class PluginTrallaCard extends CommonDBTM
         if ($changes !== []) {
             $DB->update('glpi_plugin_tralla_cards', $changes + ['date_mod' => tralla_now()], ['id' => $id]);
             if (isset($changes['description'])) {
-                PluginTrallaHistory::log($id, $userId, 'description_updated', 'Descrição atualizada pelo WhatsApp.');
+                PluginTrallaHistory::log($id, $userId, 'card_description_updated',
+                    tralla_history_change('Descrição', (string) $card['description'], $description) . ' (pelo WhatsApp)');
             }
             if (isset($changes['service_report'])) {
-                PluginTrallaHistory::log($id, $userId, 'call_report_updated', 'Relatório do chamado atualizado pelo WhatsApp.');
+                PluginTrallaHistory::log($id, $userId, 'call_report_updated',
+                    tralla_history_change('Relatório', (string) ($card['service_report'] ?? ''), $report) . ' (pelo WhatsApp)');
             }
         }
 
         return self::whatsappCardDetail($id, $chatIds, $userId);
+    }
+
+    /**
+     * Transfere o vínculo do card para outro atendimento (ex.: começou com um
+     * contato e terminou com outro). O novo atendimento passa a ser o vínculo
+     * principal; os anteriores continuam na conversa do card, em ordem.
+     */
+    public static function transferWhatsappLink(int $id, array $chatIds, int $targetChatId, string $fromLabel, string $toLabel, int $userId = 0): array
+    {
+        global $DB;
+
+        $userId = $userId > 0 ? $userId : (int) Session::getLoginUserID();
+        $card = self::whatsappLinkedCard($id, $chatIds);
+        if (empty(self::whatsappPermissions($card, $userId)['edit'])) {
+            throw new RuntimeException('Somente o técnico responsável pode transferir o card em andamento.');
+        }
+        $current = (int) $card['whatsapp_chats_id'];
+        $linked = tralla_whatsapp_chat_ids($card);
+        if ($targetChatId <= 0 || in_array($targetChatId, $linked, true)) {
+            throw new RuntimeException('Selecione outra conversa para vincular ao card.');
+        }
+        $previous = implode(',', $linked);
+        if (strlen($previous) > 255) {
+            throw new RuntimeException('Este card já passou por transferências demais.');
+        }
+
+        $DB->update('glpi_plugin_tralla_cards', [
+            'whatsapp_chats_id'       => $targetChatId,
+            'whatsapp_previous_chats' => $previous,
+            'date_mod'                => tralla_now(),
+        ], ['id' => $id]);
+        PluginTrallaHistory::log($id, $userId, 'whatsapp_link_transferred',
+            'Vínculo do WhatsApp transferido de ' . $fromLabel . ' para ' . $toLabel
+            . '. As duas conversas continuam no card; o vínculo principal passa a ser ' . $toLabel . '.');
+
+        return self::getCardDetail($id, $userId) + ['previous_chats_id' => $current];
     }
 
     /** Finaliza pela tela do WhatsApp, com as mesmas regras do Kanban (Chamado segue para aprovação). */
@@ -1499,7 +1537,7 @@ class PluginTrallaCard extends CommonDBTM
                 ], ['id' => $cardId]);
             }
             PluginTrallaHistory::log($id, $userId, 'card_description_updated',
-                'Descrição atualizada pelo SuperAdmin do quadro: ' . ($description !== '' ? $description : '(vazia)'));
+                tralla_history_change('Descrição', (string) $card['description'], $description) . ' (pelo SuperAdmin do quadro)');
             $DB->commit();
         } catch (Throwable $e) {
             $DB->rollBack();
@@ -1556,11 +1594,16 @@ class PluginTrallaCard extends CommonDBTM
             || empty(self::permissionsFor($card, 'maintenance', $userId, $isAdmin)['edit_machines'])) {
             throw new RuntimeException('Somente o técnico responsável pode editar o relatório do chamado em andamento.');
         }
+        $report = tralla_normalize_report($report);
+        $previous = trim((string) ($card['service_report'] ?? ''));
+        if ($report === $previous) {
+            return self::getCardDetail($id, $userId);
+        }
         $DB->update('glpi_plugin_tralla_cards', [
-            'service_report' => tralla_normalize_report($report),
+            'service_report' => $report,
             'date_mod' => tralla_now(),
         ], ['id' => $id]);
-        PluginTrallaHistory::log($id, $userId, 'call_report_updated', 'Relatório do chamado atualizado.');
+        PluginTrallaHistory::log($id, $userId, 'call_report_updated', tralla_history_change('Relatório', $previous, $report));
 
         return self::getCardDetail($id, $userId);
     }

@@ -115,6 +115,7 @@ function plugin_tralla_install(): bool
                 `tickets_id`              INT {$sign} NOT NULL DEFAULT '0',
                 `whatsapp_chats_id`       INT {$sign} NOT NULL DEFAULT '0' COMMENT 'atendimento de origem no WhatsAppSimples',
                 `whatsapp_transcript`     LONGTEXT     DEFAULT NULL COMMENT 'conversa do WhatsApp na abertura',
+                `whatsapp_previous_chats` VARCHAR(255) NOT NULL DEFAULT '' COMMENT 'atendimentos vinculados antes da transferência (ids, em ordem)',
                 `name`                    VARCHAR(255) NOT NULL DEFAULT '',
                 `description`             LONGTEXT     DEFAULT NULL,
                 `call_category`           VARCHAR(255) NOT NULL DEFAULT '',
@@ -214,6 +215,7 @@ function plugin_tralla_install(): bool
         'sla_alerts_sent'             => "VARCHAR(255) NOT NULL DEFAULT ''",
         'whatsapp_chats_id'           => "INT {$sign} NOT NULL DEFAULT 0",
         'whatsapp_transcript'         => 'LONGTEXT     DEFAULT NULL',
+        'whatsapp_previous_chats'     => "VARCHAR(255) NOT NULL DEFAULT ''",
     ];
     $added_is_deleted = false;
     $added_approval_kind = false;

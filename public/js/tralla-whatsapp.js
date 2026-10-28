@@ -5,7 +5,8 @@
  * - Cards do contato: chamados ainda não concluídos, com Editar e Finalizar, e "Criar card";
  * - Novo card: o modal do Kanban restrito a Chamado, com a prioridade escolhida por quem abre
  *   (o card nasce direto em Manutenção Em Andamento);
- * - Card: descrição e relatório do atendimento editáveis, SLA, detalhes e conversa do WhatsApp.
+ * - Card: descrição e relatório do atendimento editáveis, SLA, detalhes e conversa do WhatsApp;
+ * - Transferir: vincula o card a outra conversa (a anterior continua na conversa do card).
  *
  * Os dados passam pelo WhatsAppSimples, que valida o atendimento e vincula a conversa.
  *
@@ -31,6 +32,7 @@
     var settings = null;
     var activeCard = null;
     var clockTimer = null;
+    var pressedOnBackdrop = false;
 
     function esc(value) {
         return String(value === null || value === undefined ? '' : value)
@@ -59,6 +61,9 @@
             root = document.createElement('div');
             root.id = 'tralla-wa-modal-root';
             document.body.appendChild(root);
+            root.addEventListener('mousedown', function (event) {
+                pressedOnBackdrop = event.target.hasAttribute('data-wa-backdrop');
+            });
             root.addEventListener('click', onClick);
             root.addEventListener('change', onChange);
             root.addEventListener('submit', onSubmit);
@@ -457,6 +462,16 @@
             : '';
     }
 
+    function protocol(chatId) {
+        return 'WA-' + String(Number(chatId)).padStart(6, '0');
+    }
+
+    function transcriptTitle(card) {
+        var previous = String(card.whatsapp_previous_chats || '').split(',').filter(Boolean).map(protocol);
+        return (Number(card.whatsapp_chats_id) > 0 ? ' · ' + protocol(card.whatsapp_chats_id) : '')
+            + (previous.length ? ' <small>(antes: ' + esc(previous.join(', ')) + ')</small>' : '');
+    }
+
     function textBlock(value, empty) {
         return '<div class="tralla-detail-description">'
             + (value ? esc(value) : '<span class="tralla-empty-mini">' + esc(empty) + '</span>') + '</div>';
@@ -504,8 +519,7 @@
             + '</section>'
             + (card.whatsapp_transcript
                 ? '<section class="tralla-detail-section">'
-                    + '<h3><i class="ti ti-brand-whatsapp"></i> Conversa do WhatsApp'
-                    + (Number(card.whatsapp_chats_id) > 0 ? ' · WA-' + String(Number(card.whatsapp_chats_id)).padStart(6, '0') : '')
+                    + '<h3><i class="ti ti-brand-whatsapp"></i> Conversa do WhatsApp' + transcriptTitle(card)
                     + '</h3><div class="tralla-detail-description tralla-whatsapp-transcript">' + esc(card.whatsapp_transcript) + '</div>'
                     + '</section>'
                 : '');
@@ -526,6 +540,10 @@
                 ? '<button type="button" class="tralla-btn tralla-btn-primary" data-wa-finalize="' + Number(card.id)
                     + '" data-wa-code="' + esc(displayCode(card.code, card.id)) + '"><i class="ti ti-flag-check"></i> Finalizar card</button>'
                 : '')
+            + (wa.edit
+                ? '<button type="button" class="tralla-btn tralla-btn-ghost" data-wa-transfer>'
+                    + '<i class="ti ti-arrows-exchange"></i> Transferir para outra conversa</button>'
+                : '')
             + '<a class="tralla-btn tralla-btn-ghost" href="' + esc(card.url || '#') + '" target="_blank" rel="noopener noreferrer">'
             + '<i class="ti ti-external-link"></i> Abrir no Tralla</a>'
             + '<button type="button" class="tralla-btn tralla-btn-ghost" data-wa-back><i class="ti ti-arrow-left"></i> Voltar aos cards</button>'
@@ -538,6 +556,74 @@
         updateSlaClocks();
         window.clearInterval(clockTimer);
         clockTimer = window.setInterval(updateSlaClocks, 1000);
+    }
+
+    /* ------------------------------------------------------- transferir */
+
+    async function showTransfer() {
+        var card = activeCard;
+        if (!card || !(await saveCard(false))) {
+            return;
+        }
+        window.clearInterval(clockTimer);
+        showLoading('Transferir card');
+        var result = await get('targets');
+        if (!result || !result.success) {
+            toast((result && result.error) || 'Não foi possível carregar as conversas.', 'error');
+            showCard(card.id);
+            return;
+        }
+        var targets = result.targets || [];
+        var choices = targets.map(function (target) {
+            return '<option value="' + Number(target.id) + '">' + esc(target.protocol + ' · ' + target.name + ' · ' + target.phone) + '</option>';
+        }).join('');
+
+        show(head('ti-arrows-exchange', 'Transferir card', displayCode(card.code, card.id) + ' · ' + card.name)
+            + '<div class="tralla-modal-body">'
+            + '<section class="tralla-detail-section">'
+            + '<div class="tralla-field"><label for="tralla-wa-transfer-target">Vincular a qual conversa? *</label>'
+            + (targets.length
+                ? '<select id="tralla-wa-transfer-target"><option value="">Selecione a conversa...</option>' + choices + '</select>'
+                : '<p class="tralla-empty-mini">Nenhuma outra conversa aberta sua ou na fila.</p>')
+            + '<small>Mostra as conversas abertas de outros contatos que estão com você ou na fila.</small></div>'
+            + '</section>'
+            + '<p class="tralla-create-approval-note">'
+            + '<i class="ti ti-info-circle" aria-hidden="true"></i>'
+            + '<span>A conversa escolhida passa a ser o <b>vínculo principal</b> do card e é onde ele aparece no WhatsApp. '
+            + 'A conversa atual (' + esc(protocol(card.whatsapp_chats_id)) + ') continua na conversa do card, antes da nova, '
+            + 'e a transferência fica no histórico.</span></p>'
+            + '</div>'
+            + '<div class="tralla-modal-actions">'
+            + '<button type="button" class="tralla-btn tralla-btn-ghost" data-wa-open-card="' + Number(card.id) + '">'
+            + '<i class="ti ti-arrow-left"></i> Voltar ao card</button>'
+            + (targets.length
+                ? '<button type="button" class="tralla-btn tralla-btn-primary" data-wa-transfer-confirm="' + Number(card.id)
+                    + '" data-wa-code="' + esc(displayCode(card.code, card.id)) + '"><i class="ti ti-arrows-exchange"></i> Transferir</button>'
+                : '')
+            + '</div>');
+    }
+
+    async function confirmTransfer(button) {
+        var select = root.querySelector('#tralla-wa-transfer-target');
+        if (!select || !select.value) {
+            toast('Selecione a conversa que vai receber o card.', 'error');
+            return;
+        }
+        var label = select.options[select.selectedIndex].textContent;
+        button.disabled = true;
+        try {
+            var result = await post('transfer', { card_id: button.dataset.waTransferConfirm, target_chat_id: select.value });
+            if (!result || !result.success) {
+                toast((result && result.error) || 'Não foi possível transferir o card.', 'error');
+                return;
+            }
+            toast('Card ' + (button.dataset.waCode || '') + ' transferido para ' + label + '.', 'success');
+            activeCard = null;
+            changed();
+            showList();
+        } finally {
+            button.disabled = false;
+        }
     }
 
     /** Salva descrição e relatório se mudaram. Retorna false se falhou. */
@@ -599,8 +685,13 @@
 
     function onClick(event) {
         var target = event.target;
-        if (target.closest('[data-wa-close]') || target.hasAttribute('data-wa-backdrop')) {
+        var backdropClick = target.hasAttribute('data-wa-backdrop') && pressedOnBackdrop;
+        pressedOnBackdrop = false;
+        if (target.closest('[data-wa-close]') || backdropClick) {
             close();
+            return;
+        }
+        if (target.hasAttribute('data-wa-backdrop')) {
             return;
         }
         if (target.closest('[data-wa-back]')) {
@@ -616,6 +707,15 @@
         var open = target.closest('[data-wa-open-card]');
         if (open) {
             showCard(Number(open.dataset.waOpenCard));
+            return;
+        }
+        if (target.closest('[data-wa-transfer]')) {
+            showTransfer();
+            return;
+        }
+        var transfer = target.closest('[data-wa-transfer-confirm]');
+        if (transfer) {
+            confirmTransfer(transfer);
             return;
         }
         var finalize = target.closest('[data-wa-finalize]');

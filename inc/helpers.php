@@ -885,23 +885,50 @@ if (!function_exists('tralla_priorities')) {
     }
 }
 
+if (!function_exists('tralla_history_change')) {
+    /** Detalhe do histórico com o texto anterior e o novo, sem resumir. */
+    function tralla_history_change(string $field, string $old, string $new): string
+    {
+        $quote = static fn (string $text): string => trim($text) === '' ? '(vazio)' : '"' . trim($text) . '"';
+
+        return $field . ' alterado de ' . $quote($old) . ' para ' . $quote($new) . '.';
+    }
+}
+
+if (!function_exists('tralla_whatsapp_chat_ids')) {
+    /** Atendimentos do card: os anteriores à transferência e o atual, em ordem. */
+    function tralla_whatsapp_chat_ids(array $card): array
+    {
+        $ids = array_filter(array_map('intval', explode(',', (string) ($card['whatsapp_previous_chats'] ?? ''))));
+        $current = (int) ($card['whatsapp_chats_id'] ?? 0);
+        if ($current > 0) {
+            $ids[] = $current;
+        }
+
+        return array_values(array_unique($ids));
+    }
+}
+
 if (!function_exists('tralla_whatsapp_live_transcript')) {
     /**
-     * Conversa atual do atendimento de origem, montada pelo WhatsAppSimples.
+     * Conversa atual dos atendimentos do card (anteriores à transferência e o
+     * atual, nessa ordem), montada pelo WhatsAppSimples.
      *
      * Lida só quando o card é aberto: nenhum custo extra no recebimento ou
      * envio de mensagens, e edições/exclusões já aparecem. Retorna null quando
-     * o WhatsAppSimples não está ativo ou o atendimento não existe mais.
+     * o WhatsAppSimples não está ativo ou os atendimentos não existem mais.
+     *
+     * @param int[] $chatIds
      */
-    function tralla_whatsapp_live_transcript(int $chatId): ?string
+    function tralla_whatsapp_live_transcript(array $chatIds): ?string
     {
         $service = 'GlpiPlugin\Whatsappsimples\Service\TrallaIntegrationService';
-        if ($chatId <= 0 || !Plugin::isPluginActive('whatsappsimples') || !class_exists($service)
-            || !method_exists($service, 'transcriptForChat')) {
+        if ($chatIds === [] || !Plugin::isPluginActive('whatsappsimples') || !class_exists($service)
+            || !method_exists($service, 'transcriptForChats')) {
             return null;
         }
         try {
-            return (new $service())->transcriptForChat($chatId);
+            return (new $service())->transcriptForChats($chatIds);
         } catch (Throwable $e) {
             Toolbox::logInFile('tralla', 'Conversa do WhatsApp indisponível: ' . $e->getMessage() . PHP_EOL);
             return null;

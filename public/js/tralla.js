@@ -2587,6 +2587,11 @@
                 + '<h3><i class="ti ti-brand-whatsapp"></i> Conversa do WhatsApp'
                 + (Number(card.whatsapp_chats_id) > 0
                     ? ' · WA-' + String(Number(card.whatsapp_chats_id)).padStart(6, '0') : '')
+                + (card.whatsapp_previous_chats
+                    ? ' <small>(antes: ' + String(card.whatsapp_previous_chats).split(',').map(function (chatId) {
+                        return 'WA-' + String(Number(chatId)).padStart(6, '0');
+                    }).join(', ') + ')</small>'
+                    : '')
                 + '</h3>'
                 + '<div class="tralla-detail-description tralla-whatsapp-transcript">' + esc(card.whatsapp_transcript) + '</div>'
                 + '<small class="tralla-empty-mini">Atualizada sempre que o card é aberto.</small>'
