@@ -136,14 +136,17 @@ class PluginTrallaTicketSync
         if ($snapshot !== '') {
             $text .= "\n\n" . $snapshot;
         }
-        $followup = new ITILFollowup();
-        $followupId = (int) $followup->add([
-            'itemtype' => 'Ticket',
-            'items_id' => $ticketId,
-            'content' => $text,
-            'users_id' => (int) ($event['users_id'] ?? 0),
-            'is_private' => 0,
-        ]);
+        $followupId = self::existingFollowup($ticketId, $text, $historyId);
+        if ($followupId <= 0) {
+            $followup = new ITILFollowup();
+            $followupId = (int) $followup->add([
+                'itemtype' => 'Ticket',
+                'items_id' => $ticketId,
+                'content' => $text . "\n[Tralla evento #" . $historyId . ']",
+                'users_id' => (int) ($event['users_id'] ?? 0),
+                'is_private' => 0,
+            ]);
+        }
         if ($followupId <= 0) {
             throw new RuntimeException('Não foi possível registrar acompanhamento no chamado #' . $ticketId . '.');
         }
@@ -266,6 +269,23 @@ class PluginTrallaTicketSync
         if (!$actor->add(['tickets_id' => $ticketId, 'users_id' => $userId, 'type' => $type])) {
             error_log('[Tralla] Não foi possível vincular usuário #' . $userId . ' ao chamado #' . $ticketId . '.');
         }
+    }
+
+    private static function existingFollowup(int $ticketId, string $text, int $historyId): int
+    {
+        global $DB;
+        $marked = $text . "\n[Tralla evento #" . $historyId . ']';
+        foreach ($DB->request([
+            'SELECT' => ['id'], 'FROM' => 'glpi_itilfollowups',
+            'WHERE' => ['itemtype' => 'Ticket', 'items_id' => $ticketId,
+                'content' => [$marked, $text]],
+            'ORDER' => 'id ASC',
+        ]) as $row) {
+            $claimed = $DB->request(['SELECT' => ['id'], 'FROM' => 'glpi_plugin_tralla_history',
+                'WHERE' => ['ticket_followups_id' => (int) $row['id']], 'LIMIT' => 1])->current();
+            if (!is_array($claimed)) { return (int) $row['id']; }
+        }
+        return 0;
     }
 
     private static function validSla(int $slaId, int $type, int $entityId): bool
