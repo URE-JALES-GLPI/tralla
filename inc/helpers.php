@@ -885,6 +885,30 @@ if (!function_exists('tralla_priorities')) {
     }
 }
 
+if (!function_exists('tralla_whatsapp_live_transcript')) {
+    /**
+     * Conversa atual do atendimento de origem, montada pelo WhatsAppSimples.
+     *
+     * Lida só quando o card é aberto: nenhum custo extra no recebimento ou
+     * envio de mensagens, e edições/exclusões já aparecem. Retorna null quando
+     * o WhatsAppSimples não está ativo ou o atendimento não existe mais.
+     */
+    function tralla_whatsapp_live_transcript(int $chatId): ?string
+    {
+        $service = 'GlpiPlugin\Whatsappsimples\Service\TrallaIntegrationService';
+        if ($chatId <= 0 || !Plugin::isPluginActive('whatsappsimples') || !class_exists($service)
+            || !method_exists($service, 'transcriptForChat')) {
+            return null;
+        }
+        try {
+            return (new $service())->transcriptForChat($chatId);
+        } catch (Throwable $e) {
+            Toolbox::logInFile('tralla', 'Conversa do WhatsApp indisponível: ' . $e->getMessage() . PHP_EOL);
+            return null;
+        }
+    }
+}
+
 if (!function_exists('tralla_whatsapp_send')) {
     /** Envia texto pela EvolutionAPI configurada no plugin WhatsAppSimples. */
     function tralla_whatsapp_send(string $phone, string $text): bool

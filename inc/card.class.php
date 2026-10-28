@@ -303,6 +303,15 @@ class PluginTrallaCard extends CommonDBTM
         }
         $card['source_label'] = tralla_source_label((string) $card['source']);
         $card['sla'] = $boardType === 'maintenance' ? tralla_card_sla($card) : null;
+        if ((int) ($card['whatsapp_chats_id'] ?? 0) > 0) {
+            // Conversa ao vivo; a cópia gravada só muda quando há novidade e
+            // serve de reserva se o WhatsAppSimples sair do ar.
+            $live = tralla_whatsapp_live_transcript((int) $card['whatsapp_chats_id']);
+            if ($live !== null && $live !== (string) ($card['whatsapp_transcript'] ?? '')) {
+                $DB->update('glpi_plugin_tralla_cards', ['whatsapp_transcript' => $live], ['id' => $id]);
+                $card['whatsapp_transcript'] = $live;
+            }
+        }
         $ticketCard = (int) $card['stage'] === 2 && is_array($parentCard) ? $parentCard : $card;
         $card['tickets_id'] = (int) ($ticketCard['tickets_id'] ?? 0);
         $card['ticket_url'] = $card['tickets_id'] > 0
@@ -1023,7 +1032,7 @@ class PluginTrallaCard extends CommonDBTM
 
     /**
      * Dados do modal "Novo card" aberto pelo WhatsAppSimples, no quadro fixo
-     * da integração: os mesmos usados pelo modal do Kanban, mais as prioridades.
+     * da integração: entidades e categorias de chamado do Kanban, mais as prioridades.
      */
     public static function whatsappCreateOptions(int $boards_id, int $userId = 0): array
     {
@@ -1052,23 +1061,18 @@ class PluginTrallaCard extends CommonDBTM
             ],
             'entities'   => tralla_all_entity_options(),
             'call_categories' => tralla_call_categories(),
-            'models'     => array_map(static fn (array $model): array => [
-                'id'   => (int) $model['id'],
-                'name' => (string) $model['name'],
-            ], PluginTrallaMachineModel::getModels()),
-            'machine_quantity_max' => self::MAX_MACHINE_QUANTITY,
             'priorities' => $priorities,
         ];
     }
 
     /**
-     * Card aberto a partir de um atendimento do WhatsApp.
+     * Chamado aberto a partir de um atendimento do WhatsApp.
      *
-     * Mesmos dados do modal "Novo card" (Manutenção com máquinas ou Chamado com
-     * categoria e descrição), mas, como o técnico já está atendendo, o card não
-     * passa por Pendente nem por aprovação: nasce em "Manutenção Em Andamento",
-     * com ele como responsável, a prioridade escolhida por ele e o SLA contando
-     * a partir da criação.
+     * Mesmos dados do Chamado do modal "Novo card" (entidade, categoria e
+     * descrição), mas, como o técnico já está atendendo, o card não passa por
+     * Pendente nem por aprovação: nasce em "Manutenção Em Andamento", com ele
+     * como responsável, a prioridade escolhida por ele e o SLA contando a
+     * partir da criação.
      */
     public static function createFromWhatsapp(array $data, int $userId = 0): array
     {
@@ -1078,10 +1082,6 @@ class PluginTrallaCard extends CommonDBTM
         $boards_id = (int) ($data['boards_id'] ?? 0);
         self::assertWhatsappBoard($boards_id, $userId);
 
-        $workflowType = (string) ($data['workflow_type'] ?? 'maintenance');
-        if (!in_array($workflowType, ['maintenance', 'call'], true)) {
-            throw new RuntimeException('Tipo de card inválido.');
-        }
         $entityIdValue = trim((string) ($data['entity_id'] ?? ''));
         $entity = ctype_digit($entityIdValue) ? $DB->request([
             'SELECT' => ['id', 'name'],
@@ -1098,24 +1098,17 @@ class PluginTrallaCard extends CommonDBTM
         if (!tralla_valid_priority($priority)) {
             throw new RuntimeException('Selecione a prioridade do atendimento (P1 a P4).');
         }
+        $callCategory = trim((string) ($data['call_category'] ?? ''));
+        $callSubcategory = trim((string) ($data['call_subcategory'] ?? ''));
+        if (!tralla_valid_call_category($callCategory, $callSubcategory)) {
+            throw new RuntimeException('Selecione uma categoria e subcategoria válidas.');
+        }
         $description = trim(strip_tags((string) ($data['description'] ?? '')));
-        $callCategory = '';
-        $callSubcategory = '';
-        $machines = [];
-        if ($workflowType === 'call') {
-            $callCategory = trim((string) ($data['call_category'] ?? ''));
-            $callSubcategory = trim((string) ($data['call_subcategory'] ?? ''));
-            if (!tralla_valid_call_category($callCategory, $callSubcategory)) {
-                throw new RuntimeException('Selecione uma categoria e subcategoria válidas.');
-            }
-            if ($description === '') {
-                throw new RuntimeException('Descreva a situação do chamado.');
-            }
-        } else {
-            $machines = self::expandRequestedMachines($data['machines'] ?? []);
-            if ($machines === []) {
-                throw new RuntimeException('Informe ao menos uma máquina.');
-            }
+        if ($description === '') {
+            throw new RuntimeException('Descreva a situação do chamado.');
+        }
+        if (mb_strlen($description) > 2000) {
+            throw new RuntimeException('A descrição deve ter no máximo 2000 caracteres.');
         }
         $chatId = max(0, (int) ($data['whatsapp_chats_id'] ?? 0));
         $transcript = trim((string) ($data['whatsapp_transcript'] ?? ''));
@@ -1154,14 +1147,14 @@ class PluginTrallaCard extends CommonDBTM
                 'family_seq'              => 1,
                 'split_from_cards_id'     => 0,
                 'status'                  => 'in_progress',
-                'workflow_type'           => $workflowType,
+                'workflow_type'           => 'call',
                 'is_locked'               => 0,
                 'priority'                => $priority,
                 'date_sla_start'          => $now,
                 'date_taken'              => $now,
                 'is_archived'             => 0,
                 'source'                  => 'whatsapp',
-                'machines_total'          => count($machines),
+                'machines_total'          => 0,
                 'whatsapp_chats_id'       => $chatId,
                 'whatsapp_transcript'     => $transcript,
                 'date_creation'           => $now,
@@ -1174,16 +1167,9 @@ class PluginTrallaCard extends CommonDBTM
                 'code_number'        => (int) ($numberRow['max_number'] ?? 0) + 1,
             ], ['id' => $cardId]);
 
-            $rank = 1024.0;
-            foreach ($machines as $machine) {
-                PluginTrallaMachine::insertForCard($cardId, $machine, $rank);
-                $rank += 1024.0;
-            }
-
             $origin = trim((string) ($data['whatsapp_protocol'] ?? ''));
             PluginTrallaHistory::log($cardId, $userId, 'card_created',
-                ($workflowType === 'call' ? 'Chamado' : 'Card de manutenção com ' . count($machines) . ' máquina(s)')
-                . ' criado pelo WhatsApp' . ($origin !== '' ? ' (atendimento ' . $origin . ')' : '') . '.');
+                'Chamado criado pelo WhatsApp' . ($origin !== '' ? ' (atendimento ' . $origin . ')' : '') . '.');
             PluginTrallaHistory::log($cardId, $userId, 'priority_set',
                 'Prioridade ' . (tralla_priorities()[$priority]['label'] ?? $priority) . ' definida por quem abriu; SLA iniciado.');
             PluginTrallaHistory::log($cardId, $userId, 'card_taken', 'Card pego por ' . tralla_user_name($userId) . '.');

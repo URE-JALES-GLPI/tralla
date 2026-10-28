@@ -2589,6 +2589,7 @@
                     ? ' · WA-' + String(Number(card.whatsapp_chats_id)).padStart(6, '0') : '')
                 + '</h3>'
                 + '<div class="tralla-detail-description tralla-whatsapp-transcript">' + esc(card.whatsapp_transcript) + '</div>'
+                + '<small class="tralla-empty-mini">Atualizada sempre que o card é aberto.</small>'
                 + '</section>';
         }
 

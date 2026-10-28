@@ -1,10 +1,10 @@
 /**
  * [URE] Tralla — modal "Novo card" aberto pelo WhatsAppSimples.
  *
- * Mesmo modal do Kanban (Manutenção ou Chamado, entidade, máquinas ou
- * categoria e descrição), com a prioridade escolhida por quem abre. O card
- * é criado direto em Manutenção Em Andamento; o envio é feito pelo
- * WhatsAppSimples, que anexa a conversa do atendimento.
+ * Mesmo modal do Kanban, restrito a Chamado (entidade, categoria e
+ * descrição), com a prioridade escolhida por quem abre. O card é criado
+ * direto em Manutenção Em Andamento; o envio é feito pelo WhatsAppSimples,
+ * que vincula a conversa do atendimento.
  *
  * Uso: TrallaWhatsappCard.open({ chatId, request, optionsUrl, submitUrl, onCreated })
  *   request(url, formData?) -> Promise<json> (o WhatsAppSimples cuida do CSRF)
@@ -67,50 +67,6 @@
             root.innerHTML = '';
         }
         document.body.classList.remove('tralla-modal-open');
-    }
-
-    function quantityMax() {
-        return Math.max(1, Number(data.machine_quantity_max || 999));
-    }
-
-    function modelOptions() {
-        return '<option value="">Selecione um modelo...</option>'
-            + (data.models || []).map(function (model) {
-                return '<option value="' + Number(model.id) + '">' + esc(model.name) + '</option>';
-            }).join('');
-    }
-
-    function addMachineRow() {
-        var container = root.querySelector('#tralla-create-machines');
-        var row = document.createElement('div');
-        row.className = 'tralla-create-machine';
-        row.setAttribute('data-create-machine', '');
-        row.innerHTML = '<div class="tralla-add-machine-grid tralla-create-machine-grid">'
-            + '<div class="tralla-field"><label>Quantidade *</label>'
-            + '<input type="number" data-create-quantity min="1" max="' + quantityMax()
-            + '" step="1" value="1" inputmode="numeric"></div>'
-            + '<div class="tralla-field"><label>Modelo *</label><select data-create-model>'
-            + modelOptions() + '</select></div>'
-            + '</div>'
-            + '<div class="tralla-create-machine-summary" data-create-summary aria-live="polite" hidden></div>'
-            + '<button type="button" class="tralla-icon-btn" data-remove-create-machine title="Remover modelo">'
-            + '<i class="ti ti-x"></i></button>';
-        container.appendChild(row);
-    }
-
-    function updateMachineSummary(row) {
-        var model = row.querySelector('[data-create-model]');
-        var quantity = row.querySelector('[data-create-quantity]');
-        var summary = row.querySelector('[data-create-summary]');
-        var option = model.options[model.selectedIndex];
-        var count = Number(quantity.value || 0);
-        if (option && option.value && count > 0) {
-            summary.textContent = count + 'x ' + option.textContent.trim();
-            summary.hidden = false;
-        } else {
-            summary.textContent = '';
-            summary.hidden = true;
-        }
     }
 
     /* ------------------------------------------------ combobox de entidades */
@@ -216,13 +172,6 @@
             + '</div><button type="button" class="tralla-icon-btn" data-wa-close aria-label="Fechar">'
             + '<i class="ti ti-x"></i></button></div>'
             + '<div class="tralla-modal-body">'
-            + '<fieldset class="tralla-card-workflow-choice"><legend>Qual tipo de card?</legend>'
-            + '<div class="tralla-card-workflow-options">'
-            + '<label class="tralla-card-workflow-option"><input type="radio" name="workflow_type" value="maintenance" checked>'
-            + '<span><i class="ti ti-tool"></i><strong>Manutenção</strong><small>Equipamentos, aprovação e retirada</small></span></label>'
-            + '<label class="tralla-card-workflow-option"><input type="radio" name="workflow_type" value="call">'
-            + '<span><i class="ti ti-headset"></i><strong>Chamado</strong><small>Situação, atendimento e aprovação</small></span></label>'
-            + '</div></fieldset>'
             + '<section class="tralla-create-basics">'
             + '<h3><i class="ti ti-list-details"></i> Dados do atendimento</h3>'
             + '<div class="tralla-field tralla-combobox-field">'
@@ -234,7 +183,7 @@
             + '<input id="tralla-create-name-entity-id" type="hidden" name="entity_id" value="">'
             + '<div id="tralla-create-name-list" class="tralla-combobox-list" role="listbox" hidden></div>'
             + '</div><small>Digite para buscar e clique em uma entidade da lista.</small></div>'
-            + '<div class="tralla-form-row" data-create-category-section hidden>'
+            + '<div class="tralla-form-row">'
             + '<div class="tralla-field"><label for="tralla-create-category">Categoria *</label>'
             + '<select id="tralla-create-category" name="call_category">'
             + '<option value="">Selecione uma categoria...</option>' + categoryOptions + '</select></div>'
@@ -242,25 +191,19 @@
             + '<select id="tralla-create-subcategory" name="call_subcategory" disabled>'
             + '<option value="">Selecione a categoria primeiro...</option></select></div></div>'
             + '</section>'
-            + '<section class="tralla-detail-section" data-create-machines-section>'
-            + '<h3><i class="ti ti-device-desktop"></i> Máquinas *</h3>'
-            + '<div id="tralla-create-machines"></div>'
-            + '<button type="button" class="tralla-add-card" data-add-create-machine style="margin:0;padding-left:0">'
-            + '<i class="ti ti-plus"></i> Adicionar outro modelo</button>'
-            + '</section>'
-            + '<section class="tralla-detail-section tralla-create-call-description" data-create-call-section hidden>'
+            + '<section class="tralla-detail-section tralla-create-call-description">'
             + '<div class="tralla-field"><label for="tralla-create-description">Descrição da situação *</label>'
             + '<textarea id="tralla-create-description" name="description" rows="6" maxlength="2000"'
             + ' placeholder="Descreva o que aconteceu, o impacto e as informações necessárias para o atendimento..."></textarea>'
-            + '<small>A conversa do WhatsApp é anexada ao card automaticamente.</small></div></section>'
+            + '<small>A conversa do WhatsApp fica vinculada ao card e é atualizada sempre que ele é aberto.</small></div></section>'
             + '<section class="tralla-detail-section">'
             + '<h3><i class="ti ti-flag"></i> Prioridade do atendimento *</h3>'
             + '<div class="tralla-priority-options" role="radiogroup" aria-label="Prioridade">' + priorityOptions + '</div>'
             + '</section>'
             + '<p class="tralla-create-approval-note">'
             + '<i class="ti ti-info-circle" aria-hidden="true"></i>'
-            + '<span>O card será criado direto em <b>' + esc(board.in_progress_list) + '</b>, com você como técnico responsável. '
-            + 'O SLA da prioridade escolhida começa a contar agora e a conversa deste atendimento é anexada ao card.</span></p>'
+            + '<span>O chamado será criado direto em <b>' + esc(board.in_progress_list) + '</b>, com você como técnico responsável. '
+            + 'O SLA da prioridade escolhida começa a contar agora.</span></p>'
             + '</div>'
             + '<div class="tralla-modal-actions">'
             + '<button type="button" class="tralla-btn tralla-btn-ghost" data-wa-close>Cancelar</button>'
@@ -268,7 +211,6 @@
             + '<i class="ti ti-check"></i> Criar card</button>'
             + '</div></form>');
 
-        addMachineRow();
         setupEntityCombobox();
         window.setTimeout(function () {
             root.querySelector('#tralla-create-name').focus();
@@ -276,29 +218,14 @@
     }
 
     function onClick(event) {
-        if (event.target.closest('[data-wa-close]')
-            || (event.target.hasAttribute('data-wa-backdrop') && event.target === event.currentTarget.firstElementChild)) {
+        if (event.target.closest('[data-wa-close]') || event.target.hasAttribute('data-wa-backdrop')) {
             close();
-            return;
-        }
-        if (event.target.closest('[data-add-create-machine]')) {
-            addMachineRow();
-            return;
-        }
-        var remove = event.target.closest('[data-remove-create-machine]');
-        if (remove) {
-            remove.closest('[data-create-machine]').remove();
         }
     }
 
     function onChange(event) {
         var target = event.target;
-        if (target.name === 'workflow_type' && target.checked) {
-            var call = target.value === 'call';
-            root.querySelector('[data-create-machines-section]').hidden = call;
-            root.querySelector('[data-create-call-section]').hidden = !call;
-            root.querySelector('[data-create-category-section]').hidden = !call;
-        } else if (target.id === 'tralla-create-category') {
+        if (target.id === 'tralla-create-category') {
             var choices = (data.call_categories || {})[target.value] || [];
             var sub = root.querySelector('#tralla-create-subcategory');
             sub.innerHTML = '<option value="">Selecione uma subcategoria...</option>'
@@ -307,16 +234,11 @@
                 }).join('');
             sub.disabled = !choices.length;
         }
-        var row = target.closest('[data-create-machine]');
-        if (row) {
-            updateMachineSummary(row);
-        }
     }
 
     async function onSubmit(event) {
         event.preventDefault();
         var form = event.target;
-        var workflowType = form.querySelector('[name="workflow_type"]:checked').value;
         var nameEl = form.querySelector('[name="name"]');
         var entityId = form.querySelector('[name="entity_id"]').value;
         if (entityId === '') {
@@ -329,37 +251,14 @@
         var category = form.querySelector('[name="call_category"]').value;
         var subcategory = form.querySelector('[name="call_subcategory"]').value;
         var description = form.querySelector('[name="description"]').value.trim();
-        var machines = [];
-        if (workflowType === 'call') {
-            if (((data.call_categories || {})[category] || []).indexOf(subcategory) === -1) {
-                toast('Selecione uma categoria e subcategoria.', 'error');
-                return;
-            }
-            if (!description) {
-                toast('Descreva a situação do chamado.', 'error');
-                form.querySelector('[name="description"]').focus();
-                return;
-            }
-        } else {
-            var invalidQuantity = false;
-            form.querySelectorAll('[data-create-machine]').forEach(function (row) {
-                var modelId = Number(row.querySelector('[data-create-model]').value);
-                var quantity = Number(row.querySelector('[data-create-quantity]').value);
-                if (modelId > 0) {
-                    if (!Number.isInteger(quantity) || quantity < 1 || quantity > quantityMax()) {
-                        invalidQuantity = true;
-                    }
-                    machines.push({ model_id: modelId, quantity: quantity });
-                }
-            });
-            if (invalidQuantity) {
-                toast('Informe uma quantidade entre 1 e ' + quantityMax() + '.', 'error');
-                return;
-            }
-            if (!machines.length) {
-                toast('Adicione ao menos uma máquina com modelo selecionado.', 'error');
-                return;
-            }
+        if (((data.call_categories || {})[category] || []).indexOf(subcategory) === -1) {
+            toast('Selecione uma categoria e subcategoria.', 'error');
+            return;
+        }
+        if (!description) {
+            toast('Descreva a situação do chamado.', 'error');
+            form.querySelector('[name="description"]').focus();
+            return;
         }
         var priority = form.querySelector('[name="priority"]:checked');
         if (!priority) {
@@ -369,13 +268,11 @@
 
         var body = new FormData();
         body.append('chat_id', settings.chatId);
-        body.append('workflow_type', workflowType);
         body.append('entity_id', entityId);
         body.append('priority', priority.value);
         body.append('description', description);
-        body.append('call_category', workflowType === 'call' ? category : '');
-        body.append('call_subcategory', workflowType === 'call' ? subcategory : '');
-        body.append('machines', JSON.stringify(machines));
+        body.append('call_category', category);
+        body.append('call_subcategory', subcategory);
 
         var submit = form.querySelector('button[type="submit"]');
         submit.disabled = true;
@@ -386,7 +283,7 @@
                 return;
             }
             close();
-            toast('Card ' + result.card.code + ' criado em ' + (data.board.in_progress_list || 'Em Andamento') + '.', 'success');
+            toast('Chamado ' + result.card.code + ' criado em ' + (data.board.in_progress_list || 'Em Andamento') + '.', 'success');
             if (typeof settings.onCreated === 'function') {
                 settings.onCreated(result.card);
             }
