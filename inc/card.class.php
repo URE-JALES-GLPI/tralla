@@ -693,6 +693,13 @@ class PluginTrallaCard extends CommonDBTM
             && $status === 'waiting_approval'
             && self::userIsApprover($userId, $boardId);
 
+        // Acompanhamento do WhatsApp: aprovadores e admins do quadro marcam "Chamado criado".
+        $canAcknowledgeWhatsapp = $isMember
+            && $stage === 2
+            && $status === 'whatsapp_watch'
+            && empty($card['is_archived'])
+            && (self::userIsApprover($userId, $boardId) || $isBoardAdmin);
+
         $canConfirm = $isMember
             && !$isCall
             && $boardType === 'maintenance'
@@ -733,6 +740,7 @@ class PluginTrallaCard extends CommonDBTM
             'request_call_release' => $canRequestCallRelease,
             'finalize'         => $canFinalize,
             'approve'          => $canApprove,
+            'acknowledge_whatsapp' => $canAcknowledgeWhatsapp,
             'reject'           => $canApprove,
             'withdraw'         => $canConfirm,
             'toggle_withdrawal_notice' => $isMember && $canUpdate && $boardType === 'maintenance'
@@ -1237,6 +1245,41 @@ class PluginTrallaCard extends CommonDBTM
         tralla_code_cache(true);
 
         return tralla_display_code(self::getCard($watchId) ?? [], 'maintenance');
+    }
+
+    /**
+     * "Chamado criado": o aprovador registra que viu o chamado aberto pelo
+     * WhatsApp; o card de acompanhamento sai de Aprovação (arquivado).
+     */
+    public static function acknowledgeWhatsappWatch(int $id, int $userId = 0): array
+    {
+        global $DB;
+
+        $userId = $userId > 0 ? $userId : (int) Session::getLoginUserID();
+        $card = self::getCard($id);
+        if ($card === null) {
+            throw new RuntimeException('Card não encontrado.');
+        }
+        self::assertBoardAccess($card);
+        if (empty(self::permissionsFor($card, 'maintenance', $userId, false)['acknowledge_whatsapp'])) {
+            throw new RuntimeException('Somente aprovadores ou administradores do quadro podem marcar o chamado como criado.');
+        }
+
+        $now = tralla_now();
+        $who = tralla_user_name($userId);
+        $DB->update('glpi_plugin_tralla_cards', [
+            'is_archived'       => 1,
+            'users_id_approver' => $userId,
+            'date_approved'     => $now,
+            'date_mod'          => $now,
+        ], ['id' => $id]);
+        PluginTrallaHistory::log($id, $userId, 'whatsapp_watch_acknowledged', 'Chamado criado, confirmado por ' . $who . '.');
+        if ((int) $card['parent_cards_id'] > 0) {
+            PluginTrallaHistory::log((int) $card['parent_cards_id'], $userId, 'whatsapp_watch_acknowledged',
+                'Acompanhamento em Aprovação encerrado: chamado criado, confirmado por ' . $who . '.');
+        }
+
+        return self::getCardDetail($id, $userId);
     }
 
     /** IDs dos cards de acompanhamento ainda ativos de um card do WhatsApp. */

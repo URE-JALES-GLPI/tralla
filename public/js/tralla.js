@@ -1299,7 +1299,8 @@
             var departingOutcome = departing.outcome === 'rejected' ? 'rejected' : 'approved';
             departingBadge = '<span class="tralla-card-departing is-' + departingOutcome + '">'
                 + '<i class="ti ' + (departingOutcome === 'rejected' ? 'ti-x' : 'ti-check') + '" aria-hidden="true"></i>'
-                + '<span>' + (departingOutcome === 'rejected' ? 'Reprovado' : 'Aprovado')
+                + '<span>' + (departingOutcome === 'rejected' ? 'Reprovado'
+                    : (departing.card && departing.card.approval_kind === 'whatsapp' ? 'Chamado criado' : 'Aprovado'))
                 + ' · saindo em ' + Math.max(0, Number(departing.remaining) || 0) + 's</span></span>';
         }
 
@@ -1880,6 +1881,11 @@
             buttons += '<a class="tralla-btn tralla-btn-sign" data-withdrawal-action href="'
                 + attr(withdrawalBatchUrl(withdrawalSelectedCards()) || card.assignature_url)
                 + '" target="_blank" rel="noopener noreferrer"><i class="ti ti-signature"></i> <span data-withdrawal-action-label>Assinar</span></a>';
+        }
+
+        if (permissions.acknowledge_whatsapp) {
+            buttons += '<button type="button" class="tralla-btn tralla-btn-primary" data-card-action="whatsapp_ack">'
+                + '<i class="ti ti-circle-check"></i> Chamado Criado</button>';
         }
 
         if (permissions.approve) {
@@ -2932,6 +2938,21 @@
             return;
         }
 
+        if (action === 'whatsapp_ack') {
+            try {
+                setBusy(button, true);
+                var acknowledged = await api('whatsapp_watch_ack', { id: cardId });
+                applyState(acknowledged);
+                scheduleDepartingCard(departingCard, 'approved');
+                toast('Chamado criado. O card sai de Aprovação em 10 segundos.', 'success');
+                closeModal();
+            } catch (error) {
+                toast(error.message, 'error');
+                setBusy(button, false);
+            }
+            return;
+        }
+
         if (action === 'request_call_release') {
             try {
                 setBusy(button, true);
@@ -3146,7 +3167,7 @@
                 data = await api('finalize_card', { id: cardId });
                 applyState(data);
                 toast(departingCard.workflow_type === 'call'
-                    ? 'Chamado finalizado e enviado para aprovação.'
+                    ? (data.approval ? 'Chamado finalizado e enviado para aprovação.' : 'Chamado finalizado e concluído.')
                     : (data.family_ready ? 'Manutenção finalizada e enviada para Retirada.' : 'Manutenção finalizada; aguardando os demais cards da família.')
                         + (data.pending_card ? ' Máquinas pendentes no card ' + displayCardCode(data.pending_card.code, data.pending_card.id) + '.' : ''), 'success');
                 await openCard(data.approval ? data.approval.id : data.card.id);

@@ -540,6 +540,7 @@ class PluginTrallaHistory extends CommonDBTM
             'whatsapp_link_transferred' => 'Vínculo do WhatsApp transferido',
             'whatsapp_watch_created'    => 'Acompanhamento criado em Aprovação',
             'whatsapp_watch_closed'     => 'Acompanhamento encerrado',
+            'whatsapp_watch_acknowledged' => 'Chamado criado',
             'machine_added'         => 'Máquina adicionada',
             'machine_updated'       => 'Máquina atualizada',
             'machine_deleted'       => 'Máquina removida',

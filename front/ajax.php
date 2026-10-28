@@ -591,6 +591,11 @@ try {
             $detail = PluginTrallaCard::decide($cardId, true, '', $userId, $isAdmin, tralla_post_string('priority'));
             tralla_json(['ok' => true, 'data' => ['card' => $detail, 'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id'])]]);
 
+        case 'whatsapp_watch_ack':
+            tralla_ajax_require(READ);
+            $detail = PluginTrallaCard::acknowledgeWhatsappWatch(tralla_post_int('id'), $userId);
+            tralla_json(['ok' => true, 'data' => ['card' => $detail, 'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id'])]]);
+
         case 'request_call_release':
             tralla_ajax_require(READ);
             $detail = PluginTrallaCard::requestCallRelease(tralla_post_int('id'), $userId);
