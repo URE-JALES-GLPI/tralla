@@ -207,20 +207,41 @@ class PluginTrallaTicketSync
         }
         $priority = (string) ($primary['priority'] ?? '');
         if (preg_match('/^P([1-5])$/', $priority, $matches)) {
+            $slaStart = trim((string) ($primary['date_sla_start'] ?? ''));
+            if ($slaStart !== '' && strtotime($slaStart) !== false
+                && (string) ($ticket->fields['date'] ?? '') !== $slaStart) {
+                $changes['date'] = $slaStart;
+            }
             $urgency = 6 - (int) $matches[1];
             if ((int) $ticket->fields['urgency'] !== $urgency) {
                 $changes['urgency'] = $urgency;
             }
             foreach (['tto' => SLM::TTO, 'ttr' => SLM::TTR] as $kind => $type) {
                 $slaId = PluginTrallaConfig::getInt('ticket_sla_' . $kind . '_' . $priority, 0);
-                if ($slaId > 0 && self::validSla($slaId, $type, $entityId)
-                    && (int) ($ticket->fields['slas_id_' . $kind] ?? 0) !== $slaId) {
-                    $changes['slas_id_' . $kind] = $slaId;
+                if ($slaId > 0 && self::validSla($slaId, $type, $entityId)) {
+                    if ((int) ($ticket->fields['slas_id_' . $kind] ?? 0) !== $slaId) {
+                        $changes['slas_id_' . $kind] = $slaId;
+                    }
+                    if ($slaStart !== '' && strtotime($slaStart) !== false) {
+                        $sla = new SLA();
+                        $sla->getFromDB($slaId);
+                        $sla->setTicketCalendar(Entity::getUsedConfig(
+                            'calendars_strategy', $entityId, 'calendars_id', 0
+                        ));
+                        $due = $sla->computeDate($slaStart, 0);
+                        $field = $kind === 'tto' ? 'time_to_own' : 'time_to_resolve';
+                        if ($due !== null && (string) ($ticket->fields[$field] ?? '') !== $due) {
+                            $changes[$field] = $due;
+                        }
+                    }
                 }
+            }
+            if ((int) ($ticket->fields['sla_waiting_duration'] ?? 0) !== 0) {
+                $changes['sla_waiting_duration'] = 0;
             }
         }
         if ($changes !== [] && (string) $primary['status'] !== 'deleted') {
-            if ((!empty($changes['slas_id_tto']) || !empty($changes['slas_id_ttr']))
+            if (array_intersect(['slas_id_tto', 'slas_id_ttr', 'time_to_own', 'time_to_resolve'], array_keys($changes))
                 && !Session::haveRight(SLM::$rightname, SLM::RIGHT_ASSIGN)) {
                 throw new RuntimeException('Sem permissão para atribuir SLA ao chamado #' . $ticketId . '.');
             }
