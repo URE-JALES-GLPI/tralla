@@ -4788,6 +4788,25 @@ body.tralla-modal-open {
     text-align: left;
 }
 .tralla-user-dash-person:not(:disabled) { cursor: pointer; }
+.tralla-user-dash-total {
+    align-items: baseline;
+    background: var(--tr-surface-2);
+    border: 1px solid var(--tr-border);
+    border-radius: var(--tr-radius-sm);
+    color: var(--tr-text-soft);
+    display: inline-flex;
+    flex: none;
+    font-size: 12px;
+    font-weight: 600;
+    gap: 6px;
+    margin-left: auto;
+    padding: 4px 10px;
+}
+.tralla-user-dash-total b {
+    color: var(--tr-text);
+    font-size: 18px;
+    font-variant-numeric: tabular-nums;
+}
 .tralla-user-dash-person:hover strong { color: var(--tr-primary); }
 .tralla-user-dash-person > i { color: var(--tr-primary); font-size: 28px; }
 .tralla-user-dash-card header > i {

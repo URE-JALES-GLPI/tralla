@@ -62,6 +62,11 @@ $pluginUrl = $root . '/plugins/tralla';
                         <?php endif; ?>
                         <span><strong><?= tralla_h($person['name']) ?></strong><small><?= tralla_h($person['email']) ?></small></span>
                     </button>
+                    <?php if ((int) $person['users_id'] > 0): ?>
+                        <span class="tralla-user-dash-total" title="Pendente + Em andamento + Retirada + Concluído">
+                            Total <b><?= (int) $person['pending'] + (int) $person['in_progress'] + (int) $person['withdrawal'] + (int) $person['done'] ?></b>
+                        </span>
+                    <?php endif; ?>
                 </header>
                 <?php if ((int) $person['users_id'] === 0): ?>
                     <p class="tralla-user-dash-missing">Usuário não encontrado no GLPI.</p>
