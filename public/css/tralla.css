@@ -4460,6 +4460,94 @@ body.tralla-modal-open {
     font-weight: 700;
 }
 
+.tralla-split-members {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.tralla-split-members-label {
+    color: var(--tr-muted);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.tralla-split-member {
+    align-items: baseline;
+    background: var(--tr-surface-2);
+    border: 1px solid var(--tr-border);
+    border-radius: var(--tr-radius-sm);
+    color: var(--tr-text);
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 12px;
+    gap: 6px;
+    padding: 4px 10px;
+}
+
+.tralla-split-member small {
+    color: var(--tr-muted);
+    font-size: 11px;
+}
+
+.tralla-split-member:hover,
+.tralla-split-member.is-current {
+    background: var(--tr-primary-soft);
+    border-color: var(--tr-primary);
+}
+
+.tralla-split-member.is-current strong {
+    color: var(--tr-primary);
+}
+
+.tralla-split-back {
+    font-size: 12px;
+    padding: 4px 10px;
+}
+
+.tralla-split-snapshot-notice {
+    align-items: flex-start;
+    background: var(--tr-primary-soft);
+    border: 1px solid var(--tr-primary);
+    border-radius: var(--tr-radius-sm);
+    color: var(--tr-text);
+    display: flex;
+    font-size: 12px;
+    gap: 8px;
+    line-height: 1.45;
+    margin-bottom: 14px;
+    padding: 10px 12px;
+}
+
+.tralla-split-snapshot-notice i {
+    color: var(--tr-primary);
+    font-size: 16px;
+}
+
+.tralla-machine-worker {
+    align-items: center;
+    background: var(--tr-surface-2);
+    border: 1px solid var(--tr-border);
+    border-radius: 999px;
+    color: var(--tr-text-soft);
+    display: inline-flex;
+    font-size: 11px;
+    gap: 4px;
+    padding: 2px 8px;
+}
+
+.tralla-history-card {
+    background: var(--tr-surface-2);
+    border: 1px solid var(--tr-border);
+    border-radius: 4px;
+    color: var(--tr-primary);
+    font-family: var(--tr-mono, monospace);
+    font-size: 11px;
+    padding: 0 5px;
+}
+
 .tralla-split-origin {
     color: var(--tr-muted);
     font-size: 11px;

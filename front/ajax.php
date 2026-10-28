@@ -301,7 +301,9 @@ try {
 
         case 'card_get':
             $cardId = tralla_post_int('id');
-            tralla_json(['ok' => true, 'data' => PluginTrallaCard::getCardDetail($cardId, $userId)]);
+            tralla_json(['ok' => true, 'data' => PluginTrallaCard::getCardDetail(
+                $cardId, $userId, tralla_post_int('split_view') === 1
+            )]);
 
         case 'card_update':
             tralla_ajax_require(UPDATE);

@@ -1544,13 +1544,46 @@
         return '<div class="tralla-modal-head">'
             + '<div>'
             + '<div class="tralla-detail-code">' + esc(displayCardCode(card.code, card.id))
-            + ' · ' + esc(card.list_name || '') + '</div>'
+            + ' · ' + esc(card.split_snapshot ? 'Card separado' : (card.list_name || '')) + '</div>'
             + (card.workflow_type === 'call' ? '<span class="tralla-card-call-badge">Chamado</span>' : '')
             + '<h2 class="tralla-detail-title">' + esc(card.name) + '</h2>'
             + (sub ? '<div class="tralla-detail-sub">' + sub + '</div>' : '')
+            + splitMembersBar(card)
             + '</div>'
             + modalCloseButton()
             + '</div>';
+    }
+
+    function splitMembersBar(card) {
+        var members = Array.isArray(card.split_members) ? card.split_members : [];
+        if (members.length < 2) {
+            return '';
+        }
+        var back = card.split_snapshot
+            ? '<button type="button" class="tralla-btn tralla-btn-ghost tralla-split-back" data-open-card="'
+                + Number(card.split_snapshot.root_id) + '"><i class="ti ti-arrow-left"></i> Voltar ao card completo</button>'
+            : '';
+        return '<div class="tralla-split-members">' + back
+            + '<span class="tralla-split-members-label"><i class="ti ti-git-branch"></i> Separado em:</span>'
+            + members.map(function (member) {
+                return '<button type="button" class="tralla-split-member' + (member.is_current ? ' is-current' : '')
+                    + '" data-open-split-card="' + Number(member.id) + '" title="Ver como o card '
+                    + attr(displayCardCode(member.code, member.id)) + ' estava durante a separação">'
+                    + '<strong>' + esc(displayCardCode(member.code, member.id)) + '</strong>'
+                    + '<small>' + esc(member.technician_name || 'Sem técnico') + '</small></button>';
+            }).join('')
+            + '</div>';
+    }
+
+    function renderSplitSnapshotNotice(card) {
+        if (!card.split_snapshot) {
+            return '';
+        }
+        return '<div class="tralla-split-snapshot-notice"><i class="ti ti-history"></i>'
+            + '<span>Você está vendo como o card <strong>' + esc(displayCardCode(card.code, card.id))
+            + '</strong> estava durante a separação: técnico, máquinas e histórico deste card. '
+            + 'As máquinas agora estão reunidas em <strong>' + esc(displayCardCode(card.split_snapshot.root_code, card.split_snapshot.root_id))
+            + '</strong>.</span></div>';
     }
 
     function metaRow(label, value) {
@@ -1924,7 +1957,9 @@
                 return '<div class="tralla-history-item">'
                     + '<div class="tralla-history-dot"><span class="tralla-avatar">' + esc(initials(entry.user_name || 'Sistema')) + '</span></div>'
                     + '<div class="tralla-history-body">'
-                    + '<strong>' + esc(entry.action_label || entry.action) + '</strong>'
+                    + '<strong>' + (entry.card_code ? '<span class="tralla-history-card">'
+                        + esc(displayCardCode(entry.card_code, entry.card_id)) + '</span> ' : '')
+                    + esc(entry.action_label || entry.action) + '</strong>'
                     + '<small>' + esc(entry.user_name || 'Sistema') + ' · ' + esc(entry.date_formatted || formatDate(entry.date_creation)) + '</small>'
                     + (entry.details ? '<p>' + esc(entry.details) + '</p>' : '')
                     + '</div></div>';
@@ -1997,6 +2032,11 @@
             + '</div>'
             + (canBulkSelect ? '<label class="tralla-machine-select"><input type="checkbox" data-select-machine="' + id
                 + '" aria-label="Selecionar ' + attr(title) + '"><span>Selecionar</span></label>' : '')
+            + (machine.worked_card_code
+                ? '<span class="tralla-machine-worker" title="Feita no card ' + attr(displayCardCode(machine.worked_card_code, machine.worked_card_id))
+                    + ' durante a separação"><i class="ti ti-user"></i> ' + esc(machine.worked_by_name || 'Sem técnico')
+                    + ' · ' + esc(displayCardCode(machine.worked_card_code, machine.worked_card_id)) + '</span>'
+                : '')
             + '<span class="tralla-pill ' + (machine.is_filled ? 'done' : 'pending') + '">'
             + (machine.is_filled ? 'Preenchida' : 'Pendente') + '</span>'
             + '</div>'
@@ -2520,6 +2560,7 @@
                 + '</section>';
         }
 
+        body = renderSplitSnapshotNotice(card) + body;
         body += renderPendingApproval(card);
         body += renderFamily(card);
         body += renderApproval(card);
@@ -2559,13 +2600,13 @@
         }
     }
 
-    async function openCard(id) {
+    async function openCard(id, splitView) {
         var requestId = ++openCardRequest;
         try {
             if (isUpdates && activeCard && Number(activeCard.id) !== Number(id)) {
                 await flushUpdateText();
             }
-            var card = await api('card_get', { id: id });
+            var card = await api('card_get', splitView ? { id: id, split_view: 1 } : { id: id });
             if (requestId !== openCardRequest) { return; }
             activeCard = card;
             renderCardModal(card);
@@ -4915,6 +4956,12 @@
         var openCardButton = event.target.closest('[data-open-card]');
         if (openCardButton) {
             openCard(Number(openCardButton.dataset.openCard));
+            return;
+        }
+
+        var splitCardButton = event.target.closest('[data-open-split-card]');
+        if (splitCardButton) {
+            openCard(Number(splitCardButton.dataset.openSplitCard), true);
             return;
         }
 

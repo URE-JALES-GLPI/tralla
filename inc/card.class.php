@@ -243,7 +243,7 @@ class PluginTrallaCard extends CommonDBTM
     /**
      * Detalhe completo do card (modal).
      */
-    public static function getCardDetail(int $id, int $userId = 0): array
+    public static function getCardDetail(int $id, int $userId = 0, bool $splitView = false): array
     {
         global $DB;
         tralla_code_cache(true);
@@ -351,6 +351,48 @@ class PluginTrallaCard extends CommonDBTM
             }
         }
 
+        $card['split_members'] = [];
+        $card['split_snapshot'] = null;
+        if ((int) $card['stage'] === 1 && $boardType === 'maintenance') {
+            $split = self::splitHistory(self::familyRoot($card), $boardType);
+            $merged = false;
+            foreach ($split['members'] as $member) {
+                $merged = $merged || $member['is_archived'];
+            }
+            if (count($split['members']) > 1 && $merged) {
+                $byMember = [];
+                foreach ($split['members'] as $member) {
+                    $byMember[$member['id']] = $member;
+                    $member['is_current'] = $splitView && $member['id'] === $id;
+                    $card['split_members'][] = $member;
+                }
+                if ($splitView && isset($byMember[$id])) {
+                    // Visualização de como o card estava durante a separação.
+                    $machines = array_values(array_filter(
+                        PluginTrallaMachine::getMachinesForCard($split['root']),
+                        static fn (array $machine): bool => ($split['owners'][(int) $machine['id']] ?? $split['root']) === $id
+                    ));
+                    $card['machines'] = $machines;
+                    $card['machines_progress'] = tralla_machines_progress($machines);
+                    $card['split_snapshot'] = [
+                        'root_id'   => $split['root'],
+                        'root_code' => $byMember[$split['root']]['code'] ?? '',
+                    ];
+                } elseif ($id === $split['root']) {
+                    foreach ($card['machines'] as &$machine) {
+                        $owner = $byMember[$split['owners'][(int) $machine['id']] ?? $id] ?? null;
+                        if ($owner !== null) {
+                            $machine['worked_card_id'] = $owner['id'];
+                            $machine['worked_card_code'] = $owner['code'];
+                            $machine['worked_by_name'] = $owner['technician_name'];
+                        }
+                    }
+                    unset($machine);
+                    $card['history'] = self::familyHistory($split['members']);
+                }
+            }
+        }
+
         if ((int) $card['stage'] === 1 && (int) ($card['approval_cards_id'] ?? 0) > 0) {
             $pendingApproval = self::getCard((int) $card['approval_cards_id']);
             if ($pendingApproval !== null && empty($pendingApproval['is_archived'])) {
@@ -426,9 +468,120 @@ class PluginTrallaCard extends CommonDBTM
                 $card['permissions']['split'] = false;
             }
         }
+        if ($card['split_snapshot'] !== null) {
+            $card['permissions'] = array_map(static fn ($allowed) => false, $card['permissions']);
+            $card['status'] = 'approved';
+            $card['status_label'] = 'Card separado';
+            $card['sla'] = null;
+            $card['family_members'] = [];
+            $card['approval_cards_id'] = 0;
+            $card['pending_approval_kind'] = '';
+            $card['pending_approval_id'] = 0;
+            $card['assignature_url'] = '';
+            $card['assignature_term_url'] = '';
+        }
         $card['current_user_id'] = $userId;
 
         return $card;
+    }
+
+    /**
+     * Membros (inclusive arquivados) de uma família separada e o card em que cada
+     * máquina foi trabalhada. As máquinas reunidas na origem são atribuídas a partir
+     * das separações aprovadas, cujo payload guarda as máquinas enviadas a cada card.
+     */
+    private static function splitHistory(int $root, string $boardType): array
+    {
+        global $DB;
+
+        $result = ['root' => $root, 'members' => [], 'owners' => []];
+        if ($root <= 0) {
+            return $result;
+        }
+
+        $children = [];
+        foreach ($DB->request([
+            'FROM'  => 'glpi_plugin_tralla_cards',
+            'WHERE' => ['family_cards_id' => $root, 'stage' => 1, 'is_deleted' => 0],
+            'ORDER' => 'family_seq ASC, id ASC',
+        ]) as $member) {
+            $memberId = (int) $member['id'];
+            $result['members'][] = [
+                'id'              => $memberId,
+                'code'            => tralla_display_code($member, $boardType),
+                'name'            => (string) $member['name'],
+                'status'          => (string) $member['status'],
+                'status_label'    => tralla_status_label((string) $member['status']),
+                'technician_id'   => (int) ($member['technician_id'] ?? 0),
+                'technician_name' => tralla_user_name((int) ($member['technician_id'] ?? 0)),
+                'date_taken'      => $member['date_taken'],
+                'date_finalized'  => $member['date_finalized'],
+                'is_archived'     => !empty($member['is_archived']),
+            ];
+            if ((int) ($member['split_from_cards_id'] ?? 0) > 0) {
+                $children[] = ['id' => $memberId, 'from' => (int) $member['split_from_cards_id']];
+            }
+        }
+        if (count($result['members']) <= 1) {
+            return $result;
+        }
+
+        foreach ($DB->request([
+            'FROM'  => 'glpi_plugin_tralla_cards',
+            'WHERE' => [
+                'family_cards_id' => $root,
+                'stage'           => 2,
+                'approval_kind'   => 'split',
+                'status'          => 'approved',
+            ],
+            'ORDER' => 'id ASC',
+        ]) as $approval) {
+            $childIndex = null;
+            foreach ($children as $index => $child) {
+                if ($child['from'] === (int) $approval['parent_cards_id'] && $child['id'] > (int) $approval['id']) {
+                    $childIndex = $index;
+                    break;
+                }
+            }
+            if ($childIndex === null) {
+                continue;
+            }
+            $childId = $children[$childIndex]['id'];
+            unset($children[$childIndex]);
+            $payload = json_decode((string) ($approval['edit_payload'] ?? ''), true);
+            foreach ((array) (is_array($payload) ? ($payload['machine_ids'] ?? []) : []) as $machineId) {
+                $result['owners'][(int) $machineId] = $childId;
+            }
+        }
+
+        // Máquinas que ainda estão em um card separado pertencem a ele.
+        foreach ($result['members'] as $member) {
+            if ($member['id'] === $root || $member['is_archived']) {
+                continue;
+            }
+            foreach (PluginTrallaMachine::getMachinesForCard($member['id']) as $machine) {
+                $result['owners'][(int) $machine['id']] = $member['id'];
+            }
+        }
+
+        return $result;
+    }
+
+    /** Histórico unificado dos cards de uma família, identificando o card de cada evento. */
+    private static function familyHistory(array $members): array
+    {
+        $history = [];
+        foreach ($members as $member) {
+            foreach (PluginTrallaHistory::getForCard($member['id']) as $entry) {
+                $entry['card_id'] = $member['id'];
+                $entry['card_code'] = $member['code'];
+                $history[] = $entry;
+            }
+        }
+        usort($history, static fn (array $a, array $b): int => [(string) $b['date_creation'], (int) $b['id']]
+            <=> [(string) $a['date_creation'], (int) $a['id']]);
+
+        return $history;
     }
 
     public static function permissionsFor(array $card, string $boardType, int $userId, bool $isAdmin): array
@@ -3148,6 +3301,14 @@ class PluginTrallaCard extends CommonDBTM
         }
 
         $now = tralla_now();
+        // Resumo de quem trabalhou em cada card antes de reunir as máquinas.
+        $summary = [];
+        foreach ($members as $member) {
+            $count = count(PluginTrallaMachine::getMachinesForCard((int) $member['id']));
+            $technician = tralla_user_name((int) ($member['technician_id'] ?? 0));
+            $summary[] = tralla_display_code($member, 'maintenance') . ': '
+                . ($technician !== '' ? $technician : 'sem técnico') . ' (' . $count . ' máquina' . ($count === 1 ? '' : 's') . ')';
+        }
         $rankRow = $DB->request([
             'SELECT' => ['MAX' => 'rank AS max_rank'],
             'FROM' => 'glpi_plugin_tralla_machines',
@@ -3181,7 +3342,8 @@ class PluginTrallaCard extends CommonDBTM
                 'date_mod' => $now,
             ], ['id' => $memberId]);
             PluginTrallaHistory::log($memberId, $userId, 'family_merged',
-                'Máquinas reunidas no card ' . tralla_display_code($rootCard, 'maintenance') . '.');
+                'Máquinas reunidas no card ' . tralla_display_code($rootCard, 'maintenance')
+                . '. Técnico: ' . (tralla_user_name((int) ($member['technician_id'] ?? 0)) ?: 'sem técnico') . '.');
         }
         PluginTrallaMachine::refreshCardTotal($root);
         if ((string) $rootCard['status'] === 'approved') {
@@ -3196,7 +3358,7 @@ class PluginTrallaCard extends CommonDBTM
         }
         PluginTrallaHistory::log($root, $userId, 'family_withdrawal_ready',
             count($members) > 1
-                ? 'Todos os cards aprovados; máquinas reunidas e prontas para retirada.'
+                ? 'Todos os cards finalizados; máquinas reunidas e prontas para retirada. ' . implode('; ', $summary) . '.'
                 : 'Manutenção concluída; aguardando retirada.');
 
         return true;
