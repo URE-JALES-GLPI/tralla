@@ -1564,7 +1564,11 @@
         rows += metaRow('Motivo da reprovação', card.rejection_reason);
 
         return renderSlaBlock(card)
-            + '<div class="tralla-card"><h3>Detalhes</h3><div class="tralla-meta-list">' + rows + '</div></div>';
+            + '<div class="tralla-card"><h3>Detalhes</h3><div class="tralla-meta-list">' + rows + '</div>'
+            + (card.ticket_url ? '<a class="tralla-btn tralla-btn-ghost" href="' + attr(card.ticket_url)
+                + '" target="_blank" rel="noopener noreferrer" style="margin-top:12px;width:100%">'
+                + '<i class="ti ti-ticket"></i> Abrir chamado GLPI #' + Number(card.tickets_id) + '</a>' : '')
+            + '</div>';
     }
 
     /* ---------------------------------------------------------- prioridade / SLA */
@@ -1587,6 +1591,32 @@
             met: 'Cumprido',
             late_met: 'Cumprido com atraso'
         }[state] || '';
+    }
+
+    function slaSecondsLabel(totalSeconds) {
+        var seconds = Math.max(0, Math.floor(totalSeconds));
+        var days = Math.floor(seconds / 86400);
+        var hours = Math.floor(seconds % 86400 / 3600);
+        var minutes = Math.floor(seconds % 3600 / 60);
+        var remaining = seconds % 60;
+        return (days ? days + 'd ' : '') + (days || hours ? String(hours).padStart(2, '0') + 'h ' : '')
+            + String(minutes).padStart(2, '0') + 'min ' + String(remaining).padStart(2, '0') + 's';
+    }
+
+    function updateSlaClocks() {
+        document.querySelectorAll('[data-sla-clock]').forEach(function (clock) {
+            var met = Date.parse(String(clock.dataset.slaMet || '').replace(' ', 'T'));
+            var start = Date.parse(String(clock.dataset.slaStart || '').replace(' ', 'T'));
+            var deadline = Date.parse(String(clock.dataset.slaDeadline || '').replace(' ', 'T'));
+            if (!isNaN(met) && !isNaN(start)) {
+                clock.textContent = 'Tempo até cumprir: ' + slaSecondsLabel((met - start) / 1000);
+            } else if (!isNaN(deadline)) {
+                var difference = (deadline - Date.now()) / 1000;
+                clock.textContent = (difference < 0 ? 'Atrasado há ' : 'Faltam ') + slaSecondsLabel(Math.abs(difference));
+            } else {
+                clock.textContent = 'Aguardando início da contagem';
+            }
+        });
     }
 
     function slaBadges(card) {
@@ -1617,6 +1647,8 @@
             return '<div class="tralla-sla-row is-' + attr(step.state) + '">'
                 + '<div><strong>' + esc(step.title) + '</strong><small>Prazo: ' + esc(step.span) + '</small></div>'
                 + '<div class="tralla-sla-when"><span>' + esc(when) + '</span>'
+                + '<small data-sla-clock data-sla-start="' + attr(sla.start || '') + '" data-sla-deadline="'
+                + attr(step.deadline || '') + '" data-sla-met="' + attr(step.met_at || '') + '"></small>'
                 + '<em>' + esc(slaStateLabel(step.state)) + '</em></div></div>';
         }).join('');
         return '<div class="tralla-card tralla-sla-card"><h3>Prioridade e SLA</h3>'
@@ -5207,5 +5239,6 @@
 
     bindSearch();
     schedulePoll(pollInterval);
+    window.setInterval(updateSlaClocks, 1000);
     renderBoard();
 })();

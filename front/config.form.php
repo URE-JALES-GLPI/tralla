@@ -31,6 +31,18 @@ if (isset($_POST['save'])) {
     PluginTrallaConfig::set('notification_emails', implode(', ', array_unique($emails)));
     PluginTrallaConfig::set('pending_hours', (string) max(1, tralla_post_int('pending_hours', 1)));
     PluginTrallaConfig::set('withdrawal_hours', (string) max(1, tralla_post_int('withdrawal_hours', 24)));
+    PluginTrallaConfig::set('ticket_sync_enabled', !empty($_POST['ticket_sync_enabled']) ? '1' : '0');
+    foreach (array_keys(tralla_priorities()) as $priority) {
+        foreach (['tto' => SLM::TTO, 'ttr' => SLM::TTR] as $kind => $type) {
+            $slaId = max(0, (int) ($_POST['ticket_sla_' . $kind . '_' . $priority] ?? 0));
+            $sla = new SLA();
+            if ($slaId > 0 && (!$sla->getFromDB($slaId) || (int) $sla->fields['type'] !== $type)) {
+                Session::addMessageAfterRedirect('O SLA selecionado para ' . $priority . ' é inválido.', false, ERROR);
+                Html::back();
+            }
+            PluginTrallaConfig::set('ticket_sla_' . $kind . '_' . $priority, (string) $slaId);
+        }
+    }
     PluginTrallaConfig::clearCache();
 
     Session::addMessageAfterRedirect('Configurações salvas.', true);
@@ -41,6 +53,15 @@ if (isset($_POST['regenerate_token'])) {
     PluginTrallaConfig::set('assignature_token', bin2hex(random_bytes(24)));
     PluginTrallaConfig::clearCache();
     Session::addMessageAfterRedirect('Novo token gerado. Atualize o assignat-ure com o novo valor.', true);
+    Html::back();
+}
+
+if (isset($_POST['ticket_sync_existing'])) {
+    require_once GLPI_ROOT . '/plugins/tralla/inc/ticket.class.php';
+    PluginTrallaConfig::set('ticket_sync_enabled', '1');
+    PluginTrallaConfig::set('ticket_sync_start_history_id', '0');
+    $synced = PluginTrallaTicketSync::syncPending(200);
+    Session::addMessageAfterRedirect($synced . ' movimentações sincronizadas. As restantes serão processadas pelo cron do GLPI.', true);
     Html::back();
 }
 
@@ -129,6 +150,11 @@ if (isset($_POST['test_email'])) {
 $config = PluginTrallaConfig::getAll();
 $token = PluginTrallaConfig::assignatureToken();
 $notifications = PluginTrallaConfig::notificationEmails();
+$ticketSlas = ['tto' => [], 'ttr' => []];
+foreach ($DB->request(['SELECT' => ['id', 'name', 'type'], 'FROM' => 'glpi_slas', 'ORDER' => 'name ASC']) as $slaRow) {
+    $kind = (int) $slaRow['type'] === SLM::TTO ? 'tto' : 'ttr';
+    $ticketSlas[$kind][(int) $slaRow['id']] = (string) $slaRow['name'];
+}
 
 Html::header('Tralla', $_SERVER['PHP_SELF'], 'tools', 'PluginTrallaBoard');
 echo "<script>document.title = 'Tralla';</script>";
@@ -139,7 +165,7 @@ echo "<script>document.title = 'Tralla';</script>";
             <img class="tralla-brand-logo" src="<?= tralla_h($pluginUrl) ?>/logo.png?v=<?= (int) @filemtime(GLPI_ROOT . '/plugins/tralla/public/logo.png') ?>" alt="">
             <div>
                 <h1>Configurações</h1>
-                <p>Integração com o assignat-ure, aprovações e notificações.</p>
+                <p>Integração com chamados GLPI, assignat-ure, aprovações e notificações.</p>
             </div>
         </div>
         <div class="tralla-head-actions">
@@ -179,6 +205,39 @@ echo "<script>document.title = 'Tralla';</script>";
                 </div>
                 <small>Copie este token para a configuração do assignat-ure. Ele não é exibido em nenhuma outra tela.</small>
             </div>
+        </section>
+
+        <section class="tralla-card tralla-config-card">
+            <header>
+                <h2><i class="ti ti-ticket"></i> Chamados do GLPI</h2>
+                <p>Um chamado por card principal de manutenção ou chamado. Movimentações e alterações entram como acompanhamentos no mesmo chamado.</p>
+            </header>
+            <label class="tralla-check"><input type="checkbox" name="ticket_sync_enabled" value="1" <?= ($config['ticket_sync_enabled'] ?? '1') === '1' ? 'checked' : '' ?>> Criar e atualizar chamados automaticamente</label>
+            <p class="tralla-hint">Vincule as prioridades do Tralla aos SLAs nativos já cadastrados no GLPI. Sem associação, valem as regras de SLA do próprio GLPI.</p>
+            <?php foreach (tralla_priorities() as $priority => $spec): ?>
+                <div class="tralla-form-row">
+                    <div class="tralla-field">
+                        <label for="tralla-sla-tto-<?= tralla_h($priority) ?>"><?= tralla_h($spec['label']) ?> · SLA de 1º atendimento</label>
+                        <select id="tralla-sla-tto-<?= tralla_h($priority) ?>" name="ticket_sla_tto_<?= tralla_h($priority) ?>">
+                            <option value="0">Usar regras do GLPI</option>
+                            <?php foreach ($ticketSlas['tto'] as $slaId => $slaName): ?><option value="<?= $slaId ?>" <?= (int) ($config['ticket_sla_tto_' . $priority] ?? 0) === $slaId ? 'selected' : '' ?>><?= tralla_h($slaName) ?></option><?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="tralla-field">
+                        <label for="tralla-sla-ttr-<?= tralla_h($priority) ?>"><?= tralla_h($spec['label']) ?> · SLA de solução</label>
+                        <select id="tralla-sla-ttr-<?= tralla_h($priority) ?>" name="ticket_sla_ttr_<?= tralla_h($priority) ?>">
+                            <option value="0">Usar regras do GLPI</option>
+                            <?php foreach ($ticketSlas['ttr'] as $slaId => $slaName): ?><option value="<?= $slaId ?>" <?= (int) ($config['ticket_sla_ttr_' . $priority] ?? 0) === $slaId ? 'selected' : '' ?>><?= tralla_h($slaName) ?></option><?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+            <button type="submit" name="ticket_sync_existing" value="1" class="tralla-btn tralla-btn-ghost"
+                    data-tralla-confirm="Criar chamados GLPI para os cards de manutenção existentes e registrar seu histórico?"
+                    data-tralla-confirm-title="Sincronizar cards existentes"
+                    data-tralla-confirm-label="Sincronizar">
+                <i class="ti ti-refresh"></i> Sincronizar cards existentes
+            </button>
         </section>
 
         <section class="tralla-card tralla-config-card">

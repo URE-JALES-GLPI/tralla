@@ -4,6 +4,7 @@ if (!defined('GLPI_ROOT')) {
 }
 
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/ticket.class.php';
 
 /**
  * Histórico de ações dos cards.
@@ -32,6 +33,7 @@ class PluginTrallaHistory extends CommonDBTM
             'details'                => $details,
             'date_creation'          => tralla_now(),
         ]);
+        PluginTrallaTicketSync::schedule();
     }
 
     public static function getForCard(int $cards_id): array

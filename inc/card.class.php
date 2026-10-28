@@ -299,6 +299,10 @@ class PluginTrallaCard extends CommonDBTM
         }
         $card['source_label'] = tralla_source_label((string) $card['source']);
         $card['sla'] = $boardType === 'maintenance' ? tralla_card_sla($card) : null;
+        $ticketCard = (int) $card['stage'] === 2 && is_array($parentCard) ? $parentCard : $card;
+        $card['tickets_id'] = (int) ($ticketCard['tickets_id'] ?? 0);
+        $card['ticket_url'] = $card['tickets_id'] > 0
+            ? (string) ($GLOBALS['CFG_GLPI']['root_doc'] ?? '') . '/front/ticket.form.php?id=' . $card['tickets_id'] : '';
         $card['technician_name'] = tralla_user_name((int) $card['technician_id']);
         $card['technician_picture_url'] = tralla_user_picture_url((int) $card['technician_id']);
         $card['creator_name'] = tralla_user_name((int) $card['users_id']);
@@ -697,6 +701,7 @@ class PluginTrallaCard extends CommonDBTM
             $DB->insert('glpi_plugin_tralla_cards', [
                 'plugin_tralla_boards_id' => $boards_id,
                 'plugin_tralla_lists_id'  => (int) $list['id'],
+                'entities_id'             => (int) $entity['id'],
                 'name'                    => $name,
                 'description'             => $description,
                 'call_category'           => $callCategory,

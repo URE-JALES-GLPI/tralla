@@ -99,6 +99,9 @@ class PluginTrallaCron extends CommonDBTM
             $count++;
         }
 
+        require_once __DIR__ . '/ticket.class.php';
+        $count += PluginTrallaTicketSync::syncPending(200);
+
         if (method_exists($task, 'addVolume')) {
             $task->addVolume($count);
         }

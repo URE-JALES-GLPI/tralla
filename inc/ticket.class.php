@@ -1,0 +1,270 @@
+<?php
+if (!defined('GLPI_ROOT')) {
+    die("Sorry. You can't access this file directly");
+}
+
+/** Espelha o histórico dos cards de manutenção em chamados nativos do GLPI. */
+class PluginTrallaTicketSync
+{
+    private static bool $shutdownRegistered = false;
+
+    public static function schedule(): void
+    {
+        if (self::$shutdownRegistered || !PluginTrallaConfig::getBool('ticket_sync_enabled', true)) {
+            return;
+        }
+        self::$shutdownRegistered = true;
+        register_shutdown_function(static function (): void {
+            try {
+                self::syncPending(100);
+            } catch (Throwable $e) {
+                error_log('[Tralla] Falha na sincronização de chamados: ' . $e->getMessage());
+            }
+        });
+    }
+
+    public static function syncPending(int $limit = 100): int
+    {
+        global $DB;
+        if (!PluginTrallaConfig::getBool('ticket_sync_enabled', true)
+            || !$DB->fieldExists('glpi_plugin_tralla_history', 'ticket_followups_id')
+            || !$DB->fieldExists('glpi_plugin_tralla_cards', 'tickets_id')) {
+            return 0;
+        }
+        $start = PluginTrallaConfig::getInt('ticket_sync_start_history_id', 0);
+        $rows = $DB->request([
+            'SELECT' => ['h.id AS id'],
+            'FROM' => 'glpi_plugin_tralla_history AS h',
+            'INNER JOIN' => [
+                'glpi_plugin_tralla_cards AS c' => ['ON' => ['h' => 'plugin_tralla_cards_id', 'c' => 'id']],
+                'glpi_plugin_tralla_boards AS b' => ['ON' => ['c' => 'plugin_tralla_boards_id', 'b' => 'id']],
+            ],
+            'WHERE' => ['h.id' => ['>', $start], 'h.ticket_followups_id' => 0, 'b.type' => 'maintenance'],
+            'ORDER' => 'h.id ASC',
+            'LIMIT' => max(1, min(500, $limit)),
+        ]);
+        $synced = 0;
+        foreach ($rows as $row) {
+            try {
+                if (self::syncEvent((int) $row['id'])) {
+                    $synced++;
+                }
+            } catch (Throwable $e) {
+                error_log('[Tralla] Evento #' . (int) $row['id'] . ': ' . $e->getMessage());
+            }
+        }
+        return $synced;
+    }
+
+    private static function syncEvent(int $historyId): bool
+    {
+        global $DB, $CFG_GLPI;
+        $event = $DB->request([
+            'FROM' => 'glpi_plugin_tralla_history',
+            'WHERE' => ['id' => $historyId], 'LIMIT' => 1,
+        ])->current();
+        if (!is_array($event) || (int) $event['ticket_followups_id'] !== 0) {
+            return false;
+        }
+        $card = PluginTrallaCard::getCard((int) $event['plugin_tralla_cards_id']);
+        if ($card === null) {
+            return false;
+        }
+        $boardType = PluginTrallaCard::getBoardType((int) $card['plugin_tralla_boards_id']);
+        if ($boardType !== 'maintenance') {
+            // Quadros normais e de Atualizações não geram chamados.
+            return false;
+        }
+        $primary = (int) $card['stage'] === 2
+            ? PluginTrallaCard::getCard((int) $card['parent_cards_id']) : $card;
+        if ($primary === null) {
+            return false;
+        }
+        $entityId = self::entityFor($primary);
+        $ticketId = (int) ($primary['tickets_id'] ?? 0);
+        $ticket = new Ticket();
+        if ($ticketId > 0 && !$ticket->getFromDB($ticketId)) {
+            throw new RuntimeException('O chamado GLPI vinculado #' . $ticketId . ' não existe mais.');
+        }
+        if ($ticketId <= 0) {
+            $code = tralla_display_code($primary, 'maintenance');
+            $description = trim((string) ($primary['description'] ?? ''));
+            $category = trim((string) ($primary['call_category'] ?? ''));
+            $subcategory = trim((string) ($primary['call_subcategory'] ?? ''));
+            $lines = [
+                'Card Tralla: ' . $code,
+                'Quadro: ' . self::boardName((int) $primary['plugin_tralla_boards_id']),
+                'Tipo: ' . ((string) ($primary['workflow_type'] ?? '') === 'call' ? 'Chamado' : 'Manutenção'),
+            ];
+            if ($category !== '') { $lines[] = 'Categoria: ' . $category; }
+            if ($subcategory !== '') { $lines[] = 'Subcategoria: ' . $subcategory; }
+            if ($description !== '') { $lines[] = 'Descrição: ' . $description; }
+            $lines[] = 'Abrir card: ' . rtrim((string) ($CFG_GLPI['url_base'] ?? $CFG_GLPI['root_doc'] ?? ''), '/')
+                . '/plugins/tralla/front/kanban.php?boards_id=' . (int) $primary['plugin_tralla_boards_id']
+                . '&card_id=' . (int) $primary['id'];
+            $ticketId = (int) $ticket->add([
+                'name' => '[Tralla ' . $code . '] ' . (string) $primary['name'],
+                'content' => implode("\n", $lines),
+                'entities_id' => $entityId,
+                'status' => self::ticketStatus($primary),
+                'type' => (string) ($primary['workflow_type'] ?? '') === 'call'
+                    ? Ticket::INCIDENT_TYPE : Ticket::DEMAND_TYPE,
+                'users_id_recipient' => (int) ($primary['users_id'] ?? 0),
+            ]);
+            if ($ticketId <= 0) {
+                throw new RuntimeException('Não foi possível criar o chamado GLPI do card #' . (int) $primary['id'] . '.');
+            }
+            $DB->update('glpi_plugin_tralla_cards', ['tickets_id' => $ticketId], ['id' => (int) $primary['id']]);
+        }
+
+        self::linkUser($ticketId, (int) ($primary['users_id'] ?? 0), CommonITILActor::REQUESTER);
+        self::linkUser($ticketId, (int) ($primary['technician_id'] ?? 0), CommonITILActor::ASSIGN);
+
+        $code = tralla_display_code($card, 'maintenance');
+        $label = PluginTrallaHistory::getActionLabel((string) $event['action']);
+        $details = trim((string) ($event['details'] ?? ''));
+        $text = '[Tralla ' . $code . '] ' . $label . ($details !== '' ? "\n" . $details : '');
+        $snapshot = self::eventSnapshot((string) $event['action'], $primary);
+        if ($snapshot !== '') {
+            $text .= "\n\n" . $snapshot;
+        }
+        $followup = new ITILFollowup();
+        $followupId = (int) $followup->add([
+            'itemtype' => 'Ticket',
+            'items_id' => $ticketId,
+            'content' => $text,
+            'users_id' => (int) ($event['users_id'] ?? 0),
+            'is_private' => 0,
+        ]);
+        if ($followupId <= 0) {
+            throw new RuntimeException('Não foi possível registrar acompanhamento no chamado #' . $ticketId . '.');
+        }
+        $DB->update('glpi_plugin_tralla_history', ['ticket_followups_id' => $followupId], ['id' => $historyId]);
+
+        $ticket->getFromDB($ticketId);
+        $changes = [];
+        $expectedName = '[Tralla ' . tralla_display_code($primary, 'maintenance') . '] ' . (string) $primary['name'];
+        if ((string) $ticket->fields['name'] !== $expectedName) {
+            $changes['name'] = $expectedName;
+        }
+        $status = self::ticketStatus($primary);
+        if ((int) $ticket->fields['status'] !== $status) {
+            $changes['status'] = $status;
+        }
+        $priority = (string) ($primary['priority'] ?? '');
+        if (preg_match('/^P([1-5])$/', $priority, $matches)) {
+            $urgency = 6 - (int) $matches[1];
+            if ((int) $ticket->fields['urgency'] !== $urgency) {
+                $changes['urgency'] = $urgency;
+            }
+            foreach (['tto' => SLM::TTO, 'ttr' => SLM::TTR] as $kind => $type) {
+                $slaId = PluginTrallaConfig::getInt('ticket_sla_' . $kind . '_' . $priority, 0);
+                if ($slaId > 0 && self::validSla($slaId, $type, $entityId)
+                    && (int) ($ticket->fields['slas_id_' . $kind] ?? 0) !== $slaId) {
+                    $changes['slas_id_' . $kind] = $slaId;
+                }
+            }
+        }
+        if ($changes !== []) {
+            $changes['id'] = $ticketId;
+            if (!$ticket->update($changes)) {
+                throw new RuntimeException('Não foi possível atualizar status/SLA do chamado #' . $ticketId . '.');
+            }
+        }
+        return true;
+    }
+
+    private static function entityFor(array $card): int
+    {
+        global $DB;
+        $entityId = (int) ($card['entities_id'] ?? 0);
+        if ($entityId > 0) { return $entityId; }
+        $row = $DB->request(['SELECT' => ['id'], 'FROM' => 'glpi_entities',
+            'WHERE' => ['name' => (string) $card['name']], 'LIMIT' => 1])->current();
+        if (is_array($row)) { return (int) $row['id']; }
+        $board = $DB->request(['SELECT' => ['entities_id'], 'FROM' => 'glpi_plugin_tralla_boards',
+            'WHERE' => ['id' => (int) $card['plugin_tralla_boards_id']], 'LIMIT' => 1])->current();
+        return (int) ($board['entities_id'] ?? 0);
+    }
+
+    private static function boardName(int $boardId): string
+    {
+        global $DB;
+        $row = $DB->request(['SELECT' => ['name'], 'FROM' => 'glpi_plugin_tralla_boards',
+            'WHERE' => ['id' => $boardId], 'LIMIT' => 1])->current();
+        return (string) ($row['name'] ?? '');
+    }
+
+    private static function eventSnapshot(string $action, array $card): string
+    {
+        global $DB;
+        if (!in_array($action, ['card_created', 'card_finalized', 'machine_added', 'machine_deleted',
+            'machine_updated', 'edit_approved', 'approval_approved', 'call_report_updated',
+            'priority_set', 'call_released', 'withdrawal_confirmed'], true)) {
+            return '';
+        }
+        $lines = ['Estado do card: ' . tralla_status_label((string) $card['status'])];
+        if ((string) ($card['priority'] ?? '') !== '') {
+            $lines[] = 'Prioridade Tralla: ' . (string) $card['priority'];
+        }
+        $report = trim((string) ($card['service_report'] ?? ''));
+        if ($report !== '') {
+            $lines[] = 'Relatório do atendimento: ' . $report;
+        }
+        $machines = iterator_to_array($DB->request([
+            'FROM' => 'glpi_plugin_tralla_machines',
+            'WHERE' => ['plugin_tralla_cards_id' => (int) $card['id']],
+            'ORDER' => 'rank ASC, id ASC',
+        ]));
+        if ($machines !== []) {
+            $modelIds = array_values(array_unique(array_map(
+                static fn(array $machine): int => (int) ($machine['plugin_tralla_machine_models_id'] ?? 0), $machines
+            )));
+            $models = PluginTrallaMachineModel::getModelNames($modelIds);
+            foreach ($machines as $index => $machine) {
+                $model = (string) ($models[(int) ($machine['plugin_tralla_machine_models_id'] ?? 0)] ?? 'Máquina');
+                $lines[] = ($index + 1) . '. ' . $model . ' — ' . tralla_machine_status_label((string) ($machine['status'] ?? ''));
+                $machineReport = trim((string) ($machine['report'] ?? ''));
+                if ($machineReport !== '') { $lines[] = '   Relatório: ' . $machineReport; }
+                if (!empty($machine['service_done'])) { $lines[] = '   Serviço realizado: sim'; }
+                if (!empty($machine['needs_inventory'])) { $lines[] = '   Necessita inventariar: sim'; }
+            }
+        }
+        return mb_substr(implode("\n", $lines), 0, 20000);
+    }
+
+    private static function ticketStatus(array $card): int
+    {
+        return match ((string) ($card['status'] ?? 'pending')) {
+            'in_progress' => Ticket::ASSIGNED,
+            'waiting_approval', 'approved', 'withdrawal', 'deletion_pending' => Ticket::WAITING,
+            'done' => Ticket::SOLVED,
+            'deleted' => Ticket::CLOSED,
+            default => Ticket::INCOMING,
+        };
+    }
+
+    private static function linkUser(int $ticketId, int $userId, int $type): void
+    {
+        global $DB;
+        if ($userId <= 0) { return; }
+        $existing = $DB->request(['SELECT' => ['id'], 'FROM' => 'glpi_tickets_users',
+            'WHERE' => ['tickets_id' => $ticketId, 'users_id' => $userId, 'type' => $type],
+            'LIMIT' => 1])->current();
+        if (is_array($existing)) { return; }
+        $actor = new Ticket_User();
+        if (!$actor->add(['tickets_id' => $ticketId, 'users_id' => $userId, 'type' => $type])) {
+            error_log('[Tralla] Não foi possível vincular usuário #' . $userId . ' ao chamado #' . $ticketId . '.');
+        }
+    }
+
+    private static function validSla(int $slaId, int $type, int $entityId): bool
+    {
+        $sla = new SLA();
+        if (!$sla->getFromDB($slaId) || (int) $sla->fields['type'] !== $type) {
+            return false;
+        }
+        $slaEntity = (int) $sla->fields['entities_id'];
+        return $slaEntity === $entityId || ($slaEntity === 0 && (int) $sla->fields['is_recursive'] === 1);
+    }
+}

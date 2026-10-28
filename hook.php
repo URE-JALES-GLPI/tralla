@@ -102,6 +102,8 @@ function plugin_tralla_install(): bool
                 `id`                      INT {$sign} NOT NULL AUTO_INCREMENT,
                 `plugin_tralla_boards_id` INT {$sign} NOT NULL DEFAULT '0',
                 `plugin_tralla_lists_id`  INT {$sign} NOT NULL DEFAULT '0',
+                `entities_id`             INT {$sign} NOT NULL DEFAULT '0',
+                `tickets_id`              INT {$sign} NOT NULL DEFAULT '0',
                 `name`                    VARCHAR(255) NOT NULL DEFAULT '',
                 `description`             LONGTEXT     DEFAULT NULL,
                 `call_category`           VARCHAR(255) NOT NULL DEFAULT '',
@@ -165,6 +167,8 @@ function plugin_tralla_install(): bool
 
     // Colunas de exclusão em tabelas de cards já existentes.
     $cards_columns = [
+        'entities_id'                => "INT {$sign} NOT NULL DEFAULT 0",
+        'tickets_id'                 => "INT {$sign} NOT NULL DEFAULT 0",
         'call_category'              => "VARCHAR(255) NOT NULL DEFAULT ''",
         'call_subcategory'           => "VARCHAR(255) NOT NULL DEFAULT ''",
         'service_report'              => 'LONGTEXT DEFAULT NULL',
@@ -350,12 +354,18 @@ function plugin_tralla_install(): bool
                 `users_id`               INT {$sign} NOT NULL DEFAULT '0',
                 `action`                 VARCHAR(60)  NOT NULL DEFAULT '',
                 `details`                TEXT         DEFAULT NULL,
+                `ticket_followups_id`    INT {$sign} NOT NULL DEFAULT '0',
                 `date_creation`          DATETIME     DEFAULT NULL,
                 PRIMARY KEY (`id`),
                 KEY `plugin_tralla_cards_id` (`plugin_tralla_cards_id`),
                 KEY `date_creation` (`date_creation`)
             ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}
         ") or die($DB->error());
+    }
+    $ticketSyncMigration = false;
+    if (!$DB->fieldExists('glpi_plugin_tralla_history', 'ticket_followups_id')) {
+        $DB->doQuery("ALTER TABLE `glpi_plugin_tralla_history` ADD COLUMN `ticket_followups_id` INT {$sign} NOT NULL DEFAULT '0'") or die($DB->error());
+        $ticketSyncMigration = true;
     }
 
     if (!$DB->tableExists('glpi_plugin_tralla_configs')) {
@@ -370,6 +380,15 @@ function plugin_tralla_install(): bool
                 UNIQUE KEY `uniq_config_key` (`config_key`)
             ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}
         ") or die($DB->error());
+    }
+    if ($ticketSyncMigration) {
+        $lastHistory = $DB->request(['SELECT' => ['MAX' => 'id AS last_id'], 'FROM' => 'glpi_plugin_tralla_history'])->current();
+        $DB->insert('glpi_plugin_tralla_configs', [
+            'config_key' => 'ticket_sync_start_history_id',
+            'config_value' => (string) (int) ($lastHistory['last_id'] ?? 0),
+            'date_creation' => date('Y-m-d H:i:s'),
+            'date_mod' => date('Y-m-d H:i:s'),
+        ]);
     }
 
     if (!$DB->tableExists('glpi_plugin_tralla_notifications')) {

@@ -23,6 +23,8 @@ class PluginTrallaConfig
             'pending_hours'        => '1',
             'withdrawal_hours'     => '24',
             'assignature_id_offset' => '0',
+            'ticket_sync_enabled' => '1',
+            'ticket_sync_start_history_id' => '0',
         ];
     }
 
