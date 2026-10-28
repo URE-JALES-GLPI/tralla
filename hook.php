@@ -113,6 +113,8 @@ function plugin_tralla_install(): bool
                 `plugin_tralla_lists_id`  INT {$sign} NOT NULL DEFAULT '0',
                 `entities_id`             INT {$sign} NOT NULL DEFAULT '0',
                 `tickets_id`              INT {$sign} NOT NULL DEFAULT '0',
+                `whatsapp_chats_id`       INT {$sign} NOT NULL DEFAULT '0' COMMENT 'atendimento de origem no WhatsAppSimples',
+                `whatsapp_transcript`     LONGTEXT     DEFAULT NULL COMMENT 'conversa do WhatsApp na abertura',
                 `name`                    VARCHAR(255) NOT NULL DEFAULT '',
                 `description`             LONGTEXT     DEFAULT NULL,
                 `call_category`           VARCHAR(255) NOT NULL DEFAULT '',
@@ -136,7 +138,7 @@ function plugin_tralla_install(): bool
                 `workflow_type`           VARCHAR(20)  NOT NULL DEFAULT 'maintenance' COMMENT 'maintenance|call',
                 `is_locked`               TINYINT(1)   NOT NULL DEFAULT '0',
                 `is_archived`             TINYINT(1)   NOT NULL DEFAULT '0',
-                `source`                  VARCHAR(30)  NOT NULL DEFAULT '' COMMENT 'notebook_desktop|tablet_mobile|manual',
+                `source`                  VARCHAR(30)  NOT NULL DEFAULT '' COMMENT 'notebook_desktop|tablet_mobile|manual|whatsapp',
                 `machines_total`          INT {$sign} NOT NULL DEFAULT '0',
                 `date_taken`              DATETIME     DEFAULT NULL,
                 `date_finalized`          DATETIME     DEFAULT NULL,
@@ -210,6 +212,8 @@ function plugin_tralla_install(): bool
         'code_number'                 => "INT {$sign} NOT NULL DEFAULT 0",
         'pending_reminded_at'         => 'DATETIME     DEFAULT NULL',
         'sla_alerts_sent'             => "VARCHAR(255) NOT NULL DEFAULT ''",
+        'whatsapp_chats_id'           => "INT {$sign} NOT NULL DEFAULT 0",
+        'whatsapp_transcript'         => 'LONGTEXT     DEFAULT NULL',
     ];
     $added_is_deleted = false;
     $added_approval_kind = false;

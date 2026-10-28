@@ -2582,6 +2582,16 @@
             body += renderMachines(card);
         }
 
+        if (card.whatsapp_transcript) {
+            body += '<section class="tralla-detail-section">'
+                + '<h3><i class="ti ti-brand-whatsapp"></i> Conversa do WhatsApp'
+                + (Number(card.whatsapp_chats_id) > 0
+                    ? ' · WA-' + String(Number(card.whatsapp_chats_id)).padStart(6, '0') : '')
+                + '</h3>'
+                + '<div class="tralla-detail-description tralla-whatsapp-transcript">' + esc(card.whatsapp_transcript) + '</div>'
+                + '</section>';
+        }
+
         body += renderCallFiles(card);
         body += renderAssignature(card);
         body += renderHistory(card);
@@ -5422,4 +5432,10 @@
     schedulePoll(pollInterval);
     window.setInterval(updateSlaClocks, 1000);
     renderBoard();
+
+    // Link direto para um card (ex.: aberto pelo WhatsApp): kanban.php?boards_id=X&card=Y
+    var linkedCardId = Number(new URLSearchParams(window.location.search).get('card') || 0);
+    if (linkedCardId > 0) {
+        openCard(linkedCardId);
+    }
 })();

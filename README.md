@@ -97,6 +97,10 @@ Ao criar o quadro, o Tralla cria quatro listas fixas: **Atualização Futura**, 
 
 O card pode ser de **Descrição** (texto, anexos e solução) ou **Checklist** (itens marcáveis, até 10 arquivos de 100 MB por item e observação final opcional). Na criação da checklist, cada item já aceita a seleção de arquivos; o envio começa após o card ser criado e mostra o progresso. Se algum envio falhar, o card permanece criado e os arquivos podem ser reenviados nele. Os textos são salvos automaticamente enquanto se digita. O responsável finaliza após registrar uma solução no card de Descrição ou marcar todos os itens no card de Checklist. O card segue diretamente para Concluído.
 
+### Chamado aberto pelo WhatsApp
+
+O plugin WhatsAppSimples abre Chamados direto em **Manutenção Em Andamento**: o técnico do atendimento vira o responsável, escolhe a prioridade (P1 a P4) e o SLA começa a contar na criação, sem passar por Pendente nem por aprovação. O card mostra a origem **WhatsApp** e a seção **Conversa do WhatsApp** com as mensagens do atendimento. Detalhes em `whatsappsimples/docs/CARD_TRALLA.md`.
+
 ## Membros e papéis
 
 Cada quadro tem sua própria lista de membros. A visibilidade é definida pelo vínculo com o quadro; os direitos globais do perfil funcionam como limite superior e não concedem acesso a quadros dos quais o usuário não participa. Usuários com `plugin_tralla` **PURGE** global têm papel efetivo **SuperAdmin** e veem os quadros permitidos pela entidade ativa.

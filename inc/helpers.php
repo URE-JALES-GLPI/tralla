@@ -185,6 +185,7 @@ if (!function_exists('tralla_source_labels')) {
             'notebook_desktop'  => 'Notebook / Desktop',
             'tablet_mobile'     => 'Tablet / Celular',
             'manual'            => 'Manual',
+            'whatsapp'          => 'WhatsApp',
         ];
     }
 }
