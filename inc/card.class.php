@@ -1437,19 +1437,44 @@ class PluginTrallaCard extends CommonDBTM
      */
     public static function whatsappCardsForChats(array $chatIds, int $userId = 0): array
     {
-        global $DB;
-
-        $userId = $userId > 0 ? $userId : (int) Session::getLoginUserID();
         $chatIds = array_values(array_filter(array_map('intval', $chatIds)));
         if ($chatIds === []) {
             return [];
         }
+
+        return self::whatsappOpenCardRows(['whatsapp_chats_id' => $chatIds], $userId);
+    }
+
+    /**
+     * Todos os cards ainda não concluídos abertos pelo WhatsApp, nos quadros que o
+     * usuário vê (aba "Tralla" das configurações do WhatsAppSimples).
+     */
+    public static function whatsappOpenCards(int $userId = 0): array
+    {
+        return self::whatsappOpenCardRows(['whatsapp_chats_id' => ['>', 0]], $userId);
+    }
+
+    /** Detalhe completo de um card aberto pelo WhatsApp, sem exigir a conversa atual. */
+    public static function whatsappOverviewDetail(int $id, int $userId = 0): array
+    {
+        $card = self::getCard($id);
+        if ($card === null || (int) ($card['whatsapp_chats_id'] ?? 0) <= 0) {
+            throw new RuntimeException('Card do WhatsApp não encontrado.');
+        }
+
+        return self::whatsappCardDetail($id, [(int) $card['whatsapp_chats_id']], $userId);
+    }
+
+    private static function whatsappOpenCardRows(array $where, int $userId): array
+    {
+        global $DB;
+
+        $userId = $userId > 0 ? $userId : (int) Session::getLoginUserID();
         tralla_code_cache(true);
         $cards = [];
         foreach ($DB->request([
             'FROM'  => 'glpi_plugin_tralla_cards',
-            'WHERE' => [
-                'whatsapp_chats_id' => $chatIds,
+            'WHERE' => $where + [
                 'stage'             => 1,
                 'is_deleted'        => 0,
                 'is_archived'       => 0,
@@ -1473,6 +1498,9 @@ class PluginTrallaCard extends CommonDBTM
                 'technician_name'   => tralla_user_name((int) $row['technician_id']),
                 'date_creation'     => (string) $row['date_creation'],
                 'whatsapp_chats_id' => (int) $row['whatsapp_chats_id'],
+                'technician_id'     => (int) $row['technician_id'],
+                'is_paused'         => !empty($row['is_paused']),
+                'sla_next'          => (tralla_card_sla($row) ?? [])['next'] ?? null,
                 'wa'                => self::whatsappPermissions($row, $userId),
                 'url'               => tralla_web_dir() . '/front/kanban.php?boards_id=' . $boardId . '&card=' . (int) $row['id'],
             ];
