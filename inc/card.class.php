@@ -1182,6 +1182,157 @@ class PluginTrallaCard extends CommonDBTM
         return self::getCardDetail($cardId, $userId);
     }
 
+    /**
+     * O que o usuário pode fazer, pelo WhatsApp, num card aberto pelo WhatsApp.
+     * Editar: técnico responsável ou SuperAdmin do quadro, com o card em andamento.
+     * Finalizar: segue a regra do Kanban (só o técnico responsável).
+     */
+    private static function whatsappPermissions(array $card, int $userId): array
+    {
+        $inProgress = (int) ($card['stage'] ?? 1) === 1
+            && (string) ($card['status'] ?? '') === 'in_progress'
+            && empty($card['is_locked'])
+            && empty($card['is_deleted'])
+            && empty($card['is_archived']);
+        $role = PluginTrallaBoard::roleFor((int) $card['plugin_tralla_boards_id'], $userId);
+        $isTechnician = (int) ($card['technician_id'] ?? 0) === $userId;
+        $canUpdate = Session::haveRight(self::$rightname, UPDATE) && !in_array($role, ['', 'tablet'], true);
+
+        return [
+            'edit'     => $inProgress && $canUpdate && ($isTechnician || $role === 'superadmin'),
+            'finalize' => $inProgress && $canUpdate && $isTechnician,
+        ];
+    }
+
+    /** Card ligado a um dos atendimentos do contato, visível para o usuário. */
+    private static function whatsappLinkedCard(int $id, array $chatIds): array
+    {
+        $card = self::getCard($id);
+        $chatIds = array_map('intval', $chatIds);
+        if ($card === null || (int) $card['stage'] !== 1 || !empty($card['is_deleted'])
+            || !in_array((int) ($card['whatsapp_chats_id'] ?? 0), $chatIds, true)) {
+            throw new RuntimeException('Card não encontrado para este contato.');
+        }
+        self::assertBoardAccess($card);
+
+        return $card;
+    }
+
+    /**
+     * Cards ainda não concluídos abertos pelos atendimentos do contato.
+     *
+     * @param int[] $chatIds atendimentos do contato no WhatsAppSimples
+     */
+    public static function whatsappCardsForChats(array $chatIds, int $userId = 0): array
+    {
+        global $DB;
+
+        $userId = $userId > 0 ? $userId : (int) Session::getLoginUserID();
+        $chatIds = array_values(array_filter(array_map('intval', $chatIds)));
+        if ($chatIds === []) {
+            return [];
+        }
+        tralla_code_cache(true);
+        $cards = [];
+        foreach ($DB->request([
+            'FROM'  => 'glpi_plugin_tralla_cards',
+            'WHERE' => [
+                'whatsapp_chats_id' => $chatIds,
+                'stage'             => 1,
+                'is_deleted'        => 0,
+                'is_archived'       => 0,
+                'NOT'               => ['status' => ['done', 'deleted']],
+            ],
+            'ORDER' => 'id DESC',
+        ]) as $row) {
+            $boardId = (int) $row['plugin_tralla_boards_id'];
+            if (!PluginTrallaBoard::canViewBoard($boardId)) {
+                continue;
+            }
+            $list = PluginTrallaList::getList((int) $row['plugin_tralla_lists_id']);
+            $cards[] = [
+                'id'                => (int) $row['id'],
+                'code'              => tralla_display_code($row, 'maintenance'),
+                'name'              => (string) $row['name'],
+                'status'            => (string) $row['status'],
+                'status_label'      => tralla_status_label((string) $row['status']),
+                'list_name'         => (string) ($list['name'] ?? ''),
+                'priority'          => (string) $row['priority'],
+                'technician_name'   => tralla_user_name((int) $row['technician_id']),
+                'date_creation'     => (string) $row['date_creation'],
+                'whatsapp_chats_id' => (int) $row['whatsapp_chats_id'],
+                'wa'                => self::whatsappPermissions($row, $userId),
+                'url'               => tralla_web_dir() . '/front/kanban.php?boards_id=' . $boardId . '&card=' . (int) $row['id'],
+            ];
+        }
+
+        return $cards;
+    }
+
+    /** Detalhe do card (o mesmo do Kanban) com as permissões da tela do WhatsApp. */
+    public static function whatsappCardDetail(int $id, array $chatIds, int $userId = 0): array
+    {
+        $userId = $userId > 0 ? $userId : (int) Session::getLoginUserID();
+        $card = self::whatsappLinkedCard($id, $chatIds);
+        $detail = self::getCardDetail($id, $userId);
+        $detail['wa'] = self::whatsappPermissions($card, $userId);
+        $detail['url'] = tralla_web_dir() . '/front/kanban.php?boards_id='
+            . (int) $card['plugin_tralla_boards_id'] . '&card=' . $id;
+
+        return $detail;
+    }
+
+    /** Edita descrição e relatório do atendimento pela tela do WhatsApp. */
+    public static function updateFromWhatsapp(int $id, array $chatIds, string $description, string $report, int $userId = 0): array
+    {
+        global $DB;
+
+        $userId = $userId > 0 ? $userId : (int) Session::getLoginUserID();
+        $card = self::whatsappLinkedCard($id, $chatIds);
+        if (empty(self::whatsappPermissions($card, $userId)['edit'])) {
+            throw new RuntimeException('Somente o técnico responsável pode editar o card em andamento.');
+        }
+        $description = trim(strip_tags($description));
+        if ($description === '') {
+            throw new RuntimeException('Descreva a situação do chamado.');
+        }
+        if (mb_strlen($description) > 2000) {
+            throw new RuntimeException('A descrição deve ter no máximo 2000 caracteres.');
+        }
+        $report = tralla_normalize_report($report);
+
+        $changes = [];
+        if ($description !== (string) $card['description']) {
+            $changes['description'] = $description;
+        }
+        if ($report !== trim((string) ($card['service_report'] ?? ''))) {
+            $changes['service_report'] = $report;
+        }
+        if ($changes !== []) {
+            $DB->update('glpi_plugin_tralla_cards', $changes + ['date_mod' => tralla_now()], ['id' => $id]);
+            if (isset($changes['description'])) {
+                PluginTrallaHistory::log($id, $userId, 'description_updated', 'Descrição atualizada pelo WhatsApp.');
+            }
+            if (isset($changes['service_report'])) {
+                PluginTrallaHistory::log($id, $userId, 'call_report_updated', 'Relatório do chamado atualizado pelo WhatsApp.');
+            }
+        }
+
+        return self::whatsappCardDetail($id, $chatIds, $userId);
+    }
+
+    /** Finaliza pela tela do WhatsApp, com as mesmas regras do Kanban (Chamado segue para aprovação). */
+    public static function finalizeFromWhatsapp(int $id, array $chatIds, int $userId = 0): array
+    {
+        $userId = $userId > 0 ? $userId : (int) Session::getLoginUserID();
+        self::whatsappLinkedCard($id, $chatIds);
+        if (!Session::haveRight(self::$rightname, UPDATE)) {
+            throw new RuntimeException('Sem permissão para finalizar o card.');
+        }
+
+        return self::finalize($id, $userId, false)['card'];
+    }
+
     private static function createCallReleaseApproval(int $cardId, int $boardId, array $list, int $userId, string $now): int
     {
         global $DB;

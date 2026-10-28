@@ -2937,6 +2937,68 @@ body[data-theme="dark"] .tralla-add-card:disabled:hover,
     white-space: pre-wrap;
 }
 
+/* Cards do contato no WhatsAppSimples */
+.tralla-wa-card-row {
+    display: flex;
+    align-items: center;
+    gap: var(--tr-space-3);
+}
+
+.tralla-wa-card-main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.tralla-wa-card-name {
+    color: var(--tr-text);
+    font-size: 15px;
+}
+
+.tralla-wa-card-actions {
+    display: flex;
+    flex: none;
+    gap: var(--tr-space-2);
+}
+
+.tralla-wa-empty {
+    align-items: center;
+    color: var(--tr-muted);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: var(--tr-space-6);
+    text-align: center;
+}
+
+.tralla-wa-empty .ti {
+    font-size: 32px;
+}
+
+.tralla-wa-empty strong {
+    color: var(--tr-text);
+}
+
+.tralla-wa-side-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--tr-space-2);
+}
+
+.tralla-wa-side-actions .tralla-btn {
+    justify-content: center;
+    width: 100%;
+}
+
+@media (max-width: 640px) {
+    .tralla-wa-card-row {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}
+
 .tralla-whatsapp-transcript {
     max-height: 320px;
     overflow-y: auto;
