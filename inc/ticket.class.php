@@ -239,6 +239,32 @@ class PluginTrallaTicketSync
             if ((int) ($ticket->fields['sla_waiting_duration'] ?? 0) !== 0) {
                 $changes['sla_waiting_duration'] = 0;
             }
+            $takenAt = trim((string) ($primary['date_taken'] ?? ''));
+            if ($slaStart !== '' && strtotime($slaStart) !== false
+                && $takenAt !== '' && strtotime($takenAt) !== false) {
+                if ((string) ($ticket->fields['takeintoaccountdate'] ?? '') !== $takenAt) {
+                    $changes['takeintoaccountdate'] = $takenAt;
+                }
+                $elapsed = max(1, strtotime($takenAt) - strtotime($slaStart));
+                $ttoId = PluginTrallaConfig::getInt('ticket_sla_tto_' . $priority, 0);
+                $tto = new SLA();
+                if ($ttoId > 0 && $tto->getFromDB($ttoId) && (int) $tto->fields['calendars_id'] > 0) {
+                    $calendar = new Calendar();
+                    if ($calendar->getFromDB((int) $tto->fields['calendars_id'])) {
+                        $elapsed = max(1, $calendar->getActiveTimeBetween($slaStart, $takenAt));
+                    }
+                }
+                if ((int) ($ticket->fields['takeintoaccount_delay_stat'] ?? 0) !== $elapsed) {
+                    $changes['takeintoaccount_delay_stat'] = $elapsed;
+                }
+            }
+            if (in_array((string) ($primary['status'] ?? ''), ['approved', 'withdrawal', 'done'], true)) {
+                $solvedAt = trim((string) ($primary['date_approved'] ?? ''));
+                if ($solvedAt !== '' && strtotime($solvedAt) !== false
+                    && (string) ($ticket->fields['solvedate'] ?? '') !== $solvedAt) {
+                    $changes['solvedate'] = $solvedAt;
+                }
+            }
         }
         if ($changes !== [] && (string) $primary['status'] !== 'deleted') {
             if (array_intersect(['slas_id_tto', 'slas_id_ttr', 'time_to_own', 'time_to_resolve'], array_keys($changes))
