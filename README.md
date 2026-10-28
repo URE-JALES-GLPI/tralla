@@ -187,13 +187,20 @@ A tarefa automática é registrada na instalação:
 
 - Itemtype: `PluginTrallaCron`
 - Nome: `notify`
-- Frequência: horária
+- Frequência: a cada minuto
 
 Ela:
 
 - avisa uma vez sobre cards pendentes há mais de `pending_hours`;
 - reenvia lembrete de retirada a cada `withdrawal_hours` até a confirmação;
-- enfileira e-mails pelo sistema de notificações do GLPI quando habilitado.
+- enfileira e-mails pelo sistema de notificações do GLPI quando habilitado;
+- nos quadros de manutenção com **Notificar por Email** e/ou **Notificar por WhatsApp** marcados (aba Geral do quadro):
+  - **Pendente**: lembra os membros do quadro (sem o papel Tablet) enquanto o card liberado não for pego, a cada 5 min (P1), 10 min (P2), 30 min (P3) ou 1 h (P4), contando da criação ou da liberação;
+  - **SLA**: avisa o técnico do card em andamento e os aprovadores do quadro 4, 3, 2 e 1 hora antes do prazo das respostas paliativa e definitiva; cada aviso é enviado uma vez e fica no histórico do card.
+
+O e-mail usa o endereço padrão do usuário no GLPI. O WhatsApp usa o **Celular** do cadastro do usuário (ou o **Telefone**, se o celular estiver vazio) e a EvolutionAPI configurada no plugin WhatsAppSimples. Cada envio fica registrado em `glpi_plugin_tralla_notifications`.
+
+O cron do GLPI precisa rodar a cada minuto (ex.: `* * * * * www-data php /var/www/glpi/front/cron.php`) para os lembretes de 5 minutos.
 
 Ajuste a execução em **Configurar > Ações automáticas** se o ambiente não executa o cron externo do GLPI.
 

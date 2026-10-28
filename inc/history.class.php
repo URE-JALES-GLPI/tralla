@@ -547,6 +547,7 @@ class PluginTrallaHistory extends CommonDBTM
             'withdrawal_confirmed'  => 'Retirada confirmada',
             'withdrawal_reminded'   => 'Lembrete de retirada enviado',
             'pending_notified'      => 'Notificação de pendente enviada',
+            'sla_alert'             => 'Aviso de SLA enviado',
             'card_split'            => 'Card separado',
             'split_requested'       => 'Separação solicitada',
             'split_approved'        => 'Separação aprovada',

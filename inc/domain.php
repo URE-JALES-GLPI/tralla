@@ -32,6 +32,27 @@ if (!function_exists('tralla_person_name')) {
     }
 }
 
+if (!function_exists('tralla_pending_reminder_minutes')) {
+    /** Intervalo dos lembretes de card no Pendente, em minutos, por prioridade. */
+    function tralla_pending_reminder_minutes(string $priority): int
+    {
+        return ['P1' => 5, 'P2' => 10, 'P3' => 30, 'P4' => 60][$priority] ?? 0;
+    }
+}
+
+if (!function_exists('tralla_whatsapp_number')) {
+    /** Número no formato da EvolutionAPI (55 + DDD + número) ou '' se inválido. */
+    function tralla_whatsapp_number(string $phone): string
+    {
+        $digits = preg_replace('/\D+/', '', $phone) ?? '';
+        if (strlen($digits) === 10 || strlen($digits) === 11) {
+            $digits = '55' . $digits;
+        }
+
+        return strlen($digits) >= 12 && strlen($digits) <= 13 ? $digits : '';
+    }
+}
+
 if (!function_exists('tralla_role_rank')) {
     function tralla_role_rank(string $role): int
     {

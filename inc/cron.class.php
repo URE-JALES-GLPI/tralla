@@ -20,7 +20,7 @@ class PluginTrallaCron extends CommonDBTM
     public static function cronInfo(): array
     {
         return [
-            'description' => 'Tralla: notifica cards pendentes há mais de 1h e reenvia lembretes de retirada.',
+            'description' => 'Tralla: lembretes de cards pendentes por prioridade, avisos de SLA e lembretes de retirada.',
             'parameter'   => '',
         ];
     }
@@ -99,6 +99,9 @@ class PluginTrallaCron extends CommonDBTM
             $count++;
         }
 
+        $count += self::remindPendingByPriority();
+        $count += self::warnSlaDeadlines();
+
         require_once __DIR__ . '/ticket.class.php';
         $count += PluginTrallaTicketSync::syncPending(200);
 
@@ -107,6 +110,202 @@ class PluginTrallaCron extends CommonDBTM
         }
 
         return 1;
+    }
+
+    /**
+     * Cards no Pendente, já liberados com prioridade: lembra os membros do quadro
+     * a cada intervalo da prioridade, contando a partir da criação (ou liberação).
+     */
+    private static function remindPendingByPriority(): int
+    {
+        global $DB;
+
+        $count = 0;
+        $now = time();
+        foreach ($DB->request([
+            'SELECT'     => ['c.*', 'b.name AS board_name', 'b.entities_id AS board_entities_id',
+                'b.notify_email AS board_notify_email', 'b.notify_whatsapp AS board_notify_whatsapp'],
+            'FROM'       => 'glpi_plugin_tralla_cards AS c',
+            'INNER JOIN' => ['glpi_plugin_tralla_boards AS b' => ['ON' => ['c' => 'plugin_tralla_boards_id', 'b' => 'id']]],
+            'WHERE'      => [
+                'b.type' => 'maintenance', 'b.is_archived' => 0,
+                'OR' => ['b.notify_email' => 1, 'b.notify_whatsapp' => 1],
+                'c.stage' => 1, 'c.status' => 'pending', 'c.is_locked' => 0,
+                'c.is_archived' => 0, 'c.is_deleted' => 0, 'c.priority' => ['!=', ''],
+            ],
+        ]) as $card) {
+            $minutes = tralla_pending_reminder_minutes((string) $card['priority']);
+            $base = strtotime((string) ($card['pending_reminded_at'] ?: ($card['date_sla_start'] ?: $card['date_creation'])));
+            if ($minutes <= 0 || $base === false || $now < $base + $minutes * 60) {
+                continue;
+            }
+
+            $code = tralla_display_code($card, 'maintenance');
+            $waiting = max(1, (int) round(($now - strtotime((string) ($card['date_sla_start'] ?: $card['date_creation']))) / 60));
+            $text = 'Tralla: o card #' . $code . ' (' . $card['name'] . ') está no Pendente há '
+                . self::durationLabel($waiting) . ' sem técnico. Prioridade ' . (tralla_priorities()[$card['priority']]['label'] ?? $card['priority'])
+                . '. Clique em Pegar no quadro ' . $card['board_name'] . '.';
+            self::notifyUsers($card, self::boardMemberIds((int) $card['plugin_tralla_boards_id']), 'pending_priority',
+                'card pendente #' . $code, $text);
+            $DB->update('glpi_plugin_tralla_cards', ['pending_reminded_at' => tralla_now()], ['id' => (int) $card['id']]);
+            $count++;
+        }
+
+        return $count;
+    }
+
+    /**
+     * Cards em andamento: avisa o técnico e os aprovadores 4, 3, 2 e 1 hora antes
+     * do prazo das respostas paliativa e definitiva. Cada marca é enviada uma vez.
+     */
+    private static function warnSlaDeadlines(): int
+    {
+        global $DB;
+
+        $count = 0;
+        $now = time();
+        foreach ($DB->request([
+            'SELECT'     => ['c.*', 'b.name AS board_name', 'b.entities_id AS board_entities_id',
+                'b.notify_email AS board_notify_email', 'b.notify_whatsapp AS board_notify_whatsapp'],
+            'FROM'       => 'glpi_plugin_tralla_cards AS c',
+            'INNER JOIN' => ['glpi_plugin_tralla_boards AS b' => ['ON' => ['c' => 'plugin_tralla_boards_id', 'b' => 'id']]],
+            'WHERE'      => [
+                'b.type' => 'maintenance', 'b.is_archived' => 0,
+                'OR' => ['b.notify_email' => 1, 'b.notify_whatsapp' => 1],
+                'c.stage' => 1, 'c.status' => 'in_progress', 'c.technician_id' => ['>', 0],
+                'c.is_archived' => 0, 'c.is_deleted' => 0, 'c.priority' => ['!=', ''],
+            ],
+        ]) as $card) {
+            $sla = tralla_card_sla($card);
+            if ($sla === null) {
+                continue;
+            }
+            $sent = array_filter(explode(',', (string) $card['sla_alerts_sent']));
+            $newMarks = [];
+            $alerts = [];
+            foreach ($sla['steps'] as $step) {
+                if (!in_array($step['key'], ['palliative', 'definitive'], true) || $step['state'] !== 'running') {
+                    continue;
+                }
+                $left = strtotime((string) $step['deadline']) - $now;
+                $crossed = [];
+                foreach ([4, 3, 2, 1] as $hours) {
+                    $mark = $step['key'] . ':' . $hours;
+                    if ($left <= $hours * 3600 && !in_array($mark, $sent, true)) {
+                        $crossed[] = $mark;
+                    }
+                }
+                if ($crossed !== [] && $left > 0) {
+                    $newMarks = array_merge($newMarks, $crossed);
+                    $alerts[] = $step['title'] . ' vence em ' . self::durationLabel((int) ceil($left / 60))
+                        . ' (' . tralla_date((string) $step['deadline']) . ')';
+                }
+            }
+            if ($alerts === []) {
+                continue;
+            }
+
+            $code = tralla_display_code($card, 'maintenance');
+            $text = 'Tralla: SLA do card #' . $code . ' (' . $card['name'] . ') está perto de estourar. '
+                . implode('; ', $alerts) . '. Técnico: ' . tralla_user_name((int) $card['technician_id']) . '.';
+            $recipients = array_merge([(int) $card['technician_id']], self::boardApproverIds((int) $card['plugin_tralla_boards_id']));
+            self::notifyUsers($card, $recipients, 'sla_alert', 'SLA perto de estourar #' . $code, $text);
+            $DB->update('glpi_plugin_tralla_cards', [
+                'sla_alerts_sent' => substr(implode(',', array_merge($sent, $newMarks)), 0, 255),
+            ], ['id' => (int) $card['id']]);
+            PluginTrallaHistory::log((int) $card['id'], 0, 'sla_alert', $text);
+            $count++;
+        }
+
+        return $count;
+    }
+
+    private static function durationLabel(int $minutes): string
+    {
+        if ($minutes < 60) {
+            return $minutes . ' min';
+        }
+        $hours = intdiv($minutes, 60);
+        $rest = $minutes % 60;
+
+        return $hours . 'h' . ($rest > 0 ? sprintf('%02d', $rest) : '');
+    }
+
+    /** @return int[] Membros do quadro que operam cards (sem o papel Tablet). */
+    private static function boardMemberIds(int $boardId): array
+    {
+        global $DB;
+
+        $ids = [];
+        foreach ($DB->request([
+            'SELECT' => ['users_id'],
+            'FROM'   => 'glpi_plugin_tralla_boards_users',
+            'WHERE'  => ['plugin_tralla_boards_id' => $boardId, 'role' => ['member', 'admin', 'superadmin']],
+        ]) as $row) {
+            $ids[] = (int) $row['users_id'];
+        }
+
+        return $ids;
+    }
+
+    /** @return int[] */
+    private static function boardApproverIds(int $boardId): array
+    {
+        global $DB;
+
+        $ids = [];
+        foreach ($DB->request([
+            'SELECT' => ['users_id'],
+            'FROM'   => 'glpi_plugin_tralla_boards_users',
+            'WHERE'  => ['plugin_tralla_boards_id' => $boardId, 'can_approve' => 1, 'NOT' => ['role' => 'tablet']],
+        ]) as $row) {
+            $ids[] = (int) $row['users_id'];
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Envia a mensagem a cada usuário pelos canais ligados no quadro do card:
+     * e-mail padrão do GLPI e WhatsApp pelo celular (ou telefone) do cadastro.
+     */
+    private static function notifyUsers(array $card, array $userIds, string $type, string $subject, string $text): void
+    {
+        global $DB, $CFG_GLPI;
+
+        $cardId = (int) $card['id'];
+        $link = rtrim((string) ($CFG_GLPI['url_base'] ?? ''), '/') . '/plugins/tralla/front/kanban.php?boards_id='
+            . (int) $card['plugin_tralla_boards_id'];
+        foreach (array_unique(array_filter(array_map('intval', $userIds))) as $userId) {
+            $user = $DB->request([
+                'SELECT' => ['mobile', 'phone'],
+                'FROM'   => 'glpi_users',
+                'WHERE'  => ['id' => $userId, 'is_active' => 1, 'is_deleted' => 0],
+                'LIMIT'  => 1,
+            ])->current();
+            if (!is_array($user)) {
+                continue;
+            }
+            if (!empty($card['board_notify_email'])) {
+                $email = $DB->request([
+                    'SELECT' => ['email'],
+                    'FROM'   => 'glpi_useremails',
+                    'WHERE'  => ['users_id' => $userId],
+                    'ORDER'  => 'is_default DESC',
+                    'LIMIT'  => 1,
+                ])->current();
+                $address = is_array($email) ? (string) $email['email'] : '';
+                $html = '<p>' . tralla_h($text) . '</p><p><a href="' . tralla_h($link) . '">Abrir o quadro no Tralla</a></p>';
+                $sent = $address !== '' && tralla_queue_email($address, '[URE] Tralla — ' . $subject, $html,
+                    (int) ($card['board_entities_id'] ?? 0), $cardId);
+                self::logNotification($cardId, $type, 'email', $address, $sent ? 'queued' : 'failed', $text);
+            }
+            if (!empty($card['board_notify_whatsapp'])) {
+                $phone = trim((string) ($user['mobile'] ?: $user['phone']));
+                $sent = $phone !== '' && tralla_whatsapp_send($phone, $text . "\n" . $link);
+                self::logNotification($cardId, $type, 'whatsapp', $phone, $sent ? 'sent' : 'failed', $text);
+            }
+        }
     }
 
     private static function notifyCard(int $cards_id, string $type, string $message): void

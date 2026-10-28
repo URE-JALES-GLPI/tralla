@@ -73,6 +73,10 @@ if (isset($_POST['update'])) {
     } else {
         unset($input['is_archived']);
     }
+    if ((string) $board->fields['type'] === 'maintenance') {
+        $input['notify_email'] = !empty($_POST['notify_email']) ? 1 : 0;
+        $input['notify_whatsapp'] = !empty($_POST['notify_whatsapp']) ? 1 : 0;
+    }
 
     $board->check($id, UPDATE);
 
@@ -204,6 +208,20 @@ echo "<script>document.title = 'Tralla';</script>";
                 <label for="tralla-edit-comment">Descrição</label>
                 <textarea id="tralla-edit-comment" name="comment" rows="4" maxlength="2000" <?= $canUpdate ? '' : 'disabled' ?>><?= tralla_h($board->fields['comment']) ?></textarea>
             </div>
+            <?php if ((string) $board->fields['type'] === 'maintenance'): ?>
+                <fieldset class="tralla-field tralla-notify-options">
+                    <legend>Notificações</legend>
+                    <p class="tralla-muted">Lembretes de cards no Pendente (P1 a cada 5 min, P2 a cada 10 min, P3 a cada 30 min, P4 a cada 1 h) para os membros do quadro, e avisos de SLA 4, 3, 2 e 1 hora antes do prazo para o técnico do card e os aprovadores.</p>
+                    <label class="tralla-check">
+                        <input type="checkbox" name="notify_email" value="1" <?= !empty($board->fields['notify_email']) ? 'checked' : '' ?> <?= $canUpdate ? '' : 'disabled' ?>>
+                        Notificar por Email
+                    </label>
+                    <label class="tralla-check">
+                        <input type="checkbox" name="notify_whatsapp" value="1" <?= !empty($board->fields['notify_whatsapp']) ? 'checked' : '' ?> <?= $canUpdate ? '' : 'disabled' ?>>
+                        Notificar por WhatsApp
+                    </label>
+                </fieldset>
+            <?php endif; ?>
             <?php if ($canArchive): ?>
                 <label class="tralla-check">
                     <input type="checkbox" name="is_archived" value="1" <?= !empty($board->fields['is_archived']) ? 'checked' : '' ?>>

@@ -157,6 +157,11 @@ class PluginTrallaBoard extends CommonDBTM
         if (array_key_exists('is_archived', $input)) {
             $input['is_archived'] = !empty($input['is_archived']) ? 1 : 0;
         }
+        foreach (['notify_email', 'notify_whatsapp'] as $field) {
+            if (array_key_exists($field, $input)) {
+                $input[$field] = !empty($input[$field]) ? 1 : 0;
+            }
+        }
 
         // Tipo e entidade definem o schema de listas e a visibilidade: não mudam.
         unset($input['type'], $input['entities_id'], $input['users_id']);

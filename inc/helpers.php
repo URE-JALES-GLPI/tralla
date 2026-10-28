@@ -884,6 +884,50 @@ if (!function_exists('tralla_priorities')) {
     }
 }
 
+if (!function_exists('tralla_whatsapp_send')) {
+    /** Envia texto pela EvolutionAPI configurada no plugin WhatsAppSimples. */
+    function tralla_whatsapp_send(string $phone, string $text): bool
+    {
+        global $DB;
+
+        $number = tralla_whatsapp_number($phone);
+        if ($number === '' || !function_exists('curl_init')
+            || !$DB->tableExists('glpi_plugin_whatsappsimples_configs')) {
+            return false;
+        }
+        $config = [];
+        foreach ($DB->request([
+            'SELECT' => ['name', 'value'],
+            'FROM'   => 'glpi_plugin_whatsappsimples_configs',
+            'WHERE'  => ['name' => ['server_url', 'api_token', 'instance_name']],
+        ]) as $row) {
+            $config[(string) $row['name']] = trim((string) $row['value']);
+        }
+        if (($config['server_url'] ?? '') === '' || ($config['api_token'] ?? '') === '' || ($config['instance_name'] ?? '') === '') {
+            return false;
+        }
+
+        $ch = curl_init(rtrim($config['server_url'], '/') . '/message/sendText/' . rawurlencode($config['instance_name']));
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'apikey: ' . $config['api_token']],
+            CURLOPT_POSTFIELDS     => json_encode([
+                'number'      => $number,
+                'options'     => ['delay' => 1200, 'presence' => 'composing'],
+                'text'        => $text,
+                'textMessage' => ['text' => $text],
+            ], JSON_UNESCAPED_UNICODE),
+            CURLOPT_TIMEOUT        => 15,
+        ]);
+        curl_exec($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        return $status >= 200 && $status < 300;
+    }
+}
+
 if (!function_exists('tralla_valid_priority')) {
     function tralla_valid_priority(string $priority): bool
     {

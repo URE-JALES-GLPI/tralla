@@ -26,6 +26,8 @@ function plugin_tralla_install(): bool
                 `entities_id`  INT {$sign} NOT NULL DEFAULT '0',
                 `is_recursive` TINYINT(1)   NOT NULL DEFAULT '0',
                 `is_archived`  TINYINT(1)   NOT NULL DEFAULT '0',
+                `notify_email` TINYINT(1)   NOT NULL DEFAULT '0',
+                `notify_whatsapp` TINYINT(1) NOT NULL DEFAULT '0',
                 `users_id`     INT {$sign} NOT NULL DEFAULT '0',
                 `date_creation` DATETIME    DEFAULT NULL,
                 `date_mod`      DATETIME    DEFAULT NULL,
@@ -35,6 +37,13 @@ function plugin_tralla_install(): bool
                 KEY `users_id` (`users_id`)
             ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}
         ") or die($DB->error());
+    }
+
+    // Canais de notificação escolhidos em cada quadro de manutenção.
+    foreach (['notify_email', 'notify_whatsapp'] as $field) {
+        if (!$DB->fieldExists('glpi_plugin_tralla_boards', $field)) {
+            $DB->doQuery("ALTER TABLE `glpi_plugin_tralla_boards` ADD COLUMN `{$field}` TINYINT(1) NOT NULL DEFAULT '0'") or die($DB->error());
+        }
     }
 
     if (!$DB->tableExists('glpi_plugin_tralla_boards_users')) {
@@ -135,6 +144,8 @@ function plugin_tralla_install(): bool
                 `date_withdrawn`          DATETIME     DEFAULT NULL,
                 `pending_notified`        TINYINT(1)   NOT NULL DEFAULT '0',
                 `withdrawal_reminded_at`  DATETIME     DEFAULT NULL,
+                `pending_reminded_at`     DATETIME     DEFAULT NULL,
+                `sla_alerts_sent`         VARCHAR(255) NOT NULL DEFAULT '',
                 `withdrawal_notice_marked` TINYINT(1) NOT NULL DEFAULT '0',
                 `assignature_sent`        TINYINT(1)   NOT NULL DEFAULT '0',
                 `rejection_reason`        TEXT         DEFAULT NULL,
@@ -197,6 +208,8 @@ function plugin_tralla_install(): bool
         'date_sla_start'              => 'DATETIME     DEFAULT NULL',
         'withdrawal_notice_marked'    => "TINYINT(1) NOT NULL DEFAULT '0'",
         'code_number'                 => "INT {$sign} NOT NULL DEFAULT 0",
+        'pending_reminded_at'         => 'DATETIME     DEFAULT NULL',
+        'sla_alerts_sent'             => "VARCHAR(255) NOT NULL DEFAULT ''",
     ];
     $added_is_deleted = false;
     $added_approval_kind = false;
@@ -572,7 +585,7 @@ function plugin_tralla_install(): bool
         CronTask::register(
             'PluginTrallaCron',
             'notify',
-            HOUR_TIMESTAMP,
+            MINUTE_TIMESTAMP,
             [
                 'state'        => CronTask::STATE_WAITING,
                 'mode'         => CronTask::MODE_EXTERNAL,
@@ -580,6 +593,11 @@ function plugin_tralla_install(): bool
                 'logs_lifetime' => 30,
             ]
         );
+        // Lembretes de Pendente a cada 5 minutos (P1) exigem a tarefa rodando a cada minuto.
+        $DB->update('glpi_crontasks', ['frequency' => MINUTE_TIMESTAMP], [
+            'itemtype' => 'PluginTrallaCron',
+            'name'     => 'notify',
+        ]);
     }
 
     return true;
