@@ -99,7 +99,7 @@ O card pode ser de **Descrição** (texto, anexos e solução) ou **Checklist** 
 
 ### Chamado aberto pelo WhatsApp
 
-O plugin WhatsAppSimples abre Chamados direto em **Manutenção Em Andamento**: o técnico do atendimento vira o responsável, escolhe a prioridade (P1 a P4) e o SLA começa a contar na criação, sem passar por Pendente nem por aprovação. O card mostra a origem **WhatsApp** e a seção **Conversa do WhatsApp** com as mensagens do atendimento. Detalhes em `whatsappsimples/docs/CARD_TRALLA.md`.
+O plugin WhatsAppSimples abre o mesmo modal **Novo card** (Manutenção ou Chamado) na tela do atendimento, no quadro configurado (padrão: quadro 1), e cria o card direto em **Manutenção Em Andamento**: o técnico do atendimento vira o responsável, escolhe a prioridade (P1 a P4) e o SLA começa a contar na criação, sem passar por Pendente nem por aprovação. O card mostra a origem **WhatsApp** e a seção **Conversa do WhatsApp** com as mensagens do atendimento. Detalhes em `whatsappsimples/docs/CARD_TRALLA.md`.
 
 ## Membros e papéis
 

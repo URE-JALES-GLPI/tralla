@@ -9,7 +9,7 @@ use Glpi\Http\SessionManager;
 require_once __DIR__ . '/inc/compat.php';
 require_once __DIR__ . '/inc/helpers.php';
 
-define('PLUGIN_TRALLA_VERSION', '1.7.3');
+define('PLUGIN_TRALLA_VERSION', '1.7.4');
 define('PLUGIN_TRALLA_MIN_GLPI', '12.0.0');
 define('PLUGIN_TRALLA_MAX_GLPI', '12.0.99');
 
@@ -56,6 +56,7 @@ function plugin_init_tralla(): void
 
     $PLUGIN_HOOKS['add_javascript']['tralla'] = [
         $versioned('public/js/tralla.js'),
+        $versioned('public/js/tralla-whatsapp.js'),
     ];
 }
 
