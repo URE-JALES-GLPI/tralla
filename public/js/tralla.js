@@ -735,6 +735,12 @@
         if (kind === 'call_release') {
             return 'Liberação de chamado';
         }
+        if (kind === 'pause') {
+            return 'Aprovação de pausa';
+        }
+        if (kind === 'resume') {
+            return 'Aprovação para despausar';
+        }
         return 'Aprovação de finalização';
     }
 
@@ -1293,6 +1299,10 @@
         var lock = card.is_locked
             ? '<span class="tralla-card-badge tralla-card-lock" title="Card bloqueado"><i class="ti ti-lock" aria-hidden="true"></i></span>'
             : '';
+        if (Number(card.is_paused)) {
+            lock += '<span class="tralla-card-badge tralla-card-paused" title="Card pausado: ações e prazos de SLA suspensos">'
+                + '<i class="ti ti-player-pause" aria-hidden="true"></i> Pausado</span>';
+        }
 
         var departingBadge = '';
         if (departing) {
@@ -1571,6 +1581,18 @@
             + '</div>';
     }
 
+    function renderPausedNotice(card) {
+        if (!Number(card.is_paused) || Number(card.stage) !== 1) {
+            return '';
+        }
+        return '<div class="tralla-approval-banner is-paused">'
+            + '<i class="ti ti-player-pause"></i>'
+            + '<div class="tralla-approval-content"><strong>Card pausado desde ' + esc(formatDate(card.paused_at)) + '</strong>'
+            + (card.pause_reason ? '<small>Motivo: ' + esc(card.pause_reason) + '</small>' : '')
+            + '<small>Ações, lembretes e prazos de SLA estão suspensos. Para voltar, use Despausar; o pedido passa por aprovação.</small>'
+            + '</div></div>';
+    }
+
     function renderSplitSnapshotNotice(card) {
         if (!card.split_snapshot) {
             return '';
@@ -1633,7 +1655,8 @@
             running: 'No prazo',
             overdue: 'Atrasado',
             met: 'Cumprido',
-            late_met: 'Cumprido com atraso'
+            late_met: 'Cumprido com atraso',
+            paused: 'Pausado'
         }[state] || '';
     }
 
@@ -1654,6 +1677,8 @@
             var deadline = Date.parse(String(clock.dataset.slaDeadline || '').replace(' ', 'T'));
             if (!isNaN(met) && !isNaN(start)) {
                 clock.textContent = 'Tempo até cumprir: ' + slaSecondsLabel((met - start) / 1000);
+            } else if (clock.dataset.slaPaused === '1') {
+                clock.textContent = 'Contagem pausada';
             } else if (!isNaN(deadline)) {
                 var difference = (deadline - Date.now()) / 1000;
                 clock.textContent = (difference < 0 ? 'Atrasado há ' : 'Faltam ') + slaSecondsLabel(Math.abs(difference));
@@ -1673,8 +1698,9 @@
         if (sla.next) {
             html += '<span class="tralla-card-badge tralla-sla-badge is-' + attr(sla.next.state) + '"'
                 + ' title="' + attr(sla.next.title + ': até ' + formatDate(sla.next.deadline) + ' (' + slaStateLabel(sla.next.state) + ')') + '">'
-                + '<i class="ti ' + (sla.next.state === 'overdue' ? 'ti-alarm' : 'ti-clock') + '" aria-hidden="true"></i>'
-                + '<span>' + esc(sla.next.state === 'overdue' ? 'Atrasado' : 'até ' + formatDate(sla.next.deadline)) + '</span></span>';
+                + '<i class="ti ' + (sla.next.state === 'overdue' ? 'ti-alarm' : (sla.next.state === 'paused' ? 'ti-player-pause' : 'ti-clock')) + '" aria-hidden="true"></i>'
+                + '<span>' + esc(sla.next.state === 'overdue' ? 'Atrasado'
+                    : (sla.next.state === 'paused' ? 'SLA pausado' : 'até ' + formatDate(sla.next.deadline))) + '</span></span>';
         }
         return html;
     }
@@ -1692,7 +1718,8 @@
                 + '<div><strong>' + esc(step.title) + '</strong><small>Prazo: ' + esc(step.span) + '</small></div>'
                 + '<div class="tralla-sla-when"><span>' + esc(when) + '</span>'
                 + '<small data-sla-clock data-sla-start="' + attr(sla.start || '') + '" data-sla-deadline="'
-                + attr(step.deadline || '') + '" data-sla-met="' + attr(step.met_at || '') + '"></small>'
+                + attr(step.deadline || '') + '" data-sla-met="' + attr(step.met_at || '') + '"'
+                + (step.state === 'paused' ? ' data-sla-paused="1"' : '') + '></small>'
                 + '<em>' + esc(slaStateLabel(step.state)) + '</em></div></div>';
         }).join('');
         return '<div class="tralla-card tralla-sla-card"><h3>Prioridade e SLA</h3>'
@@ -1902,6 +1929,15 @@
                 + '<i class="ti ti-shield-check"></i> ' + approveLabel + '</button>';
             buttons += '<button type="button" class="tralla-btn tralla-btn-danger" data-card-action="reject">'
                 + '<i class="ti ti-shield-x"></i> ' + rejectLabel + '</button>';
+        }
+
+        if (permissions.request_pause) {
+            buttons += '<button type="button" class="tralla-btn tralla-btn-ghost" data-card-action="pause">'
+                + '<i class="ti ti-player-pause"></i> Pausar</button>';
+        }
+        if (permissions.request_resume) {
+            buttons += '<button type="button" class="tralla-btn tralla-btn-primary" data-card-action="resume">'
+                + '<i class="ti ti-player-play"></i> Despausar</button>';
         }
 
         if (permissions.split) {
@@ -2173,6 +2209,20 @@
                 + '</div>';
         }
 
+        if (kind === 'pause' || kind === 'resume') {
+            return '<div class="tralla-approval-banner is-paused">'
+                + '<i class="ti ' + (kind === 'pause' ? 'ti-player-pause' : 'ti-player-play') + '"></i>'
+                + '<div class="tralla-approval-content"><strong>'
+                + (kind === 'pause' ? 'Pausa aguardando aprovação' : 'Despausa aguardando aprovação') + '</strong>'
+                + parentLine
+                + (card.pause_request_reason ? '<small>Motivo: ' + esc(card.pause_request_reason) + '</small>' : '')
+                + '<small>' + (kind === 'pause'
+                    ? 'Ao aprovar, o card fica pausado: ações, lembretes e prazos de SLA ficam suspensos.'
+                    : 'Ao aprovar, o card volta ao fluxo e os prazos de SLA são estendidos pelo tempo pausado.') + '</small></div>'
+                + openParent
+                + '</div>';
+        }
+
         if (kind === 'call_release') {
             return '<div class="tralla-approval-banner is-call-release">'
                 + '<i class="ti ti-lock-open"></i>'
@@ -2200,13 +2250,16 @@
 
         var kind = String(card.pending_approval_kind || 'maintenance');
         var kindClass = kind === 'deletion' ? 'deletion' : (kind === 'call_release' ? 'call-release'
-            : (kind === 'edit' || kind === 'split' ? 'edit' : 'finalization'));
-        var label = kind === 'deletion'
+            : (kind === 'edit' || kind === 'split' ? 'edit' : (kind === 'pause' || kind === 'resume' ? 'paused' : 'finalization')));
+        var label = kind === 'pause' ? 'Pausa pendente de aprovação'
+            : kind === 'resume' ? 'Despausa pendente de aprovação'
+            : kind === 'deletion'
             ? 'Exclusão pendente de aprovação'
             : (kind === 'edit' ? 'Edição pendente de aprovação'
                 : (kind === 'split' ? 'Separação pendente de aprovação'
                     : (kind === 'call_release' ? 'Liberação pendente de aprovação' : 'Finalização pendente de aprovação')));
-        var icon = kind === 'deletion' ? 'ti-trash' : (kind === 'edit' ? 'ti-pencil'
+        var icon = kind === 'pause' ? 'ti-player-pause' : kind === 'resume' ? 'ti-player-play'
+            : kind === 'deletion' ? 'ti-trash' : (kind === 'edit' ? 'ti-pencil'
             : (kind === 'split' ? 'ti-git-branch' : (kind === 'call_release' ? 'ti-lock-open' : 'ti-shield-check')));
 
         return '<div class="tralla-approval-banner is-' + kindClass + '">'
@@ -2575,7 +2628,7 @@
                 + '</section>';
         }
 
-        body = renderSplitSnapshotNotice(card) + body;
+        body = renderSplitSnapshotNotice(card) + renderPausedNotice(card) + body;
         body += renderPendingApproval(card);
         body += renderFamily(card);
         body += renderApproval(card);
@@ -2968,6 +3021,33 @@
         }
 
         try {
+            if (action === 'pause' || action === 'resume') {
+                var pausing = action === 'pause';
+                var pauseReason = await promptDialog({
+                    title: pausing ? 'Pausar card' : 'Despausar card',
+                    message: pausing
+                        ? 'O pedido vai para aprovação. Depois de aprovado, o card fica parado por completo: ações, lembretes e prazos de SLA.'
+                        : 'O pedido vai para aprovação. Depois de aprovado, o card volta ao fluxo e os prazos de SLA são estendidos pelo tempo pausado.',
+                    label: pausing ? 'Motivo da pausa' : 'Observação (opcional)',
+                    multiline: true,
+                    required: pausing,
+                    requiredMessage: 'Informe o motivo da pausa.',
+                    maxlength: 2000,
+                    placeholder: pausing ? 'Ex.: aguardando peça, escola fechada...' : 'Ex.: peça chegou...',
+                    icon: pausing ? 'ti-player-pause' : 'ti-player-play',
+                    confirmLabel: pausing ? 'Solicitar pausa' : 'Solicitar despausa'
+                });
+                if (pauseReason === null) {
+                    return;
+                }
+                setBusy(button, true);
+                var pauseResult = await api(pausing ? 'request_pause' : 'request_resume', { id: cardId, reason: pauseReason });
+                applyState(pauseResult);
+                toast(pausing ? 'Pausa enviada para aprovação.' : 'Despausa enviada para aprovação.', 'success');
+                await openCard(cardId);
+                return;
+            }
+
             if (action === 'delete') {
                 var reason = await promptDialog({
                     title: 'Excluir card',
@@ -3017,6 +3097,13 @@
                         message: 'Nenhuma máquina será movida; o card de origem será liberado.',
                         label: 'Motivo (opcional)',
                         confirmLabel: 'Recusar separação'
+                    };
+                } else if (kind === 'pause' || kind === 'resume') {
+                    rejectConfig = {
+                        title: kind === 'pause' ? 'Recusar pausa' : 'Recusar despausa',
+                        message: kind === 'pause' ? 'O card continua no fluxo normalmente.' : 'O card continua pausado.',
+                        label: 'Motivo (opcional)',
+                        confirmLabel: 'Recusar'
                     };
                 } else if (isCallReleaseApproval) {
                     rejectConfig = {
@@ -3124,6 +3211,15 @@
                         icon: 'ti-git-branch',
                         confirmLabel: 'Aprovar separação'
                     };
+                } else if (kind === 'pause' || kind === 'resume') {
+                    approveConfig = {
+                        title: kind === 'pause' ? 'Aprovar pausa' : 'Aprovar despausa',
+                        message: kind === 'pause'
+                            ? 'Pausar o card? Ações, lembretes e prazos de SLA ficam suspensos até a despausa.'
+                            : 'Despausar o card? Ele volta ao fluxo e os prazos de SLA são estendidos pelo tempo pausado.',
+                        icon: kind === 'pause' ? 'ti-player-pause' : 'ti-player-play',
+                        confirmLabel: kind === 'pause' ? 'Aprovar pausa' : 'Aprovar despausa'
+                    };
                 } else if (isCallReleaseApproval) {
                     approveConfig = null;
                 } else {
@@ -3186,6 +3282,9 @@
                     await openCard(data.card.id);
                 } else if (isSplitApproval) {
                     toast('Separação aprovada. Novo card criado.', 'success');
+                    await openCard(data.card.id);
+                } else if (kind === 'pause' || kind === 'resume') {
+                    toast(kind === 'pause' ? 'Card pausado.' : 'Card despausado.', 'success');
                     await openCard(data.card.id);
                 } else if (isCallReleaseApproval) {
                     toast('Card liberado como ' + (priorityInfo(chosenPriority).label || chosenPriority) + '. Um técnico já pode clicar em Pegar.', 'success');

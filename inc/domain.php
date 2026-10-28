@@ -53,6 +53,24 @@ if (!function_exists('tralla_whatsapp_number')) {
     }
 }
 
+if (!function_exists('tralla_duration_label')) {
+    /** Duração legível: 45min, 3h10, 2d 4h. */
+    function tralla_duration_label(int $seconds): string
+    {
+        $minutes = intdiv(max(0, $seconds), 60);
+        if ($minutes < 60) {
+            return $minutes . 'min';
+        }
+        $hours = intdiv($minutes, 60);
+        if ($hours < 24) {
+            $rest = $minutes % 60;
+            return $hours . 'h' . ($rest > 0 ? sprintf('%02d', $rest) : '');
+        }
+
+        return intdiv($hours, 24) . 'd ' . ($hours % 24) . 'h';
+    }
+}
+
 if (!function_exists('tralla_role_rank')) {
     function tralla_role_rank(string $role): int
     {

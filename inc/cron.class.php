@@ -41,6 +41,7 @@ class PluginTrallaCron extends CommonDBTM
                 'status'         => 'pending',
                 'is_archived'    => 0,
                 'pending_notified' => 0,
+                'is_paused'      => 0,
             ],
         ]);
 
@@ -131,6 +132,7 @@ class PluginTrallaCron extends CommonDBTM
                 'b.type' => 'maintenance', 'b.is_archived' => 0,
                 'OR' => ['b.notify_email' => 1, 'b.notify_whatsapp' => 1],
                 'c.stage' => 1, 'c.status' => 'pending', 'c.is_locked' => 0,
+                'c.is_paused' => 0,
                 'c.is_archived' => 0, 'c.is_deleted' => 0, 'c.priority' => ['!=', ''],
             ],
         ]) as $card) {
@@ -173,6 +175,7 @@ class PluginTrallaCron extends CommonDBTM
                 'b.type' => 'maintenance', 'b.is_archived' => 0,
                 'OR' => ['b.notify_email' => 1, 'b.notify_whatsapp' => 1],
                 'c.stage' => 1, 'c.status' => 'in_progress', 'c.technician_id' => ['>', 0],
+                'c.is_paused' => 0,
                 'c.is_archived' => 0, 'c.is_deleted' => 0, 'c.priority' => ['!=', ''],
             ],
         ]) as $card) {

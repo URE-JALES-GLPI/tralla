@@ -4869,6 +4869,23 @@ body.tralla-modal-open {
     text-align: left;
 }
 .tralla-user-dash-person:not(:disabled) { cursor: pointer; }
+.tralla-card-badge.tralla-card-paused {
+    background: var(--tr-surface-2);
+    color: var(--tr-text-soft);
+    font-weight: 700;
+}
+.tralla-sla-badge.is-paused,
+.tralla-sla-row.is-paused em {
+    background: var(--tr-surface-2);
+    color: var(--tr-text-soft);
+}
+.tralla-approval-banner.is-paused {
+    background: var(--tr-surface-2);
+    border-color: var(--tr-border);
+}
+.tralla-approval-banner.is-paused > i {
+    color: var(--tr-muted);
+}
 .tralla-user-dash-total {
     align-items: baseline;
     background: var(--tr-surface-2);

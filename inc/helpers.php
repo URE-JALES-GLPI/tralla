@@ -401,6 +401,8 @@ if (!function_exists('tralla_approval_kind_labels')) {
             'split'       => 'Aprovação de separação',
             'call_release' => 'Liberação e prioridade',
             'whatsapp'    => 'Acompanhamento (WhatsApp)',
+            'pause'       => 'Aprovação de pausa',
+            'resume'      => 'Aprovação para despausar',
         ];
     }
 }
@@ -472,6 +474,8 @@ if (!function_exists('tralla_can_transition')) {
         $status = (string) ($card['status'] ?? '');
         $locked = !empty($card['is_locked']);
         $archived = !empty($card['is_archived']);
+        // Card pausado ou com pausa/despausa aguardando aprovação não avança no fluxo.
+        $blocked = !empty($card['is_paused']) || (int) ($card['approval_cards_id'] ?? 0) > 0;
 
         if ($archived) {
             return false;
@@ -483,9 +487,9 @@ if (!function_exists('tralla_can_transition')) {
 
         switch ($action) {
             case 'take':
-                return $stage === 1 && $status === 'pending' && !$locked;
+                return $stage === 1 && $status === 'pending' && !$locked && !$blocked;
             case 'finalize':
-                return $stage === 1 && $status === 'in_progress' && !$locked;
+                return $stage === 1 && $status === 'in_progress' && !$locked && !$blocked;
             case 'approve':
             case 'reject':
                 return $stage === 2 && $status === 'waiting_approval';
@@ -1042,6 +1046,12 @@ if (!function_exists('tralla_card_sla')) {
         }
         $spec = $priorities[$priority];
         $status = (string) ($card['status'] ?? '');
+        // O tempo pausado (acumulado + pausa em curso) empurra os prazos para frente.
+        $paused = !empty($card['is_paused']);
+        $pausedSeconds = (int) ($card['paused_seconds'] ?? 0);
+        if ($paused && !empty($card['paused_at'])) {
+            $pausedSeconds += max(0, time() - (int) strtotime((string) $card['paused_at']));
+        }
         $finishedDefinitive = in_array($status, ['withdrawal', 'done'], true);
         $metAt = [
             'first'      => (string) ($card['date_taken'] ?? ''),
@@ -1061,11 +1071,16 @@ if (!function_exists('tralla_card_sla')) {
         $next = null;
         foreach ($titles as $key => $title) {
             $deadline = $start !== '' ? tralla_sla_deadline($start, $spec[$key]) : '';
+            if ($deadline !== '' && $pausedSeconds > 0) {
+                $deadline = date('Y-m-d H:i:s', (int) strtotime($deadline) + $pausedSeconds);
+            }
             $met = $metAt[$key] !== '' ? $metAt[$key] : '';
             if ($start === '') {
                 $state = 'waiting';
             } elseif ($met !== '') {
                 $state = strtotime($met) <= strtotime($deadline) ? 'met' : 'late_met';
+            } elseif ($paused) {
+                $state = 'paused';
             } else {
                 $state = strtotime($now) > strtotime($deadline) ? 'overdue' : 'running';
             }
@@ -1077,7 +1092,7 @@ if (!function_exists('tralla_card_sla')) {
                 'met_at'   => $met,
                 'state'    => $state,
             ];
-            if ($next === null && in_array($state, ['running', 'overdue'], true)) {
+            if ($next === null && in_array($state, ['running', 'overdue', 'paused'], true)) {
                 $next = $step;
             }
             $steps[] = $step;
@@ -1089,6 +1104,7 @@ if (!function_exists('tralla_card_sla')) {
             'name'     => $spec['name'],
             'color'    => $spec['color'],
             'start'    => $start,
+            'paused'   => $paused,
             'steps'    => $steps,
             'next'     => $next,
         ];
