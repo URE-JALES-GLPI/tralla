@@ -265,43 +265,97 @@ if (!function_exists('tralla_background_color')) {
     }
 }
 
+if (!function_exists('tralla_code_cache')) {
+    /**
+     * Cache por requisição usado pelo código de exibição.
+     * $reset = true limpa (chamar após criar cards de separação).
+     */
+    function &tralla_code_cache(bool $reset = false): array
+    {
+        static $cache = ['split' => [], 'rows' => []];
+        if ($reset) {
+            $cache = ['split' => [], 'rows' => []];
+        }
+        return $cache;
+    }
+}
+
+if (!function_exists('tralla_code_root_has_split')) {
+    /** A raiz já foi separada (existe card principal com sequência > 1)? */
+    function tralla_code_root_has_split(int $root): bool
+    {
+        global $DB;
+        if ($root <= 0 || !isset($DB) || !is_object($DB)) {
+            return false;
+        }
+        $cache = &tralla_code_cache();
+        if (!array_key_exists($root, $cache['split'])) {
+            $row = $DB->request([
+                'SELECT' => ['id'],
+                'FROM'   => 'glpi_plugin_tralla_cards',
+                'WHERE'  => [
+                    'code_root_cards_id' => $root,
+                    'stage'              => 1,
+                    'family_seq'         => ['>', 1],
+                ],
+                'LIMIT'  => 1,
+            ])->current();
+            $cache['split'][$root] = is_array($row);
+        }
+        return $cache['split'][$root];
+    }
+}
+
 if (!function_exists('tralla_display_code')) {
     /**
-     * Código do card: AP-<raiz>/<seq> para aprovação, <raiz>/<seq> para
-     * manutenção e #<id> para quadros normais.
+     * Código do card de manutenção: <raiz> normalmente; <raiz>/<seq> só quando
+     * a raiz foi separada (3/1 é o card original e 3/2 o separado).
+     * Cards de aprovação mostram o mesmo código do card de origem.
+     * Quadros normais: #<id>.
      */
     function tralla_display_code(array $card, string $board_type = ''): string
     {
+        global $DB;
         $stage = (int) ($card['stage'] ?? 1);
         $id = (int) ($card['id'] ?? 0);
-        $familyRoot = (int) ($card['code_root_cards_id'] ?? 0);
-        if ($familyRoot <= 0) {
-            $familyRoot = (int) ($card['family_cards_id'] ?? 0);
-        }
-        $familySeq = (int) ($card['family_seq'] ?? 0);
 
         if ($stage === 2) {
-            if ($familyRoot <= 0) {
-                $familyRoot = (int) ($card['parent_cards_id'] ?? 0);
+            $parentId = (int) ($card['parent_cards_id'] ?? 0);
+            if ($parentId > 0 && isset($DB) && is_object($DB)) {
+                $cache = &tralla_code_cache();
+                if (!array_key_exists($parentId, $cache['rows'])) {
+                    $parent = $DB->request([
+                        'SELECT' => ['id', 'stage', 'code_root_cards_id', 'family_cards_id', 'family_seq'],
+                        'FROM'   => 'glpi_plugin_tralla_cards',
+                        'WHERE'  => ['id' => $parentId],
+                        'LIMIT'  => 1,
+                    ])->current();
+                    $cache['rows'][$parentId] = is_array($parent) ? $parent : null;
+                }
+                if (is_array($cache['rows'][$parentId]) && (int) $cache['rows'][$parentId]['stage'] === 1) {
+                    return tralla_display_code($cache['rows'][$parentId], 'maintenance');
+                }
             }
-            if ($familySeq <= 0) {
-                $familySeq = 2;
-            }
-
-            return $familyRoot > 0 ? 'AP-' . $familyRoot . '/' . $familySeq : '';
+            $root = (int) ($card['code_root_cards_id'] ?? 0) ?: (int) ($card['family_cards_id'] ?? 0) ?: $parentId;
+            return $root > 0 ? (string) $root : ($id > 0 ? '#' . $id : '');
         }
 
         $isMaintenance = $board_type === 'maintenance' || !empty($card['is_maintenance']);
 
         if ($isMaintenance && $id > 0) {
+            $familyRoot = (int) ($card['code_root_cards_id'] ?? 0);
+            if ($familyRoot <= 0) {
+                $familyRoot = (int) ($card['family_cards_id'] ?? 0);
+            }
             if ($familyRoot <= 0) {
                 $familyRoot = $id;
             }
-            if ($familySeq <= 0) {
-                $familySeq = 1;
-            }
+            $familySeq = max(1, (int) ($card['family_seq'] ?? 1));
 
-            return $familyRoot . '/' . $familySeq;
+            if ($familySeq > 1 || tralla_code_root_has_split($familyRoot)) {
+                return $familyRoot . '/' . $familySeq;
+            }
+            return (string) $familyRoot;
         }
 
         return $id > 0 ? '#' . $id : '';

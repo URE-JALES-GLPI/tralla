@@ -1058,7 +1058,6 @@
         if (familyRoot > 0) {
             parts.push(String(familyRoot));
             parts.push(familyRoot + '/' + familySeq);
-            parts.push('AP-' + familyRoot + '/' + familySeq);
         }
         if (Number(card.stage) === 2 && card.parent && card.parent.code) {
             parts.push(card.parent.code);

@@ -74,6 +74,7 @@ class PluginTrallaCard extends CommonDBTM
     public static function getCardsForBoard(int $boards_id): array
     {
         global $DB;
+        tralla_code_cache(true);
 
         if (!PluginTrallaBoard::canViewBoard($boards_id)) {
             throw new RuntimeException('Você não tem acesso a este quadro.');
@@ -245,6 +246,7 @@ class PluginTrallaCard extends CommonDBTM
     public static function getCardDetail(int $id, int $userId = 0): array
     {
         global $DB;
+        tralla_code_cache(true);
 
         $card = self::getCard($id);
         if ($card === null) {
@@ -3020,9 +3022,11 @@ class PluginTrallaCard extends CommonDBTM
         $row = $DB->request([
             'SELECT' => ['MAX' => 'family_seq AS max_seq'],
             'FROM'   => 'glpi_plugin_tralla_cards',
-            'WHERE'  => ['code_root_cards_id' => $root],
+            // Só cards principais contam: aprovações não consomem número (3/2 é o primeiro separado).
+            'WHERE'  => ['code_root_cards_id' => $root, 'stage' => 1],
         ])->current();
 
+        tralla_code_cache(true);
         return max(1, (int) ($row['max_seq'] ?? 0)) + 1;
     }
 
