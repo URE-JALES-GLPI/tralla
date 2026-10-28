@@ -880,8 +880,6 @@ if (!function_exists('tralla_priorities')) {
                 'first' => ['h' => 8],   'palliative' => ['bd' => 2],   'definitive' => ['bd' => 4]],
             'P4' => ['label' => 'P4 · Mínima',    'name' => 'Mínima',     'color' => '#5f6368',
                 'first' => ['bd' => 5],  'palliative' => ['bd' => 15],  'definitive' => ['bd' => 15]],
-            'P5' => ['label' => 'P5 · Inventário', 'name' => 'Inventário', 'color' => '#1a4fa0',
-                'first' => ['bd' => 14], 'palliative' => ['bd' => 60],  'definitive' => ['bd' => 60]],
         ];
     }
 }

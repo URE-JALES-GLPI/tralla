@@ -1863,7 +1863,7 @@ class PluginTrallaCard extends CommonDBTM
         global $DB;
         $priority = strtoupper(trim($priority));
         if ($approve && !tralla_valid_priority($priority)) {
-            throw new RuntimeException('Escolha a prioridade (P1 a P5) para liberar o card.');
+            throw new RuntimeException('Escolha a prioridade (P1 a P4) para liberar o card.');
         }
         $approval = self::getCard($approvalId);
         if ($approval === null || (int) $approval['stage'] !== 2

@@ -2160,7 +2160,7 @@
                 + '<i class="ti ti-lock-open"></i>'
                 + '<div class="tralla-approval-content"><strong>Aguardando prioridade e liberação</strong>'
                 + parentLine
-                + '<small>Defina a prioridade (P1 a P5). Ao liberar, o card fica disponível para o técnico clicar em Pegar e os prazos de SLA começam a contar.</small></div>'
+                + '<small>Defina a prioridade (P1 a P4). Ao liberar, o card fica disponível para o técnico clicar em Pegar e os prazos de SLA começam a contar.</small></div>'
                 + openParent
                 + '</div>';
         }
@@ -4410,7 +4410,7 @@
             + (isMaintenance ? '<p class="tralla-create-approval-note" data-approval-note>'
                 + '<i class="ti ti-info-circle" aria-hidden="true"></i>'
                 + '<span>O card será criado <b>bloqueado</b> em Manutenção Pendente e enviado para <b>Manutenção Aprovação</b>, '
-                + 'onde o aprovador define a prioridade (P1 a P5) e os prazos de SLA.</span></p>' : '')
+                + 'onde o aprovador define a prioridade (P1 a P4) e os prazos de SLA.</span></p>' : '')
             + '</div>'
             + '<div class="tralla-modal-actions">'
             + '<button type="button" class="tralla-btn tralla-btn-ghost" data-tralla-close>Cancelar</button>'

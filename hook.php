@@ -193,7 +193,7 @@ function plugin_tralla_install(): bool
         'deletion_previous_lists_id'  => "INT {$sign} NOT NULL DEFAULT 0",
         'deletion_previous_status'    => "VARCHAR(30)  NOT NULL DEFAULT ''",
         'deletion_previous_is_locked' => 'TINYINT(1)   NOT NULL DEFAULT 0',
-        'priority'                    => "VARCHAR(2)   NOT NULL DEFAULT '' COMMENT 'P1..P5'",
+        'priority'                    => "VARCHAR(2)   NOT NULL DEFAULT '' COMMENT 'P1..P4'",
         'date_sla_start'              => 'DATETIME     DEFAULT NULL',
         'withdrawal_notice_marked'    => "TINYINT(1) NOT NULL DEFAULT '0'",
         'code_number'                 => "INT {$sign} NOT NULL DEFAULT 0",
