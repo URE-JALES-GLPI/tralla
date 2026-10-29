@@ -85,9 +85,9 @@ class PluginTrallaBoard extends CommonDBTM
                 ['name' => 'Manutenção Aprovação', 'category' => 'maintenance_approval', 'color' => tralla_category_color('maintenance_approval')],
                 ['name' => 'Manutenção Pendente', 'category' => 'maintenance_pending', 'color' => tralla_category_color('maintenance_pending')],
                 ['name' => 'Manutenção Em Andamento', 'category' => 'maintenance_in_progress', 'color' => tralla_category_color('maintenance_in_progress')],
-                ['name' => 'Manutenção Pausados', 'category' => 'maintenance_paused', 'color' => tralla_category_color('maintenance_paused')],
                 ['name' => 'Manutenção Retirada', 'category' => 'maintenance_withdrawal', 'color' => tralla_category_color('maintenance_withdrawal')],
                 ['name' => 'Manutenção Concluído', 'category' => 'maintenance_done', 'color' => tralla_category_color('maintenance_done')],
+                ['name' => 'Manutenção Pausados', 'category' => 'maintenance_paused', 'color' => tralla_category_color('maintenance_paused')],
             ];
         }
 
@@ -370,27 +370,35 @@ class PluginTrallaBoard extends CommonDBTM
         return is_array($row) ? $row : null;
     }
 
-    /** Acrescenta a lista de pausados aos quadros criados antes deste fluxo. */
+    /** Mantém Pausados como a última lista dos quadros de manutenção existentes. */
     public static function ensurePausedList(int $boardId): ?array
     {
         global $DB;
 
         $existing = self::findListByCategory($boardId, 'maintenance_paused');
+        $last = $DB->request([
+            'SELECT' => ['id', 'rank'],
+            'FROM' => 'glpi_plugin_tralla_lists',
+            'WHERE' => ['plugin_tralla_boards_id' => $boardId, 'is_archived' => 0],
+            'ORDER' => 'rank DESC, id DESC',
+            'LIMIT' => 1,
+        ])->current();
         if ($existing !== null) {
+            if (is_array($last) && (int) $last['id'] !== (int) $existing['id']) {
+                $rank = (float) $last['rank'] + 1000.0;
+                $DB->update('glpi_plugin_tralla_lists', [
+                    'rank' => $rank,
+                    'date_mod' => tralla_now(),
+                ], ['id' => (int) $existing['id']]);
+                $existing['rank'] = $rank;
+            }
             return $existing;
         }
         $board = new self();
         if (!$board->getFromDB($boardId) || (string) $board->fields['type'] !== 'maintenance') {
             return null;
         }
-        $inProgress = self::findListByCategory($boardId, 'maintenance_in_progress');
-        $withdrawal = self::findListByCategory($boardId, 'maintenance_withdrawal');
-        $rank = $inProgress !== null ? (float) $inProgress['rank'] + 500.0 : 3500.0;
-        if ($withdrawal !== null && (float) $withdrawal['rank'] > (float) ($inProgress['rank'] ?? 0)) {
-            $rank = $inProgress !== null
-                ? ((float) $inProgress['rank'] + (float) $withdrawal['rank']) / 2
-                : (float) $withdrawal['rank'] - 500.0;
-        }
+        $rank = is_array($last) ? (float) $last['rank'] + 1000.0 : 1000.0;
         $now = tralla_now();
         $DB->insert('glpi_plugin_tralla_lists', [
             'plugin_tralla_boards_id' => $boardId,
