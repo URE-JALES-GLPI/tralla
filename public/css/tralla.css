@@ -4410,6 +4410,28 @@ body.tralla-modal-open {
 .tralla-finalize-requirements h3 .ti { color: var(--tr-primary); }
 .tralla-finalize-requirements ul { margin: 8px 0 0; padding-left: 22px; }
 .tralla-finalize-requirements li { line-height: 1.45; margin: 5px 0; }
+/* "O que falta para finalizar?": pendências em vermelho. */
+.tralla-dialog-danger .tralla-finalize-requirements {
+    background: #fff5f3;
+    border: 1px solid #ffd2c7;
+    border-radius: var(--tr-radius-sm);
+    padding: 12px 14px;
+}
+.tralla-dialog-danger .tralla-finalize-requirements > strong,
+.tralla-dialog-danger .tralla-finalize-requirements h3 .ti { color: #de350b; }
+.tralla-dialog-danger .tralla-finalize-requirements section { border-top-color: #ffd2c7; }
+.tralla-dialog-danger .tralla-finalize-requirements li::marker { color: #de350b; }
+.tralla-dialog-danger:has(.tralla-finalize-requirements) [data-dialog-confirm] {
+    background: #de350b;
+    border-color: #de350b;
+    color: #fff;
+}
+.tralla-dialog-danger:has(.tralla-finalize-requirements) [data-dialog-confirm]:hover { background: #bf2600; border-color: #bf2600; }
+html[data-theme="dark"] .tralla-dialog-danger .tralla-finalize-requirements,
+body[data-theme="dark"] .tralla-dialog-danger .tralla-finalize-requirements {
+    background: rgba(222, 53, 11, 0.12);
+    border-color: rgba(255, 140, 110, 0.35);
+}
 
 .tralla-card-label-approval-final {
     background: var(--tr-primary);

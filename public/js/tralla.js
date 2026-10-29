@@ -2024,6 +2024,7 @@
             message: 'Complete os itens abaixo para liberar o botão Finalizar.',
             confirmLabel: 'Entendi',
             icon: 'ti-list-check',
+            tone: 'danger',
             detailsHtml: html
         });
     }
