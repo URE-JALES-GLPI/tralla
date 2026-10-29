@@ -64,16 +64,23 @@ class PluginTrallaSheetSync
             $code = trim((string) ($row[0] ?? ''));
             if ($code !== '' && !isset($byCode[$code])) { $byCode[$code] = $index + 1; }
         }
+        // Sem a linha "N", reaproveita a primeira linha "N/x" como a linha única do card.
+        foreach ($rows as $index => $row) {
+            if ($index > 0 && preg_match('/^(\d+)\/\d+$/', trim((string) ($row[0] ?? '')), $match)
+                && !isset($byCode[$match[1]])) {
+                $byCode[$match[1]] = $index + 1;
+            }
+        }
 
         $updates = [];
         $appends = [];
         $pausedList = PluginTrallaBoard::findListByCategory($boardId, 'maintenance_paused');
+        // Inclui as partes já arquivadas de uma separação (datas e técnicos de quem fez).
         $cards = iterator_to_array($DB->request([
             'FROM' => 'glpi_plugin_tralla_cards',
             'WHERE' => [
                 'plugin_tralla_boards_id' => $boardId,
                 'stage' => 1,
-                'is_archived' => 0,
                 'is_deleted' => 0,
             ],
             'ORDER' => 'code_number ASC, id ASC',
@@ -93,28 +100,72 @@ class PluginTrallaSheetSync
             }
         }
         $modelNames = PluginTrallaMachineModel::getModelNames(array_values($modelIds));
+
+        // Uma linha por número de card: a origem e as partes separadas (30/1, 30/2...)
+        // compartilham a mesma raiz de numeração e viram uma linha só ("30").
+        $groups = [];
         foreach ($cards as $card) {
-            $code = tralla_display_code($card, 'maintenance');
-            $status = (string) $card['status'];
-            $isPaused = !empty($card['is_paused'])
-                || ($pausedList !== null && (int) $card['plugin_tralla_lists_id'] === (int) $pausedList['id']);
-            $label = $isPaused ? 'Em andamento'
-                : ($status === 'withdrawal' ? 'Concluido' : tralla_status_label($status));
-            $kind = (string) ($card['workflow_type'] ?? 'maintenance');
+            $cardId = (int) $card['id'];
+            $root = (int) ($card['code_root_cards_id'] ?? 0) ?: (int) ($card['family_cards_id'] ?? 0) ?: $cardId;
+            $groups[$root][] = $card;
+        }
+        $exported = [];
+        foreach ($groups as $root => $members) {
+            $rootCard = null;
+            foreach ($members as $member) {
+                if ((int) $member['id'] === $root) { $rootCard = $member; }
+            }
+            if ($rootCard === null || !empty($rootCard['is_archived'])) { continue; }
+            $active = array_values(array_filter($members, static fn(array $member): bool => empty($member['is_archived'])));
+
+            $labels = [];
+            $technicians = [];
+            $machines = [];
+            $taken = '';
+            $finalized = '';
+            foreach ($members as $member) {
+                $memberTaken = (string) ($member['date_taken'] ?? '');
+                if ($memberTaken !== '' && ($taken === '' || $memberTaken < $taken)) { $taken = $memberTaken; }
+                $memberFinalized = (string) ($member['date_finalized'] ?? '');
+                if ($memberFinalized > $finalized) { $finalized = $memberFinalized; }
+                $technician = tralla_user_name((int) ($member['technician_id'] ?? 0));
+                if ($technician !== '' && !in_array($technician, $technicians, true)) { $technicians[] = $technician; }
+            }
+            foreach ($active as $member) {
+                $status = (string) $member['status'];
+                $isPaused = !empty($member['is_paused'])
+                    || ($pausedList !== null && (int) $member['plugin_tralla_lists_id'] === (int) $pausedList['id']);
+                // "Aprovado" é a parte que terminou e espera as demais: o card ainda está em andamento.
+                $labels[] = $isPaused || $status === 'approved' ? 'Em andamento'
+                    : ($status === 'withdrawal' ? 'Concluido' : tralla_status_label($status));
+                $machines = array_merge($machines, $machinesByCard[(int) $member['id']] ?? []);
+            }
+            if (in_array('Em andamento', $labels, true)) {
+                $label = 'Em andamento';
+            } elseif (in_array('Pendente', $labels, true)) {
+                $label = 'Pendente';
+            } else {
+                $label = $labels[0] ?? tralla_status_label((string) $rootCard['status']);
+            }
+            if (in_array($label, ['Em andamento', 'Pendente'], true)) {
+                $finalized = '';
+            }
+
+            $kind = (string) ($rootCard['workflow_type'] ?? 'maintenance');
             $description = $kind === 'call'
-                ? (string) ($card['description'] ?? '')
-                : str_replace(' · ', ' | ', PluginTrallaMachine::summarizeModels(
-                    $machinesByCard[(int) $card['id']] ?? [], $modelNames
-                ));
+                ? (string) ($rootCard['description'] ?? '')
+                : str_replace(' · ', ' | ', PluginTrallaMachine::summarizeModels($machines, $modelNames));
+            $code = (string) tralla_code_number($root, $rootCard);
+            $exported[$code] = true;
             $record = [
                 $code,
-                self::formatDate((string) ($card['date_taken'] ?? '')),
-                self::formatDate((string) ($card['date_finalized'] ?? '')),
-                $kind === 'call' ? (string) ($card['call_category'] ?? '') : 'Equipamentos',
+                self::formatDate($taken),
+                self::formatDate($finalized),
+                $kind === 'call' ? (string) ($rootCard['call_category'] ?? '') : 'Equipamentos',
                 $label,
                 $description,
-                (string) $card['name'],
-                tralla_user_name((int) ($card['technician_id'] ?? 0)),
+                (string) $rootCard['name'],
+                implode(', ', $technicians),
             ];
             if (isset($byCode[$code])) {
                 $rowNumber = $byCode[$code];
@@ -131,6 +182,18 @@ class PluginTrallaSheetSync
             }
         }
 
+        // Linhas antigas de partes separadas ("30/1", "30/2") ou repetidas de um card que
+        // agora tem a linha única: removidas de baixo para cima depois de gravar.
+        $obsolete = [];
+        foreach ($rows as $index => $row) {
+            if ($index === 0) { continue; }
+            $code = trim((string) ($row[0] ?? ''));
+            $base = preg_match('/^(\d+)\/\d+$/', $code, $match) ? $match[1] : $code;
+            if (isset($exported[$base]) && ($byCode[$base] ?? 0) !== $index + 1) {
+                $obsolete[] = $index;
+            }
+        }
+
         if ($updates !== []) {
             self::request('POST', 'https://sheets.googleapis.com/v4/spreadsheets/' . self::SHEET_ID
                 . '/values:batchUpdate', $token,
@@ -141,9 +204,34 @@ class PluginTrallaSheetSync
                 . '&insertDataOption=INSERT_ROWS', $token,
                 ['majorDimension' => 'ROWS', 'values' => $appends]);
         }
+        if ($obsolete !== []) {
+            self::deleteRows($token, $tab, $obsolete);
+        }
         PluginTrallaConfig::set('sheet_last_success', (string) time());
         PluginTrallaConfig::set('sheet_last_error', '');
-        return count($updates) + count($appends);
+        return count($updates) + count($appends) + count($obsolete);
+    }
+
+    /** Remove linhas (índices a partir de 0) da aba, de baixo para cima. */
+    private static function deleteRows(string $token, string $tab, array $indexes): void
+    {
+        $meta = self::request('GET', 'https://sheets.googleapis.com/v4/spreadsheets/' . self::SHEET_ID
+            . '?fields=sheets.properties(sheetId,title)', $token);
+        $sheetId = null;
+        foreach ((array) ($meta['sheets'] ?? []) as $sheet) {
+            if ((string) ($sheet['properties']['title'] ?? '') === $tab) {
+                $sheetId = (int) $sheet['properties']['sheetId'];
+            }
+        }
+        if ($sheetId === null) {
+            throw new RuntimeException('Aba "' . $tab . '" não encontrada na planilha.');
+        }
+        rsort($indexes);
+        $requests = array_map(static fn(int $index): array => ['deleteDimension' => ['range' => [
+            'sheetId' => $sheetId, 'dimension' => 'ROWS', 'startIndex' => $index, 'endIndex' => $index + 1,
+        ]]], array_values(array_unique($indexes)));
+        self::request('POST', 'https://sheets.googleapis.com/v4/spreadsheets/' . self::SHEET_ID . ':batchUpdate',
+            $token, ['requests' => $requests]);
     }
 
     private static function formatDate(string $value): string
