@@ -501,6 +501,17 @@ try {
                 'approval' => $result['approval'],
             ]]);
 
+        case 'pause_codes_update':
+            tralla_ajax_require(READ);
+            $detail = PluginTrallaCard::updatePauseCodes(
+                tralla_post_int('id'), tralla_post_string('crm_code'),
+                tralla_post_string('external_ticket_code'), $userId
+            );
+            tralla_json(['ok' => true, 'data' => [
+                'card' => $detail,
+                'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id']),
+            ]]);
+
         case 'deleted_cards':            $boards_id = tralla_post_int('boards_id');
             if (!PluginTrallaBoard::canAdminBoard($boards_id)) {
                 throw new RuntimeException('Você não tem acesso aos cards excluídos deste quadro.');

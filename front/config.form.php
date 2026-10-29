@@ -32,6 +32,18 @@ if (isset($_POST['save'])) {
     PluginTrallaConfig::set('pending_hours', (string) max(1, tralla_post_int('pending_hours', 1)));
     PluginTrallaConfig::set('withdrawal_hours', (string) max(1, tralla_post_int('withdrawal_hours', 24)));
     PluginTrallaConfig::set('ticket_sync_enabled', !empty($_POST['ticket_sync_enabled']) ? '1' : '0');
+    $sheetBoardId = max(0, tralla_post_int('sheet_board_id'));
+    if ($sheetBoardId > 0) {
+        $sheetBoard = new PluginTrallaBoard();
+        if (!$sheetBoard->getFromDB($sheetBoardId) || (string) $sheetBoard->fields['type'] !== 'maintenance') {
+            Session::addMessageAfterRedirect('Selecione um quadro de manutenção válido para a planilha.', false, ERROR);
+            Html::back();
+        }
+    }
+    PluginTrallaConfig::set('sheet_sync_enabled', !empty($_POST['sheet_sync_enabled']) ? '1' : '0');
+    PluginTrallaConfig::set('sheet_board_id', (string) $sheetBoardId);
+    PluginTrallaConfig::set('sheet_tab', trim(tralla_post_string('sheet_tab', 'Página1')));
+    PluginTrallaConfig::set('sheet_credentials_path', trim(tralla_post_string('sheet_credentials_path')));
     foreach (array_keys(tralla_priorities()) as $priority) {
         foreach (['tto' => SLM::TTO, 'ttr' => SLM::TTR] as $kind => $type) {
             $slaId = max(0, (int) ($_POST['ticket_sla_' . $kind . '_' . $priority] ?? 0));
@@ -76,6 +88,17 @@ if (isset($_POST['ticket_sync_existing'])) {
     $reconciled = PluginTrallaTicketSync::reconcileLinked();
     Session::addMessageAfterRedirect($synced . ' movimentações sincronizadas; ' . $reconciled
         . ' chamados existentes atualizados. Eventos restantes serão processados pelo cron do GLPI.', true);
+    Html::back();
+}
+
+if (isset($_POST['sheet_sync_now'])) {
+    require_once GLPI_ROOT . '/plugins/tralla/inc/sheet.class.php';
+    try {
+        $count = PluginTrallaSheetSync::sync();
+        Session::addMessageAfterRedirect($count . ' linha(s) atualizada(s) na planilha SEINTEC.', true);
+    } catch (Throwable $e) {
+        Session::addMessageAfterRedirect('Sincronização da planilha falhou: ' . $e->getMessage(), false, ERROR);
+    }
     Html::back();
 }
 
@@ -165,6 +188,11 @@ $config = PluginTrallaConfig::getAll();
 $token = PluginTrallaConfig::assignatureToken();
 $notifications = PluginTrallaConfig::notificationEmails();
 $ticketSlas = ['tto' => [], 'ttr' => []];
+$maintenanceBoards = [];
+foreach ($DB->request(['SELECT' => ['id', 'name'], 'FROM' => 'glpi_plugin_tralla_boards',
+    'WHERE' => ['type' => 'maintenance', 'is_archived' => 0], 'ORDER' => 'name ASC']) as $sheetBoard) {
+    $maintenanceBoards[(int) $sheetBoard['id']] = (string) $sheetBoard['name'];
+}
 foreach ($DB->request(['SELECT' => ['id', 'name', 'type'], 'FROM' => 'glpi_slas', 'ORDER' => 'name ASC']) as $slaRow) {
     $kind = (int) $slaRow['type'] === SLM::TTO ? 'tto' : 'ttr';
     $ticketSlas[$kind][(int) $slaRow['id']] = (string) $slaRow['name'];
@@ -256,6 +284,42 @@ echo "<script>document.title = 'Tralla';</script>";
 
         <section class="tralla-card tralla-config-card">
             <header>
+                <h2><i class="ti ti-table"></i> Planilha SEINTEC</h2>
+                <p>Atualiza a aba do Google Sheets a cada 30 minutos, uma linha por card principal. Cards de aprovação não são exportados.</p>
+            </header>
+            <a href="https://docs.google.com/spreadsheets/d/1FOViixQ3jH2QwTOzzJglUDaWXf1cxfjvxxbvYI7UMMU/edit?gid=0" target="_blank" rel="noopener noreferrer">Abrir planilha SEINTEC</a>
+            <label class="tralla-check"><input type="checkbox" name="sheet_sync_enabled" value="1" <?= ($config['sheet_sync_enabled'] ?? '0') === '1' ? 'checked' : '' ?>> Ativar sincronização</label>
+            <div class="tralla-field">
+                <label for="tralla-sheet-board">Quadro de manutenção</label>
+                <select id="tralla-sheet-board" name="sheet_board_id">
+                    <option value="0">Selecione o quadro...</option>
+                    <?php foreach ($maintenanceBoards as $boardId => $boardName): ?>
+                        <option value="<?= $boardId ?>" <?= (int) ($config['sheet_board_id'] ?? 0) === $boardId ? 'selected' : '' ?>><?= tralla_h($boardName) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="tralla-field">
+                <label for="tralla-sheet-tab">Nome da aba</label>
+                <input id="tralla-sheet-tab" type="text" name="sheet_tab" maxlength="100" value="<?= tralla_h($config['sheet_tab'] ?? 'Página1') ?>">
+            </div>
+            <div class="tralla-field">
+                <label for="tralla-sheet-key">Caminho do JSON da conta de serviço no servidor</label>
+                <input id="tralla-sheet-key" type="text" name="sheet_credentials_path" maxlength="500"
+                       placeholder="/etc/glpi/tralla-google-service-account.json"
+                       value="<?= tralla_h($config['sheet_credentials_path'] ?? '') ?>">
+                <small>Crie uma conta de serviço com a API Google Sheets ativa, compartilhe a planilha com o e-mail dela como Editor e coloque o JSON fora da pasta pública do GLPI, legível pelo www-data.</small>
+            </div>
+            <small>Colunas: Código Card, Data Inclusão (Pegar), Data Finalização (Finalizar), Tipo, Situação, Descrição, Escola e Observação.</small>
+            <?php if ((int) ($config['sheet_last_success'] ?? 0) > 0): ?>
+                <p class="tralla-hint">Última sincronização: <?= tralla_h(date('d/m/Y H:i', (int) $config['sheet_last_success'])) ?></p>
+            <?php endif; ?>
+            <?php if (($config['sheet_last_error'] ?? '') !== ''): ?>
+                <p class="tralla-hint">Último erro: <?= tralla_h($config['sheet_last_error']) ?></p>
+            <?php endif; ?>
+        </section>
+
+        <section class="tralla-card tralla-config-card">
+            <header>
                 <h2><i class="ti ti-mail"></i> Notificações</h2>
                 <p>Lembretes automáticos de cards pendentes e retiradas aguardando confirmação.</p>
             </header>
@@ -291,6 +355,13 @@ echo "<script>document.title = 'Tralla';</script>";
                 <i class="ti ti-device-floppy"></i> Salvar configurações
             </button>
         </footer>
+    </form>
+
+    <form method="post" action="<?= tralla_h($pluginUrl) ?>/front/config.form.php">
+        <?= Html::hidden('_glpi_csrf_token', ['value' => tralla_csrf_token()]) ?>
+        <button type="submit" name="sheet_sync_now" value="1" class="tralla-btn tralla-btn-ghost">
+            <i class="ti ti-refresh"></i> Sincronizar planilha agora
+        </button>
     </form>
 
 <?php $models = PluginTrallaMachineModel::getModels(true); ?>

@@ -43,6 +43,27 @@ sudo -u www-data php bin/console plugin:activate tralla
 
 ## Primeiros passos
 
+### Sincronização com a planilha SEINTEC
+
+Em **Tralla > Configurações > Planilha SEINTEC**, selecione o quadro de manutenção,
+confirme o nome da aba (`Página1`) e ative a sincronização. O cron já existente
+do Tralla verifica a planilha a cada 30 minutos. Cada card principal do quadro
+ocupa uma linha, identificada pelo código visual na coluna A; aprovações não
+geram linhas separadas. As colunas A:H seguem o cabeçalho da planilha.
+
+Para autorizar o servidor:
+
+1. Crie uma conta de serviço em um projeto Google Cloud com a **Google Sheets API** ativa.
+2. Compartilhe a planilha SEINTEC com o e-mail da conta de serviço como **Editor**.
+3. Coloque a chave JSON no servidor, fora de `/var/www/glpi`, com leitura para o
+   usuário do PHP (`www-data`). Exemplo: `/etc/glpi/tralla-google-service-account.json`.
+4. Informe o caminho completo do JSON nas configurações, salve e clique em
+   **Sincronizar planilha agora** para conferir o acesso. Nunca coloque o JSON no Git.
+
+O Tralla atualiza apenas o quadro escolhido. Cards removidos não têm sua linha
+apagada automaticamente da planilha. O último sucesso ou erro aparece nas
+configurações do plugin.
+
 Na página inicial, crie **Grupos** e arraste seus quadros entre eles para organizar os atalhos. Cada usuário tem sua própria organização; mover um quadro nessa página não altera o quadro nem a organização dos demais. Também é possível renomear, excluir e mudar a ordem dos grupos. Ao excluir um grupo, seus quadros voltam para **Sem grupo**.
 
 ### 1. Configurar modelos de máquina

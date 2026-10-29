@@ -102,6 +102,30 @@ class PluginTrallaCard extends CommonDBTM
         }
 
         $cardIds = array_map(static fn(array $row): int => (int) $row['id'], $cards);
+        $codesByCard = [];
+        if ($boardType === 'maintenance') {
+            foreach ($DB->request([
+                'SELECT' => ['parent_cards_id', 'edit_payload'],
+                'FROM' => 'glpi_plugin_tralla_cards',
+                'WHERE' => [
+                    'parent_cards_id' => $cardIds,
+                    'stage' => 2,
+                    'status' => 'approved',
+                    'approval_kind' => ['call_release', 'pause', 'resume'],
+                ],
+                'ORDER' => 'id ASC',
+            ]) as $approvalRow) {
+                $parentId = (int) $approvalRow['parent_cards_id'];
+                $payload = json_decode((string) ($approvalRow['edit_payload'] ?? ''), true);
+                $codesByCard[$parentId] = self::mergePauseCodes($codesByCard[$parentId] ?? [], $payload);
+            }
+            foreach ($cards as $row) {
+                if ((int) $row['stage'] !== 1) { continue; }
+                $cardId = (int) $row['id'];
+                $payload = json_decode((string) ($row['edit_payload'] ?? ''), true);
+                $codesByCard[$cardId] = self::mergePauseCodes($codesByCard[$cardId] ?? [], $payload);
+            }
+        }
         $machineCardIds = $cardIds;
         foreach ($cards as $card) {
             if ((int) $card['stage'] === 2 && (int) $card['parent_cards_id'] > 0) {
@@ -193,6 +217,9 @@ class PluginTrallaCard extends CommonDBTM
             unset($card['whatsapp_transcript']);
             $list = $lists[(int) $card['plugin_tralla_lists_id']] ?? [];
             $card['board_type'] = $boardType;
+            $codeOwner = (int) $card['stage'] === 2 ? (int) $card['parent_cards_id'] : (int) $card['id'];
+            $card['pause_codes'] = $codesByCard[$codeOwner] ?? ['crm_code' => '', 'external_ticket_code' => ''];
+            $card['search_codes'] = implode(' ', array_filter($card['pause_codes']));
             $card['code'] = tralla_display_code($card, $boardType);
             $card['approval_kind_label'] = '';
             $card['pending_approval_kind'] = '';
@@ -246,6 +273,39 @@ class PluginTrallaCard extends CommonDBTM
         unset($card);
 
         return $cards;
+    }
+
+    private static function mergePauseCodes(array $codes, $payload): array
+    {
+        $codes += ['crm_code' => '', 'external_ticket_code' => ''];
+        if (!is_array($payload)) { return $codes; }
+        if (array_key_exists('crm_code', $payload) || array_key_exists('crm', $payload)) {
+            $codes['crm_code'] = (string) ($payload['crm_code'] ?? $payload['crm'] ?? '');
+        }
+        if (array_key_exists('external_ticket_code', $payload)) {
+            $codes['external_ticket_code'] = (string) ($payload['external_ticket_code'] ?? '');
+        }
+        return $codes;
+    }
+
+    private static function codesForCard(int $id, string $parentPayload): array
+    {
+        global $DB;
+        $codes = [];
+        foreach ($DB->request([
+            'SELECT' => ['edit_payload'],
+            'FROM' => 'glpi_plugin_tralla_cards',
+            'WHERE' => [
+                'parent_cards_id' => $id,
+                'stage' => 2,
+                'status' => 'approved',
+                'approval_kind' => ['call_release', 'pause', 'resume'],
+            ],
+            'ORDER' => 'id ASC',
+        ]) as $approval) {
+            $codes = self::mergePauseCodes($codes, json_decode((string) ($approval['edit_payload'] ?? ''), true));
+        }
+        return self::mergePauseCodes($codes, json_decode($parentPayload, true));
     }
 
     /**
@@ -337,6 +397,12 @@ class PluginTrallaCard extends CommonDBTM
         $card['split_from'] = null;
         $rawEditPayload = (string) ($card['edit_payload'] ?? '');
         $card['edit_payload'] = null;
+        $codeOwnerId = (int) $card['stage'] === 2 ? (int) $card['parent_cards_id'] : $id;
+        $codeOwner = $codeOwnerId === $id ? $card : $parentCard;
+        $card['pause_codes'] = $codeOwnerId > 0
+            ? self::codesForCard($codeOwnerId, $codeOwnerId === $id
+                ? $rawEditPayload : (string) ($codeOwner['edit_payload'] ?? ''))
+            : ['crm_code' => '', 'external_ticket_code' => ''];
         $card['edit_changes'] = [];
         $card['split_machine_ids'] = [];
         $card['pause_request_reason'] = '';
@@ -765,6 +831,8 @@ class PluginTrallaCard extends CommonDBTM
             'tablet_edit'      => $canTabletEdit,
             'request_pause'    => $canRequestPause,
             'request_resume'   => $canRequestResume,
+            'edit_pause_codes' => $boardType === 'maintenance' && $stage === 1 && $paused
+                && $isMember && self::userIsApprover($userId, $boardId),
             'edit_card'        => $canEditCard,
             'edit_description' => $canEditDescription,
             'edit_machines'    => $canEditMachines,
@@ -790,7 +858,7 @@ class PluginTrallaCard extends CommonDBTM
         if ($paused) {
             // Pausado: nada além de ver o card e pedir para despausar.
             foreach ($permissions as $name => $allowed) {
-                $permissions[$name] = in_array($name, ['view', 'request_resume'], true) ? $allowed : false;
+                $permissions[$name] = in_array($name, ['view', 'request_resume', 'edit_pause_codes'], true) ? $allowed : false;
             }
         }
 
@@ -2630,6 +2698,14 @@ class PluginTrallaCard extends CommonDBTM
 
             $now = tralla_now();
             $reason = trim(strip_tags($reason));
+            if ($approve) {
+                $parentPayload = json_decode((string) ($parent['edit_payload'] ?? ''), true);
+                $parentPayload = is_array($parentPayload) ? $parentPayload : [];
+                $parentPayload['crm_code'] = $crm;
+                $DB->update('glpi_plugin_tralla_cards', [
+                    'edit_payload' => json_encode($parentPayload, JSON_UNESCAPED_UNICODE),
+                ], ['id' => $parentId]);
+            }
             $DB->update('glpi_plugin_tralla_cards', [
                 'approval_cards_id' => 0,
                 'is_locked' => $approve ? 0 : 1,
@@ -2782,6 +2858,55 @@ class PluginTrallaCard extends CommonDBTM
         }
 
         return self::getCardDetail($parentId, $userId);
+    }
+
+    /** Permite ao aprovador corrigir os identificadores de um card já pausado. */
+    public static function updatePauseCodes(int $id, string $crmCode, string $externalCode, int $userId = 0): array
+    {
+        global $DB;
+        $userId = $userId > 0 ? $userId : (int) Session::getLoginUserID();
+        $crmCode = trim($crmCode);
+        $externalCode = trim($externalCode);
+        foreach ([$crmCode, $externalCode] as $value) {
+            if ($value !== '' && (mb_strlen($value) > 100
+                || !preg_match('/^[\p{L}\p{N}][\p{L}\p{N} ._\/-]*$/u', $value))) {
+                throw new RuntimeException('Informe códigos válidos com letras e números (até 100 caracteres).');
+            }
+        }
+        $card = self::getCard($id);
+        if ($card === null) { throw new RuntimeException('Card não encontrado.'); }
+        self::assertBoardAccess($card);
+        $boardId = (int) $card['plugin_tralla_boards_id'];
+        if (self::getBoardType($boardId) !== 'maintenance' || (int) $card['stage'] !== 1
+            || empty($card['is_paused']) || !empty($card['is_archived']) || !empty($card['is_deleted'])
+            || !self::userIsApprover($userId, $boardId)) {
+            throw new RuntimeException('Somente aprovadores podem editar códigos de cards pausados.');
+        }
+        $DB->beginTransaction();
+        try {
+            self::lockCardRow($id);
+            $card = self::getCard($id);
+            if ($card === null || empty($card['is_paused']) || !empty($card['is_archived'])
+                || !empty($card['is_deleted'])) {
+                throw new RuntimeException('O card não está mais pausado.');
+            }
+            $payload = json_decode((string) ($card['edit_payload'] ?? ''), true);
+            $payload = is_array($payload) ? $payload : [];
+            $payload['crm_code'] = $crmCode;
+            $payload['external_ticket_code'] = $externalCode;
+            $DB->update('glpi_plugin_tralla_cards', [
+                'edit_payload' => json_encode($payload, JSON_UNESCAPED_UNICODE),
+                'date_mod' => tralla_now(),
+            ], ['id' => $id]);
+            PluginTrallaHistory::log($id, $userId, 'pause_codes_updated',
+                'Códigos atualizados. CRM: ' . ($crmCode ?: 'não informado')
+                . '; Chamado Externo: ' . ($externalCode ?: 'não informado') . '.');
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
+        }
+        return self::getCardDetail($id, $userId);
     }
 
     /**
@@ -2987,6 +3112,14 @@ class PluginTrallaCard extends CommonDBTM
                 $fields['rank'] = self::nextRankForList((int) $previousList['id']);
             }
             $DB->update('glpi_plugin_tralla_cards', $fields, ['id' => $parentId]);
+            if ($approve) {
+                $parentPayload = json_decode((string) ($parent['edit_payload'] ?? ''), true);
+                $parentPayload = is_array($parentPayload) ? $parentPayload : [];
+                $parentPayload[$kind === 'pause' ? 'external_ticket_code' : 'crm_code'] = $code;
+                $DB->update('glpi_plugin_tralla_cards', [
+                    'edit_payload' => json_encode($parentPayload, JSON_UNESCAPED_UNICODE),
+                ], ['id' => $parentId]);
+            }
             $DB->update('glpi_plugin_tralla_cards', [
                 'status'            => $approve ? 'approved' : 'rejected',
                 'is_archived'       => 1,

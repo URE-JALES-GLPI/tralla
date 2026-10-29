@@ -1074,6 +1074,7 @@
         var parts = [
             card.name,
             card.technician_name,
+            card.search_codes,
             code,
             code.replace(/^#/, '')
         ];
@@ -1614,6 +1615,26 @@
             + (card.pause_reason ? '<small>Motivo: ' + esc(card.pause_reason) + '</small>' : '')
             + '<small>Ações, lembretes e prazos de SLA estão suspensos. Para voltar, use Despausar; o pedido passa por aprovação.</small>'
             + '</div></div>';
+    }
+
+    function renderPausedCodes(card) {
+        if (!Number(card.is_paused) || Number(card.stage) !== 1) { return ''; }
+        var codes = card.pause_codes || {};
+        var editable = !!(card.permissions || {}).edit_pause_codes;
+        return '<section class="tralla-detail-section">'
+            + '<h3><i class="ti ti-ticket"></i> Códigos da pausa</h3>'
+            + (editable
+                ? '<div class="tralla-form-grid">'
+                    + '<div class="tralla-field"><label for="tralla-pause-crm">Código CRM</label>'
+                    + '<input id="tralla-pause-crm" type="text" maxlength="100" value="' + attr(codes.crm_code || '') + '"></div>'
+                    + '<div class="tralla-field"><label for="tralla-pause-external">Chamado Externo</label>'
+                    + '<input id="tralla-pause-external" type="text" maxlength="100" value="' + attr(codes.external_ticket_code || '') + '"></div>'
+                    + '</div><div class="tralla-detail-edit-actions">'
+                    + '<button type="button" class="tralla-btn tralla-btn-primary" data-save-pause-codes>'
+                    + '<i class="ti ti-device-floppy"></i> Salvar códigos</button></div>'
+                : '<div class="tralla-detail-description">CRM: ' + esc(codes.crm_code || 'Não informado')
+                    + '<br>Chamado Externo: ' + esc(codes.external_ticket_code || 'Não informado') + '</div>')
+            + '</section>';
     }
 
     function renderSplitSnapshotNotice(card) {
@@ -2661,7 +2682,7 @@
                 + '</section>';
         }
 
-        body = renderSplitSnapshotNotice(card) + renderPausedNotice(card) + body;
+        body = renderSplitSnapshotNotice(card) + renderPausedNotice(card) + renderPausedCodes(card) + body;
         body += renderPendingApproval(card);
         body += renderFamily(card);
         body += renderApproval(card);
@@ -2879,6 +2900,27 @@
             toast('Descrição atualizada.', 'success');
             await openCard(activeCard.id);
             shouldRefreshBoard = false;
+        } catch (error) {
+            toast(error.message, 'error');
+            setBusy(button, false);
+        }
+    }
+
+    async function savePauseCodes(button) {
+        if (!activeCard) { return; }
+        var crm = modalRoot.querySelector('#tralla-pause-crm');
+        var external = modalRoot.querySelector('#tralla-pause-external');
+        if (!crm || !external) { return; }
+        setBusy(button, true);
+        try {
+            var data = await api('pause_codes_update', {
+                id: activeCard.id,
+                crm_code: crm.value.trim(),
+                external_ticket_code: external.value.trim()
+            });
+            applyState(data);
+            toast('Códigos da pausa salvos.', 'success');
+            await openCard(data.card.id);
         } catch (error) {
             toast(error.message, 'error');
             setBusy(button, false);
@@ -5328,6 +5370,11 @@
         var saveDescriptionButton = event.target.closest('[data-save-description]');
         if (saveDescriptionButton) {
             saveDescription(saveDescriptionButton);
+            return;
+        }
+        var savePauseCodesButton = event.target.closest('[data-save-pause-codes]');
+        if (savePauseCodesButton) {
+            savePauseCodes(savePauseCodesButton);
             return;
         }
         var saveCallButton = event.target.closest('[data-save-call-report]');

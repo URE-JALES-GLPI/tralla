@@ -25,6 +25,13 @@ class PluginTrallaConfig
             'assignature_id_offset' => '0',
             'ticket_sync_enabled' => '1',
             'ticket_sync_start_history_id' => '0',
+            'sheet_sync_enabled' => '0',
+            'sheet_board_id' => '0',
+            'sheet_tab' => 'Página1',
+            'sheet_credentials_path' => '',
+            'sheet_last_attempt' => '0',
+            'sheet_last_success' => '0',
+            'sheet_last_error' => '',
         ];
     }
 

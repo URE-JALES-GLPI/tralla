@@ -560,6 +560,7 @@ class PluginTrallaHistory extends CommonDBTM
             'edit_requested'        => 'Edição solicitada',
             'pause_requested'       => 'Pausa solicitada',
             'pause_approved'        => 'Card pausado',
+            'pause_codes_updated'   => 'Códigos da pausa atualizados',
             'pause_rejected'        => 'Pausa recusada',
             'resume_requested'      => 'Despausa solicitada',
             'resume_approved'       => 'Card despausado',
