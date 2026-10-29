@@ -902,8 +902,10 @@ if (!function_exists('tralla_history_change')) {
     function tralla_history_change(string $field, string $old, string $new): string
     {
         $quote = static fn (string $text): string => trim($text) === '' ? '(vazio)' : '"' . trim($text) . '"';
+        // Concordância: "Descrição alterada", "Relatório alterado".
+        $verb = in_array($field, ['Descrição'], true) ? ' alterada de ' : ' alterado de ';
 
-        return $field . ' alterado de ' . $quote($old) . ' para ' . $quote($new) . '.';
+        return $field . $verb . $quote($old) . ' para ' . $quote($new) . '.';
     }
 }
 
