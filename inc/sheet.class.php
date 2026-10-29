@@ -149,7 +149,7 @@ class PluginTrallaSheetSync
     private static function formatDate(string $value): string
     {
         $time = $value !== '' ? strtotime($value) : false;
-        return $time === false ? '' : date('d/m/Y H:i', $time);
+        return $time === false ? '' : date('d/m/Y', $time);
     }
 
     private static function accessToken(array $credentials): string
