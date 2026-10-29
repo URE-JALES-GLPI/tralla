@@ -116,7 +116,10 @@ class PluginTrallaCron extends CommonDBTM
     }
 
     /** Resultado dos envios da execução atual (usado pelo "Forçar notificações"). */
-    private static array $delivery = ['email_queued' => 0, 'email_failed' => 0, 'whatsapp_sent' => 0, 'whatsapp_failed' => 0];
+    private static array $delivery = [
+        'email_queued' => 0, 'email_failed' => 0, 'email_missing' => 0,
+        'whatsapp_sent' => 0, 'whatsapp_failed' => 0, 'whatsapp_missing' => 0,
+    ];
 
     /**
      * "Forçar notificações" do quadro: envia agora, sem esperar o intervalo, o lembrete
@@ -301,6 +304,9 @@ class PluginTrallaCron extends CommonDBTM
         $cardId = (int) $card['id'];
         $link = rtrim((string) ($CFG_GLPI['url_base'] ?? ''), '/') . '/plugins/tralla/front/kanban.php?boards_id='
             . (int) $card['plugin_tralla_boards_id'];
+        // Um número ou e-mail cadastrado em mais de um usuário recebe o aviso uma vez só.
+        $sentNumbers = [];
+        $sentEmails = [];
         foreach (array_unique(array_filter(array_map('intval', $userIds))) as $userId) {
             $user = $DB->request([
                 'SELECT' => ['mobile', 'phone'],
@@ -319,18 +325,29 @@ class PluginTrallaCron extends CommonDBTM
                     'ORDER'  => 'is_default DESC',
                     'LIMIT'  => 1,
                 ])->current();
-                $address = is_array($email) ? (string) $email['email'] : '';
-                $html = '<p>' . nl2br(tralla_h($text)) . '</p><p><a href="' . tralla_h($link) . '">Abrir o quadro no Tralla</a></p>';
-                $sent = $address !== '' && tralla_queue_email($address, '[URE] Tralla — ' . $subject, $html,
-                    (int) ($card['board_entities_id'] ?? 0), $cardId);
-                self::logNotification($cardId, $type, 'email', $address, $sent ? 'queued' : 'failed', $text);
-                self::$delivery[$sent ? 'email_queued' : 'email_failed']++;
+                $address = strtolower(trim(is_array($email) ? (string) $email['email'] : ''));
+                if ($address === '') {
+                    self::$delivery['email_missing']++;
+                } elseif (!isset($sentEmails[$address])) {
+                    $sentEmails[$address] = true;
+                    $html = '<p>' . nl2br(tralla_h($text)) . '</p><p><a href="' . tralla_h($link) . '">Abrir o quadro no Tralla</a></p>';
+                    $sent = tralla_queue_email($address, '[URE] Tralla — ' . $subject, $html,
+                        (int) ($card['board_entities_id'] ?? 0), $cardId);
+                    self::logNotification($cardId, $type, 'email', $address, $sent ? 'queued' : 'failed', $text);
+                    self::$delivery[$sent ? 'email_queued' : 'email_failed']++;
+                }
             }
             if (!empty($card['board_notify_whatsapp'])) {
                 $phone = trim((string) ($user['mobile'] ?: $user['phone']));
-                $sent = $phone !== '' && tralla_whatsapp_send($phone, $text);
-                self::logNotification($cardId, $type, 'whatsapp', $phone, $sent ? 'sent' : 'failed', $text);
-                self::$delivery[$sent ? 'whatsapp_sent' : 'whatsapp_failed']++;
+                $number = tralla_whatsapp_number($phone);
+                if ($number === '') {
+                    self::$delivery['whatsapp_missing']++;
+                } elseif (!isset($sentNumbers[$number])) {
+                    $sentNumbers[$number] = true;
+                    $sent = tralla_whatsapp_send($phone, $text);
+                    self::logNotification($cardId, $type, 'whatsapp', $phone, $sent ? 'sent' : 'failed', $text);
+                    self::$delivery[$sent ? 'whatsapp_sent' : 'whatsapp_failed']++;
+                }
             }
         }
     }

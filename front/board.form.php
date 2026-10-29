@@ -103,10 +103,17 @@ if (isset($_POST['notify_force'])) {
             );
         } else {
             $failed = $result['email_failed'] + $result['whatsapp_failed'];
+            $channel = static function (string $name, int $ok, string $okLabel, int $failedCount, int $missing): string {
+                return $name . ': ' . $ok . ' ' . $okLabel
+                    . ($failedCount > 0 ? ', ' . $failedCount . ' com falha' : '')
+                    . ($missing > 0 ? ', ' . $missing . ' sem cadastro' : '');
+            };
             Session::addMessageAfterRedirect(
-                'Notificações forçadas: ' . $result['pending'] . ' card(s) no Pendente e ' . $result['sla']
-                . ' aviso(s) de SLA. WhatsApp: ' . $result['whatsapp_sent'] . ' enviada(s), ' . $result['whatsapp_failed']
-                . ' com falha. Email: ' . $result['email_queued'] . ' na fila do GLPI, ' . $result['email_failed'] . ' com falha.',
+                'Notificações forçadas: ' . $result['pending'] . ' card(s) no Pendente e ' . $result['sla'] . ' aviso(s) de SLA. '
+                . (!empty($board->fields['notify_whatsapp'])
+                    ? $channel('WhatsApp', $result['whatsapp_sent'], 'enviada(s)', $result['whatsapp_failed'], $result['whatsapp_missing']) . '. ' : '')
+                . (!empty($board->fields['notify_email'])
+                    ? $channel('Email', $result['email_queued'], 'na fila do GLPI', $result['email_failed'], $result['email_missing']) . '.' : ''),
                 $failed === 0,
                 $failed === 0 ? INFO : WARNING
             );
