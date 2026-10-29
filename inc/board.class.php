@@ -85,6 +85,7 @@ class PluginTrallaBoard extends CommonDBTM
                 ['name' => 'Manutenção Aprovação', 'category' => 'maintenance_approval', 'color' => tralla_category_color('maintenance_approval')],
                 ['name' => 'Manutenção Pendente', 'category' => 'maintenance_pending', 'color' => tralla_category_color('maintenance_pending')],
                 ['name' => 'Manutenção Em Andamento', 'category' => 'maintenance_in_progress', 'color' => tralla_category_color('maintenance_in_progress')],
+                ['name' => 'Manutenção Pausados', 'category' => 'maintenance_paused', 'color' => tralla_category_color('maintenance_paused')],
                 ['name' => 'Manutenção Retirada', 'category' => 'maintenance_withdrawal', 'color' => tralla_category_color('maintenance_withdrawal')],
                 ['name' => 'Manutenção Concluído', 'category' => 'maintenance_done', 'color' => tralla_category_color('maintenance_done')],
             ];
@@ -367,6 +368,56 @@ class PluginTrallaBoard extends CommonDBTM
         ])->current();
 
         return is_array($row) ? $row : null;
+    }
+
+    /** Acrescenta a lista de pausados aos quadros criados antes deste fluxo. */
+    public static function ensurePausedList(int $boardId): ?array
+    {
+        global $DB;
+
+        $existing = self::findListByCategory($boardId, 'maintenance_paused');
+        if ($existing !== null) {
+            return $existing;
+        }
+        $board = new self();
+        if (!$board->getFromDB($boardId) || (string) $board->fields['type'] !== 'maintenance') {
+            return null;
+        }
+        $inProgress = self::findListByCategory($boardId, 'maintenance_in_progress');
+        $withdrawal = self::findListByCategory($boardId, 'maintenance_withdrawal');
+        $rank = $inProgress !== null ? (float) $inProgress['rank'] + 500.0 : 3500.0;
+        if ($withdrawal !== null && (float) $withdrawal['rank'] > (float) ($inProgress['rank'] ?? 0)) {
+            $rank = $inProgress !== null
+                ? ((float) $inProgress['rank'] + (float) $withdrawal['rank']) / 2
+                : (float) $withdrawal['rank'] - 500.0;
+        }
+        $now = tralla_now();
+        $DB->insert('glpi_plugin_tralla_lists', [
+            'plugin_tralla_boards_id' => $boardId,
+            'name' => 'Manutenção Pausados',
+            'rank' => $rank,
+            'category' => 'maintenance_paused',
+            'color' => tralla_category_color('maintenance_paused'),
+            'is_archived' => 0,
+            'users_id' => (int) ($board->fields['users_id'] ?? 0),
+            'date_creation' => $now,
+            'date_mod' => $now,
+        ]);
+        $pausedList = self::findListByCategory($boardId, 'maintenance_paused');
+        if ($pausedList !== null) {
+            // Cards pausados antes da criação desta lista passam a aparecer nela.
+            $DB->update('glpi_plugin_tralla_cards', [
+                'plugin_tralla_lists_id' => (int) $pausedList['id'],
+                'date_mod' => $now,
+            ], [
+                'plugin_tralla_boards_id' => $boardId,
+                'stage' => 1,
+                'is_paused' => 1,
+                'is_archived' => 0,
+                'is_deleted' => 0,
+            ]);
+        }
+        return $pausedList;
     }
 
     public static function getStats(int $boards_id): array

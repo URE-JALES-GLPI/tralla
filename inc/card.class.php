@@ -211,6 +211,9 @@ class PluginTrallaCard extends CommonDBTM
                     $card['status_label'] = 'Pausado';
                 }
                 $card['pending_approval_kind'] = $pendingApprovalKinds[(int) $card['id']] ?? '';
+                if ($card['pending_approval_kind'] === 'pause') {
+                    $card['status_label'] = 'Pausa em aprovação';
+                }
             }
             $card['source_label'] = tralla_source_label((string) $card['source']);
             $card['sla'] = $boardType === 'maintenance' ? tralla_card_sla($card) : null;
@@ -416,6 +419,9 @@ class PluginTrallaCard extends CommonDBTM
             if ($pendingApproval !== null && empty($pendingApproval['is_archived'])) {
                 $card['pending_approval_kind'] = (string) ($pendingApproval['approval_kind'] ?? 'maintenance');
                 $card['pending_approval_id'] = (int) $pendingApproval['id'];
+                if ($card['pending_approval_kind'] === 'pause') {
+                    $card['status_label'] = 'Pausa em aprovação';
+                }
             }
         }
 
@@ -2411,7 +2417,7 @@ class PluginTrallaCard extends CommonDBTM
         ];
     }
 
-    public static function decide(int $approvalId, bool $approve, string $reason = '', int $userId = 0, bool $isAdmin = false, string $priority = ''): array
+    public static function decide(int $approvalId, bool $approve, string $reason = '', int $userId = 0, bool $isAdmin = false, string $priority = '', string $code = ''): array
     {
         global $DB;
 
@@ -2434,10 +2440,10 @@ class PluginTrallaCard extends CommonDBTM
             return self::decideSplit($approvalId, $approve, $reason, $userId, $isAdmin);
         }
         if ($kind === 'call_release') {
-            return self::decideCallRelease($approvalId, $approve, $reason, $userId, $priority);
+            return self::decideCallRelease($approvalId, $approve, $reason, $userId, $priority, $code);
         }
         if ($kind === 'pause' || $kind === 'resume') {
-            return self::decidePauseChange($approvalId, $approve, $reason, $userId);
+            return self::decidePauseChange($approvalId, $approve, $reason, $userId, $code);
         }
         if (!tralla_can_transition($approval, $approve ? 'approve' : 'reject', 'maintenance')) {
             throw new RuntimeException('Este card não está aguardando aprovação.');
@@ -2572,12 +2578,16 @@ class PluginTrallaCard extends CommonDBTM
         return $detail;
     }
 
-    private static function decideCallRelease(int $approvalId, bool $approve, string $reason, int $userId, string $priority = ''): array
+    private static function decideCallRelease(int $approvalId, bool $approve, string $reason, int $userId, string $priority = '', string $crm = ''): array
     {
         global $DB;
         $priority = strtoupper(trim($priority));
         if ($approve && !tralla_valid_priority($priority)) {
             throw new RuntimeException('Escolha a prioridade (P1 a P4) para liberar o card.');
+        }
+        $crm = trim(strip_tags($crm));
+        if ($approve && ($crm === '' || mb_strlen($crm) > 255)) {
+            throw new RuntimeException('Informe o CRM (até 255 caracteres) para liberar o card.');
         }
         $approval = self::getCard($approvalId);
         if ($approval === null || (int) $approval['stage'] !== 2
@@ -2633,13 +2643,14 @@ class PluginTrallaCard extends CommonDBTM
             $DB->update('glpi_plugin_tralla_cards', [
                 'status' => $approve ? 'approved' : 'rejected',
                 'is_archived' => 1,
+                'edit_payload' => $approve ? json_encode(['crm' => $crm], JSON_UNESCAPED_UNICODE) : ($approval['edit_payload'] ?? null),
                 'users_id_approver' => $userId,
                 'rejection_reason' => !$approve && $reason !== '' ? $reason : null,
                 'date_mod' => $now,
             ], ['id' => $approvalId]);
             $what = (string) ($parent['workflow_type'] ?? '') === 'call' ? 'Chamado' : 'Card';
             $message = $approve
-                ? $what . ' liberado com prioridade ' . (tralla_priorities()[$priority]['label'] ?? $priority) . '; já pode ser assumido por um técnico.'
+                ? $what . ' liberado com prioridade ' . (tralla_priorities()[$priority]['label'] ?? $priority) . '. CRM: ' . $crm . '; já pode ser assumido por um técnico.'
                 : 'Liberação recusada.' . ($reason !== '' ? ' Motivo: ' . $reason : '');
             PluginTrallaHistory::log($parentId, $userId, $approve ? 'call_released' : 'call_release_rejected', $message);
             PluginTrallaHistory::log($approvalId, $userId, $approve ? 'approval_approved' : 'approval_rejected', $message);
@@ -2775,7 +2786,8 @@ class PluginTrallaCard extends CommonDBTM
 
     /**
      * Pede para pausar ($kind = 'pause') ou despausar ($kind = 'resume') o card.
-     * Cria um card de aprovação; nada muda no card até a decisão.
+     * Cria um card de aprovação. O pedido de pausa já coloca o card na lista de pausados;
+     * a suspensão efetiva dos prazos acontece somente depois da aprovação.
      */
     public static function requestPauseChange(int $id, string $kind, string $reason, int $userId = 0): array
     {
@@ -2803,6 +2815,10 @@ class PluginTrallaCard extends CommonDBTM
         $boards_id = (int) $card['plugin_tralla_boards_id'];
         $boardType = self::getBoardType($boards_id);
         $permission = $kind === 'pause' ? 'request_pause' : 'request_resume';
+        $pausedList = $kind === 'pause' ? PluginTrallaBoard::ensurePausedList($boards_id) : null;
+        if ($kind === 'pause' && $pausedList === null) {
+            throw new RuntimeException('O quadro não possui a lista Manutenção Pausados.');
+        }
 
         $approvalId = 0;
         $DB->beginTransaction();
@@ -2843,7 +2859,12 @@ class PluginTrallaCard extends CommonDBTM
                 'split_from_cards_id'     => 0,
                 'approval_kind'           => $kind,
                 'workflow_type'           => (string) ($fresh['workflow_type'] ?? 'maintenance'),
-                'edit_payload'            => json_encode(['reason' => $reason], JSON_UNESCAPED_UNICODE),
+                'edit_payload'            => json_encode([
+                    'reason' => $reason,
+                    'previous_list_id' => (int) $fresh['plugin_tralla_lists_id'],
+                    'previous_status' => (string) $fresh['status'],
+                    'technician_id' => (int) $fresh['technician_id'],
+                ], JSON_UNESCAPED_UNICODE),
                 'status'                  => 'waiting_approval',
                 'is_locked'               => 0,
                 'is_archived'             => 0,
@@ -2853,10 +2874,15 @@ class PluginTrallaCard extends CommonDBTM
                 'date_mod'                => $now,
             ]);
             $approvalId = (int) $DB->insertId();
-            $DB->update('glpi_plugin_tralla_cards', [
+            $parentUpdate = [
                 'approval_cards_id' => $approvalId,
                 'date_mod'          => $now,
-            ], ['id' => $id]);
+            ];
+            if ($kind === 'pause') {
+                $parentUpdate['plugin_tralla_lists_id'] = (int) $pausedList['id'];
+                $parentUpdate['rank'] = self::nextRankForList((int) $pausedList['id']);
+            }
+            $DB->update('glpi_plugin_tralla_cards', $parentUpdate, ['id' => $id]);
 
             $what = $kind === 'pause' ? 'Pausa' : 'Despausa';
             PluginTrallaHistory::log($id, $userId, $kind . '_requested',
@@ -2874,7 +2900,7 @@ class PluginTrallaCard extends CommonDBTM
         ];
     }
 
-    private static function decidePauseChange(int $approvalId, bool $approve, string $reason, int $userId): array
+    private static function decidePauseChange(int $approvalId, bool $approve, string $reason, int $userId, string $code = ''): array
     {
         global $DB;
 
@@ -2895,6 +2921,17 @@ class PluginTrallaCard extends CommonDBTM
             throw new RuntimeException('Sem permissão para aprovar ou recusar.');
         }
         $reason = trim(strip_tags($reason));
+        $code = trim($code);
+        if ($approve && (mb_strlen($code) > 100 || !preg_match('/^[\p{L}\p{N}][\p{L}\p{N} ._\/-]*$/u', $code))) {
+            throw new RuntimeException($kind === 'pause'
+                ? 'Informe um Chamado Externo válido (letras e números, até 100 caracteres).'
+                : 'Informe um Código CRM válido (letras e números, até 100 caracteres).');
+        }
+        $pausedList = PluginTrallaBoard::ensurePausedList($boardId);
+        $pendingList = PluginTrallaBoard::findListByCategory($boardId, 'maintenance_pending');
+        if ($approve && ($kind === 'pause' ? $pausedList === null : $pendingList === null)) {
+            throw new RuntimeException('Lista de destino não encontrada no quadro.');
+        }
 
         $DB->beginTransaction();
         try {
@@ -2910,25 +2947,52 @@ class PluginTrallaCard extends CommonDBTM
 
             $now = tralla_now();
             $payload = json_decode((string) ($approval['edit_payload'] ?? ''), true);
-            $requestReason = is_array($payload) ? (string) ($payload['reason'] ?? '') : '';
+            $payload = is_array($payload) ? $payload : [];
+            $requestReason = (string) ($payload['reason'] ?? '');
             $fields = ['approval_cards_id' => 0, 'date_mod' => $now];
             if ($approve && $kind === 'pause') {
-                $fields += ['is_paused' => 1, 'paused_at' => $now, 'pause_reason' => $requestReason];
+                $fields += [
+                    'is_paused' => 1,
+                    'paused_at' => $now,
+                    'pause_reason' => $requestReason,
+                    'plugin_tralla_lists_id' => (int) $pausedList['id'],
+                    'rank' => self::nextRankForList((int) $pausedList['id']),
+                ];
             } elseif ($approve) {
                 $pausedFor = max(0, time() - (int) strtotime((string) $parent['paused_at']));
                 $fields += [
                     'is_paused'           => 0,
                     'paused_at'           => null,
-                    'paused_seconds'      => (int) $parent['paused_seconds'] + $pausedFor,
-                    // Lembretes e avisos de SLA recomeçam a partir da volta.
+                    'paused_seconds'      => 0,
+                    'status'              => 'pending',
+                    'technician_id'       => 0,
+                    'date_taken'          => null,
+                    'date_sla_start'      => $now,
+                    'plugin_tralla_lists_id' => (int) $pendingList['id'],
+                    'rank'                => self::nextRankForList((int) $pendingList['id']),
                     'pending_reminded_at' => $now,
                     'sla_alerts_sent'     => '',
                 ];
+            } elseif ($kind === 'pause') {
+                $previousId = (int) ($payload['previous_list_id'] ?? 0);
+                $previousList = $previousId > 0 ? PluginTrallaList::getList($previousId) : null;
+                if ($previousList === null || (int) $previousList['plugin_tralla_boards_id'] !== $boardId
+                    || !empty($previousList['is_archived'])) {
+                    $previousList = $pendingList;
+                }
+                if ($previousList === null) {
+                    throw new RuntimeException('Lista original do card não encontrada.');
+                }
+                $fields['plugin_tralla_lists_id'] = (int) $previousList['id'];
+                $fields['rank'] = self::nextRankForList((int) $previousList['id']);
             }
             $DB->update('glpi_plugin_tralla_cards', $fields, ['id' => $parentId]);
             $DB->update('glpi_plugin_tralla_cards', [
                 'status'            => $approve ? 'approved' : 'rejected',
                 'is_archived'       => 1,
+                'edit_payload'      => $approve ? json_encode($payload + [
+                    $kind === 'pause' ? 'external_ticket_code' : 'crm_code' => $code,
+                ], JSON_UNESCAPED_UNICODE) : ($approval['edit_payload'] ?? null),
                 'users_id_approver' => $userId,
                 'rejection_reason'  => !$approve && $reason !== '' ? $reason : null,
                 'date_mod'          => $now,
@@ -2936,11 +3000,11 @@ class PluginTrallaCard extends CommonDBTM
 
             if ($kind === 'pause') {
                 $message = $approve
-                    ? 'Card pausado; prazos de SLA, lembretes e ações suspensos.' . ($requestReason !== '' ? ' Motivo: ' . $requestReason : '')
+                    ? 'Card pausado. Chamado Externo: ' . $code . '; prazos de SLA, lembretes e ações suspensos.' . ($requestReason !== '' ? ' Motivo: ' . $requestReason : '')
                     : 'Pausa recusada.' . ($reason !== '' ? ' Motivo: ' . $reason : '');
             } else {
                 $message = $approve
-                    ? 'Card despausado após ' . tralla_duration_label((int) ($pausedFor ?? 0)) . ' pausado; os prazos de SLA foram estendidos nesse tempo.'
+                    ? 'Card despausado após ' . tralla_duration_label((int) ($pausedFor ?? 0)) . ' pausado. Código CRM: ' . $code . '. Card devolvido a Pendente sem técnico; novo ciclo de SLA iniciado.'
                     : 'Despausa recusada; o card continua pausado.' . ($reason !== '' ? ' Motivo: ' . $reason : '');
             }
             PluginTrallaHistory::log($parentId, $userId, $kind . ($approve ? '_approved' : '_rejected'), $message);

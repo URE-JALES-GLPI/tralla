@@ -162,6 +162,27 @@ class PluginTrallaTicketSync
 
         self::linkUser($ticketId, (int) ($primary['users_id'] ?? 0), CommonITILActor::REQUESTER);
         self::linkUser($ticketId, (int) ($primary['technician_id'] ?? 0), CommonITILActor::ASSIGN);
+        if ((string) $event['action'] === 'resume_approved' && (int) $primary['technician_id'] === 0) {
+            $formerApproval = $DB->request([
+                'SELECT' => ['edit_payload'],
+                'FROM' => 'glpi_plugin_tralla_cards',
+                'WHERE' => ['parent_cards_id' => (int) $primary['id'], 'approval_kind' => 'resume', 'status' => 'approved'],
+                'ORDER' => 'id DESC',
+                'LIMIT' => 1,
+            ])->current();
+            $formerPayload = is_array($formerApproval)
+                ? json_decode((string) ($formerApproval['edit_payload'] ?? ''), true) : null;
+            $formerId = is_array($formerPayload) ? (int) ($formerPayload['technician_id'] ?? 0) : 0;
+            if ($formerId > 0) {
+                foreach ($DB->request([
+                    'SELECT' => ['id'], 'FROM' => 'glpi_tickets_users',
+                    'WHERE' => ['tickets_id' => $ticketId, 'users_id' => $formerId, 'type' => CommonITILActor::ASSIGN],
+                ]) as $actorRow) {
+                    $actor = new Ticket_User();
+                    $actor->delete(['id' => (int) $actorRow['id']]);
+                }
+            }
+        }
 
         $code = tralla_display_code($card, 'maintenance');
         $label = PluginTrallaHistory::getActionLabel((string) $event['action']);
@@ -257,6 +278,11 @@ class PluginTrallaTicketSync
                 if ((int) ($ticket->fields['takeintoaccount_delay_stat'] ?? 0) !== $elapsed) {
                     $changes['takeintoaccount_delay_stat'] = $elapsed;
                 }
+            } elseif ((string) ($primary['status'] ?? '') === 'pending'
+                && (int) ($primary['technician_id'] ?? 0) === 0
+                && (string) ($ticket->fields['takeintoaccountdate'] ?? '') !== '') {
+                $changes['takeintoaccountdate'] = null;
+                $changes['takeintoaccount_delay_stat'] = 0;
             }
             if (in_array((string) ($primary['status'] ?? ''), ['approved', 'withdrawal', 'done'], true)) {
                 $solvedAt = trim((string) ($primary['date_approved'] ?? ''));

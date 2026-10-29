@@ -597,6 +597,7 @@
         '': '#97a0af',
         maintenance_pending: '#ff9f1a',
         maintenance_in_progress: '#0079bf',
+        maintenance_paused: '#64748b',
         maintenance_approval: '#c377e0',
         maintenance_withdrawal: '#f2d600',
         maintenance_done: '#61bd4f',
@@ -608,6 +609,7 @@
 
     var addCardBlockedCategories = {
         maintenance_in_progress: true,
+        maintenance_paused: true,
         maintenance_approval: true,
         maintenance_withdrawal: true,
         maintenance_done: true,
@@ -1778,6 +1780,9 @@
                         + ' · Definitiva: ' + esc(item.definitive) + '</small></span></label>';
                 }).join('')
                 + '</div>'
+                + '<label class="tralla-field" style="display:block;margin:16px 0 0">'
+                + '<span>CRM <strong aria-hidden="true">*</strong></span>'
+                + '<input type="text" data-approval-code maxlength="255" required placeholder="Informe o CRM para liberar"></label>'
                 + '<div class="tralla-dialog-actions">'
                 + '<button type="button" class="tralla-btn tralla-btn-ghost" data-dialog-cancel>Cancelar</button>'
                 + '<button type="button" class="tralla-btn tralla-btn-primary" data-dialog-confirm disabled>'
@@ -1786,6 +1791,7 @@
             document.body.appendChild(layer);
             document.body.classList.add('tralla-dialog-open');
             var confirmEl = layer.querySelector('[data-dialog-confirm]');
+            var crmEl = layer.querySelector('[data-approval-code]');
             var finished = false;
             function selected() {
                 var checked = layer.querySelector('input[type="radio"]:checked');
@@ -1803,14 +1809,16 @@
                 resolve(value);
             }
             function onKeydown(event) {
-                if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); finish(''); }
+                if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); finish(null); }
             }
+            function ready() { confirmEl.disabled = !selected() || !crmEl.value.trim(); }
             layer.querySelectorAll('input[type="radio"]').forEach(function (radio) {
-                radio.addEventListener('change', function () { confirmEl.disabled = selected() === ''; });
+                radio.addEventListener('change', ready);
             });
-            confirmEl.addEventListener('click', function () { if (selected()) { finish(selected()); } });
-            layer.querySelector('[data-dialog-backdrop]').addEventListener('click', function () { finish(''); });
-            layer.querySelector('[data-dialog-cancel]').addEventListener('click', function () { finish(''); });
+            crmEl.addEventListener('input', ready);
+            confirmEl.addEventListener('click', function () { if (!confirmEl.disabled) { finish({ priority: selected(), code: crmEl.value.trim() }); } });
+            layer.querySelector('[data-dialog-backdrop]').addEventListener('click', function () { finish(null); });
+            layer.querySelector('[data-dialog-cancel]').addEventListener('click', function () { finish(null); });
             document.addEventListener('keydown', onKeydown, true);
             window.setTimeout(function () {
                 var first = layer.querySelector('input[type="radio"]');
@@ -2243,7 +2251,7 @@
                 + (card.pause_request_reason ? '<small>Motivo: ' + esc(card.pause_request_reason) + '</small>' : '')
                 + '<small>' + (kind === 'pause'
                     ? 'Ao aprovar, o card fica pausado: ações, lembretes e prazos de SLA ficam suspensos.'
-                    : 'Ao aprovar, o card volta ao fluxo e os prazos de SLA são estendidos pelo tempo pausado.') + '</small></div>'
+                    : 'Ao aprovar, o card volta a Pendente sem técnico e inicia um novo ciclo de SLA.') + '</small></div>'
                 + openParent
                 + '</div>';
         }
@@ -3060,6 +3068,7 @@
         var isSplitApproval = kind === 'split';
         var isCallReleaseApproval = kind === 'call_release';
         var chosenPriority = '';
+        var chosenCode = '';
         var departingCard = Object.assign({}, activeCard);
 
         if (action === 'split') {
@@ -3296,7 +3305,7 @@
                         title: kind === 'pause' ? 'Aprovar pausa' : 'Aprovar despausa',
                         message: kind === 'pause'
                             ? 'Pausar o card? Ações, lembretes e prazos de SLA ficam suspensos até a despausa.'
-                            : 'Despausar o card? Ele volta ao fluxo e os prazos de SLA são estendidos pelo tempo pausado.',
+                            : 'Despausar o card? Ele volta a Pendente sem técnico e inicia um novo ciclo de SLA.',
                         icon: kind === 'pause' ? 'ti-player-pause' : 'ti-player-play',
                         confirmLabel: kind === 'pause' ? 'Aprovar pausa' : 'Aprovar despausa'
                     };
@@ -3311,10 +3320,30 @@
                     };
                 }
                 if (isCallReleaseApproval) {
-                    chosenPriority = await priorityDialog(activeCard);
-                    if (!chosenPriority) {
+                    var releaseChoice = await priorityDialog(activeCard);
+                    if (!releaseChoice) {
                         return;
                     }
+                    chosenPriority = releaseChoice.priority;
+                    chosenCode = releaseChoice.code;
+                } else if (kind === 'pause' || kind === 'resume') {
+                    var approvalCodeLabel = kind === 'pause' ? 'Chamado Externo' : 'Código CRM';
+                    chosenCode = await promptDialog({
+                        title: kind === 'pause' ? 'Aprovar pausa' : 'Aprovar despausa',
+                        message: 'Informe ' + approvalCodeLabel + ' para concluir a aprovação.',
+                        label: approvalCodeLabel,
+                        required: true,
+                        maxlength: 100,
+                        confirmLabel: 'Continuar'
+                    });
+                    if (!chosenCode) { return; }
+                    chosenCode = String(chosenCode).trim();
+                    if (!/^[\p{L}\p{N}][\p{L}\p{N} ._\/-]*$/u.test(chosenCode) || chosenCode.length > 100) {
+                        toast('Informe um código válido com letras e números (até 100 caracteres).', 'error');
+                        return;
+                    }
+                    var approveConfirmed = await checkboxConfirmation(approveConfig);
+                    if (!approveConfirmed) { return; }
                 } else {
                     var approveConfirmed = await checkboxConfirmation(approveConfig);
                     if (!approveConfirmed) {
@@ -3355,7 +3384,7 @@
                 var approvalPosition = isCallReleaseApproval
                     ? approvalCardsInBoard().findIndex(function (item) { return Number(item.id) === Number(cardId); })
                     : -1;
-                data = await api('approve_card', { id: cardId, priority: chosenPriority });
+                data = await api('approve_card', { id: cardId, priority: chosenPriority, code: chosenCode });
                 applyState(data);
                 scheduleDepartingCard(departingCard, 'approved');
                 if (isDeletionApproval) {

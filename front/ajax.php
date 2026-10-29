@@ -608,7 +608,7 @@ try {
         case 'approve_card':
             tralla_ajax_require(READ);
             $cardId = tralla_post_int('id');
-            $detail = PluginTrallaCard::decide($cardId, true, '', $userId, $isAdmin, tralla_post_string('priority'));
+            $detail = PluginTrallaCard::decide($cardId, true, '', $userId, $isAdmin, tralla_post_string('priority'), tralla_post_string('code'));
             tralla_json(['ok' => true, 'data' => ['card' => $detail, 'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id'])]]);
 
         case 'whatsapp_watch_ack':

@@ -30,6 +30,7 @@ if (!function_exists('tralla_category_labels')) {
             ''                      => 'Sem categoria (normal)',
             'maintenance_pending'   => 'Manutenção Pendente',
             'maintenance_in_progress' => 'Manutenção Em Andamento',
+            'maintenance_paused' => 'Manutenção Pausados',
             'maintenance_approval'  => 'Manutenção Aprovação',
             'maintenance_withdrawal' => 'Manutenção Retirada',
             'maintenance_done'      => 'Manutenção Concluído',
@@ -47,6 +48,7 @@ if (!function_exists('tralla_maintenance_categories')) {
         return [
             'maintenance_pending',
             'maintenance_in_progress',
+            'maintenance_paused',
             'maintenance_approval',
             'maintenance_withdrawal',
             'maintenance_done',
@@ -84,6 +86,7 @@ if (!function_exists('tralla_category_colors')) {
             ''                       => '#97a0af',
             'maintenance_pending'    => '#ff9f1a',
             'maintenance_in_progress' => '#0079bf',
+            'maintenance_paused' => '#64748b',
             'maintenance_approval'   => '#c377e0',
             'maintenance_withdrawal' => '#f2d600',
             'maintenance_done'       => '#61bd4f',
@@ -840,6 +843,7 @@ if (!function_exists('tralla_board_state')) {
      */
     function tralla_board_state(int $boards_id, bool $canApprove): array
     {
+        PluginTrallaBoard::ensurePausedList($boards_id);
         $lists = PluginTrallaList::getListsForBoard($boards_id);
         $cards = PluginTrallaCard::getCardsForBoard($boards_id);
 
