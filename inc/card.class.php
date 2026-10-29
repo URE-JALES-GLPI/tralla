@@ -1658,11 +1658,12 @@ class PluginTrallaCard extends CommonDBTM
             throw new RuntimeException('Somente o técnico responsável pode transferir o card em andamento.');
         }
         $current = (int) $card['whatsapp_chats_id'];
-        $linked = tralla_whatsapp_chat_ids($card);
-        if ($targetChatId <= 0 || in_array($targetChatId, $linked, true)) {
+        if ($targetChatId <= 0 || $targetChatId === $current) {
             throw new RuntimeException('Selecione outra conversa para vincular ao card.');
         }
-        $previous = implode(',', $linked);
+        // Voltar para uma conversa que já passou pelo card é permitido: ela sai das
+        // anteriores e vira o vínculo principal (o card vai e volta entre contatos).
+        $previous = implode(',', array_values(array_diff(tralla_whatsapp_chat_ids($card), [$targetChatId])));
         if (strlen($previous) > 255) {
             throw new RuntimeException('Este card já passou por transferências demais.');
         }

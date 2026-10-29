@@ -906,7 +906,7 @@ if (!function_exists('tralla_history_change')) {
 }
 
 if (!function_exists('tralla_whatsapp_chat_ids')) {
-    /** Atendimentos do card: os anteriores à transferência e o atual, em ordem. */
+    /** Atendimentos do card (anteriores e o atual), em ordem de abertura. */
     function tralla_whatsapp_chat_ids(array $card): array
     {
         $ids = array_filter(array_map('intval', explode(',', (string) ($card['whatsapp_previous_chats'] ?? ''))));
@@ -914,8 +914,12 @@ if (!function_exists('tralla_whatsapp_chat_ids')) {
         if ($current > 0) {
             $ids[] = $current;
         }
+        // Em ordem de abertura dos atendimentos: a conversa do card fica cronológica
+        // mesmo quando o vínculo volta para uma conversa anterior.
+        $ids = array_values(array_unique($ids));
+        sort($ids);
 
-        return array_values(array_unique($ids));
+        return $ids;
     }
 }
 
