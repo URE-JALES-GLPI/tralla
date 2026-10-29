@@ -52,6 +52,7 @@ function plugin_init_tralla(): void
 
     $PLUGIN_HOOKS['add_css']['tralla'] = [
         $versioned('public/css/tralla.css'),
+        $versioned('public/css/tralla-responsive.css'),
     ];
 
     $PLUGIN_HOOKS['add_javascript']['tralla'] = [

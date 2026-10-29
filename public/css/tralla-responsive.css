@@ -1,0 +1,104 @@
+/* Layout da lista de quadros baseado no espaço que sobra ao lado do menu do GLPI. */
+.tralla-boards-page {
+    container-type: inline-size;
+    min-width: 0;
+}
+
+.tralla-boards-page .tralla-user-dash-card,
+.tralla-boards-page .tralla-board-group,
+.tralla-boards-page .tralla-board-group-create {
+    min-width: 0;
+}
+
+.tralla-boards-page .tralla-user-dash-person {
+    flex: 1 1 auto;
+}
+
+.tralla-boards-page .tralla-user-dash-person > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.tralla-boards-page .tralla-user-dash-card dl {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.tralla-boards-page .tralla-user-dash-card dl > div {
+    min-width: 0;
+}
+
+.tralla-boards-page .tralla-user-dash-card dt button {
+    align-items: center;
+    overflow-wrap: anywhere;
+    text-align: center;
+}
+
+@container (max-width: 1100px) {
+    .tralla-boards-page .tralla-user-dash {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .tralla-boards-page .tralla-page-head {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .tralla-boards-page .tralla-head-actions {
+        justify-content: flex-start;
+    }
+
+    .tralla-boards-page .tralla-board-groups {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        overflow-x: visible;
+        padding-bottom: 2px;
+    }
+
+    .tralla-boards-page .tralla-board-group,
+    .tralla-boards-page .tralla-board-group-create {
+        width: auto;
+    }
+}
+
+@container (max-width: 760px) {
+    .tralla-boards-page .tralla-user-dash,
+    .tralla-boards-page .tralla-board-groups {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .tralla-boards-page .tralla-head-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .tralla-boards-page .tralla-head-actions .tralla-btn {
+        min-height: 42px;
+        white-space: normal;
+        width: 100%;
+    }
+}
+
+@container (max-width: 480px) {
+    .tralla-boards-page .tralla-user-dash-card dl {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .tralla-boards-page .tralla-user-dash-card header {
+        align-items: flex-start;
+    }
+
+    .tralla-boards-page .tralla-user-dash-total {
+        font-size: 11px;
+        padding: 4px 7px;
+    }
+
+    .tralla-boards-page .tralla-board-tile {
+        height: auto;
+        min-height: 218px;
+    }
+
+    .tralla-boards-page .tralla-board-metrics {
+        padding-bottom: 8px;
+    }
+}
