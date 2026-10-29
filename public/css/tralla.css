@@ -1536,6 +1536,19 @@ body[data-theme="dark"] .tralla-card-id-chip,
     border-color: rgba(107, 184, 234, 0.32);
 }
 
+/* Card pausado: o código fica preto enquanto durar a pausa. */
+.tralla-card-id-chip.is-paused {
+    background: #111;
+    border-color: #111;
+    color: #fff;
+}
+
+html[data-theme="dark"] .tralla-card-id-chip.is-paused,
+body[data-theme="dark"] .tralla-card-id-chip.is-paused,
+.tralla-page[data-theme="dark"] .tralla-card-id-chip.is-paused {
+    border-color: rgba(255, 255, 255, 0.45);
+}
+
 .tralla-card-top-spacer {
     flex: 1 1 auto;
 }

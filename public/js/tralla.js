@@ -1354,7 +1354,8 @@
 
         var cardCode = displayCardCode(card.code, cardId);
         var cardTop = '<div class="tralla-card-top">'
-            + '<span class="tralla-card-id-chip" title="ID do card: ' + attr(cardCode) + '">'
+            + '<span class="tralla-card-id-chip' + (Number(card.is_paused) ? ' is-paused' : '') + '" title="ID do card: '
+            + attr(cardCode) + (Number(card.is_paused) ? ' (pausado)' : '') + '">'
             + esc(cardCode) + '</span>'
             + (card.workflow_type === 'call' ? '<span class="tralla-card-call-badge">Chamado</span>' : '')
             + (isUpdates ? '<span class="tralla-card-update-badge">'
