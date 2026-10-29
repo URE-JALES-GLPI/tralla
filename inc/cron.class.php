@@ -115,11 +115,27 @@ class PluginTrallaCron extends CommonDBTM
         return 1;
     }
 
+    /** Resultado dos envios da execução atual (usado pelo "Forçar notificações"). */
+    private static array $delivery = ['email_queued' => 0, 'email_failed' => 0, 'whatsapp_sent' => 0, 'whatsapp_failed' => 0];
+
+    /**
+     * "Forçar notificações" do quadro: envia agora, sem esperar o intervalo, o lembrete
+     * de cada card liberado no Pendente e o aviso de cada card a 4 horas ou menos do SLA.
+     */
+    public static function forceForBoard(int $boardId): array
+    {
+        self::$delivery = array_map(static fn () => 0, self::$delivery);
+        $pending = self::remindPendingByPriority($boardId, true);
+        $sla = self::warnSlaDeadlines($boardId, true);
+
+        return ['pending' => $pending, 'sla' => $sla] + self::$delivery;
+    }
+
     /**
      * Cards no Pendente, já liberados com prioridade: lembra os membros do quadro
      * a cada intervalo da prioridade, contando a partir da criação (ou liberação).
      */
-    private static function remindPendingByPriority(): int
+    private static function remindPendingByPriority(int $boardId = 0, bool $force = false): int
     {
         global $DB;
 
@@ -136,11 +152,11 @@ class PluginTrallaCron extends CommonDBTM
                 'c.stage' => 1, 'c.status' => 'pending', 'c.is_locked' => 0,
                 'c.is_paused' => 0,
                 'c.is_archived' => 0, 'c.is_deleted' => 0, 'c.priority' => ['!=', ''],
-            ],
+            ] + ($boardId > 0 ? ['c.plugin_tralla_boards_id' => $boardId] : []),
         ]) as $card) {
             $minutes = tralla_pending_reminder_minutes((string) $card['priority']);
             $base = strtotime((string) ($card['pending_reminded_at'] ?: ($card['date_sla_start'] ?: $card['date_creation'])));
-            if ($minutes <= 0 || $base === false || $now < $base + $minutes * 60) {
+            if ($minutes <= 0 || $base === false || (!$force && $now < $base + $minutes * 60)) {
                 continue;
             }
 
@@ -160,9 +176,10 @@ class PluginTrallaCron extends CommonDBTM
 
     /**
      * Cards em andamento: avisa o técnico e os aprovadores 4, 3, 2 e 1 hora antes
-     * do prazo das respostas paliativa e definitiva. Cada marca é enviada uma vez.
+     * do prazo das respostas paliativa e definitiva. Cada marca é enviada uma vez;
+     * forçado, reenvia para todo card a 4 horas ou menos do prazo.
      */
-    private static function warnSlaDeadlines(): int
+    private static function warnSlaDeadlines(int $boardId = 0, bool $force = false): int
     {
         global $DB;
 
@@ -179,7 +196,7 @@ class PluginTrallaCron extends CommonDBTM
                 'c.stage' => 1, 'c.status' => 'in_progress', 'c.technician_id' => ['>', 0],
                 'c.is_paused' => 0,
                 'c.is_archived' => 0, 'c.is_deleted' => 0, 'c.priority' => ['!=', ''],
-            ],
+            ] + ($boardId > 0 ? ['c.plugin_tralla_boards_id' => $boardId] : []),
         ]) as $card) {
             $sla = tralla_card_sla($card);
             if ($sla === null) {
@@ -196,7 +213,7 @@ class PluginTrallaCron extends CommonDBTM
                 $crossed = [];
                 foreach ([4, 3, 2, 1] as $hours) {
                     $mark = $step['key'] . ':' . $hours;
-                    if ($left <= $hours * 3600 && !in_array($mark, $sent, true)) {
+                    if ($left <= $hours * 3600 && ($force || !in_array($mark, $sent, true))) {
                         $crossed[] = $mark;
                     }
                 }
@@ -216,7 +233,7 @@ class PluginTrallaCron extends CommonDBTM
             $recipients = array_merge([(int) $card['technician_id']], self::boardApproverIds((int) $card['plugin_tralla_boards_id']));
             self::notifyUsers($card, $recipients, 'sla_alert', 'SLA perto de estourar #' . $code, $text);
             $DB->update('glpi_plugin_tralla_cards', [
-                'sla_alerts_sent' => substr(implode(',', array_merge($sent, $newMarks)), 0, 255),
+                'sla_alerts_sent' => substr(implode(',', array_unique(array_merge($sent, $newMarks))), 0, 255),
             ], ['id' => (int) $card['id']]);
             PluginTrallaHistory::log((int) $card['id'], 0, 'sla_alert', $text);
             $count++;
@@ -304,11 +321,13 @@ class PluginTrallaCron extends CommonDBTM
                 $sent = $address !== '' && tralla_queue_email($address, '[URE] Tralla — ' . $subject, $html,
                     (int) ($card['board_entities_id'] ?? 0), $cardId);
                 self::logNotification($cardId, $type, 'email', $address, $sent ? 'queued' : 'failed', $text);
+                self::$delivery[$sent ? 'email_queued' : 'email_failed']++;
             }
             if (!empty($card['board_notify_whatsapp'])) {
                 $phone = trim((string) ($user['mobile'] ?: $user['phone']));
                 $sent = $phone !== '' && tralla_whatsapp_send($phone, $text . "\n" . $link);
                 self::logNotification($cardId, $type, 'whatsapp', $phone, $sent ? 'sent' : 'failed', $text);
+                self::$delivery[$sent ? 'whatsapp_sent' : 'whatsapp_failed']++;
             }
         }
     }

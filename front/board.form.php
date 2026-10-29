@@ -84,6 +84,37 @@ if (isset($_POST['update'])) {
     Html::redirect($pluginUrl . '/front/board.form.php?id=' . $id . '&tab=general');
 }
 
+if (isset($_POST['notify_force'])) {
+    Session::checkRight('plugin_tralla', UPDATE);
+    tralla_check_csrf($_POST);
+
+    if (!$canUpdate || (string) $board->fields['type'] !== 'maintenance') {
+        Session::addMessageAfterRedirect('Sem permissão para forçar as notificações deste quadro.', false, ERROR);
+    } elseif (empty($board->fields['notify_email']) && empty($board->fields['notify_whatsapp'])) {
+        Session::addMessageAfterRedirect('Marque Notificar por Email ou por WhatsApp e salve o quadro antes de forçar.', false, ERROR);
+    } else {
+        require_once GLPI_ROOT . '/plugins/tralla/inc/cron.class.php';
+        $result = PluginTrallaCron::forceForBoard($id);
+        if ($result['pending'] + $result['sla'] === 0) {
+            Session::addMessageAfterRedirect(
+                'Nada para enviar: nenhum card liberado no Pendente e nenhum card a 4 horas ou menos do prazo de SLA.',
+                false,
+                WARNING
+            );
+        } else {
+            $failed = $result['email_failed'] + $result['whatsapp_failed'];
+            Session::addMessageAfterRedirect(
+                'Notificações forçadas: ' . $result['pending'] . ' card(s) no Pendente e ' . $result['sla']
+                . ' aviso(s) de SLA. WhatsApp: ' . $result['whatsapp_sent'] . ' enviada(s), ' . $result['whatsapp_failed']
+                . ' com falha. Email: ' . $result['email_queued'] . ' na fila do GLPI, ' . $result['email_failed'] . ' com falha.',
+                $failed === 0,
+                $failed === 0 ? INFO : WARNING
+            );
+        }
+    }
+    Html::redirect($pluginUrl . '/front/board.form.php?id=' . $id . '&tab=general');
+}
+
 if (isset($_POST['delete'])) {
     Session::checkRight('plugin_tralla', DELETE);
     tralla_check_csrf($_POST);
@@ -220,6 +251,17 @@ echo "<script>document.title = 'Tralla';</script>";
                         <input type="checkbox" name="notify_whatsapp" value="1" <?= !empty($board->fields['notify_whatsapp']) ? 'checked' : '' ?> <?= $canUpdate ? '' : 'disabled' ?>>
                         Notificar por WhatsApp
                     </label>
+                    <?php if ($canUpdate): ?>
+                        <div>
+                            <button type="submit" name="notify_force" value="1" class="tralla-btn tralla-btn-ghost"
+                                    data-tralla-confirm="Enviar agora, sem esperar o intervalo, os lembretes dos cards liberados no Pendente e os avisos dos cards a 4 horas ou menos do prazo de SLA? Use depois de salvar as opções acima."
+                                    data-tralla-confirm-title="Forçar notificações"
+                                    data-tralla-confirm-label="Enviar agora"
+                                    data-tralla-confirm-icon="ti-send">
+                                <i class="ti ti-send"></i> Forçar notificações
+                            </button>
+                        </div>
+                    <?php endif; ?>
                 </fieldset>
             <?php endif; ?>
             <?php if ($canArchive): ?>
