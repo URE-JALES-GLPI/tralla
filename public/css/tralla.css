@@ -5151,6 +5151,35 @@ body[data-theme="dark"] .tralla-dialog-danger .tralla-finalize-requirements {
 .tralla-priority-tag { flex: none; min-width: 34px; padding: 4px 6px; border-radius: 6px; color: #fff; font-weight: 800; text-align: center; }
 .tralla-priority-text { display: flex; flex-direction: column; min-width: 0; }
 .tralla-priority-text small { color: var(--tr-muted); }
+/* Mesmo recuo do restante do diálogo (Definir prioridade, Transferir card). */
+.tralla-priority-dialog .tralla-priority-options { margin: 16px 24px 0; }
+.tralla-priority-dialog > .tralla-field {
+    gap: 6px;
+    margin: 16px 24px 0 !important;
+}
+.tralla-priority-dialog > .tralla-field > span {
+    color: var(--tr-text);
+    font-size: 13px;
+    font-weight: 600;
+}
+.tralla-priority-dialog > .tralla-field > span strong { color: #de350b; }
+.tralla-priority-dialog > .tralla-field input,
+.tralla-priority-dialog > .tralla-field select {
+    background: var(--tr-surface);
+    border: 1px solid var(--tr-border-strong);
+    border-radius: var(--tr-radius-sm);
+    color: var(--tr-text);
+    font-size: 14px;
+    padding: 9px 12px;
+    width: 100%;
+}
+.tralla-priority-dialog > .tralla-field input:focus,
+.tralla-priority-dialog > .tralla-field select:focus {
+    border-color: var(--tr-primary);
+    box-shadow: 0 0 0 3px var(--tr-primary-soft);
+    outline: none;
+}
+.tralla-priority-dialog .tralla-dialog-actions { padding-top: 20px; }
 
 /* Bloco "Prioridade e SLA" no detalhe */
 .tralla-sla-card .tralla-sla-priority {

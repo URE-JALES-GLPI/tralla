@@ -162,9 +162,10 @@ class PluginTrallaCron extends CommonDBTM
 
             $code = tralla_display_code($card, 'maintenance');
             $waiting = max(1, (int) round(($now - strtotime((string) ($card['date_sla_start'] ?: $card['date_creation']))) / 60));
-            $text = 'Tralla: o card #' . $code . ' (' . $card['name'] . ') está no Pendente há '
-                . self::durationLabel($waiting) . ' sem técnico. Prioridade ' . (tralla_priorities()[$card['priority']]['label'] ?? $card['priority'])
-                . '. Clique em Pegar no quadro ' . $card['board_name'] . '.';
+            $text = "Tralla – card #{$code} aguardando técnico\n"
+                . $card['name'] . "\n"
+                . 'Prioridade: ' . (tralla_priorities()[$card['priority']]['label'] ?? $card['priority']) . "\n"
+                . 'No Pendente há ' . self::durationLabel($waiting);
             self::notifyUsers($card, self::boardMemberIds((int) $card['plugin_tralla_boards_id']), 'pending_priority',
                 'card pendente #' . $code, $text);
             $DB->update('glpi_plugin_tralla_cards', ['pending_reminded_at' => tralla_now()], ['id' => (int) $card['id']]);
@@ -228,8 +229,10 @@ class PluginTrallaCron extends CommonDBTM
             }
 
             $code = tralla_display_code($card, 'maintenance');
-            $text = 'Tralla: SLA do card #' . $code . ' (' . $card['name'] . ') está perto de estourar. '
-                . implode('; ', $alerts) . '. Técnico: ' . tralla_user_name((int) $card['technician_id']) . '.';
+            $text = "Tralla – SLA do card #{$code} perto de vencer\n"
+                . $card['name'] . "\n"
+                . implode("\n", $alerts) . "\n"
+                . 'Técnico: ' . tralla_user_name((int) $card['technician_id']);
             $recipients = array_merge([(int) $card['technician_id']], self::boardApproverIds((int) $card['plugin_tralla_boards_id']));
             self::notifyUsers($card, $recipients, 'sla_alert', 'SLA perto de estourar #' . $code, $text);
             $DB->update('glpi_plugin_tralla_cards', [
@@ -317,7 +320,7 @@ class PluginTrallaCron extends CommonDBTM
                     'LIMIT'  => 1,
                 ])->current();
                 $address = is_array($email) ? (string) $email['email'] : '';
-                $html = '<p>' . tralla_h($text) . '</p><p><a href="' . tralla_h($link) . '">Abrir o quadro no Tralla</a></p>';
+                $html = '<p>' . nl2br(tralla_h($text)) . '</p><p><a href="' . tralla_h($link) . '">Abrir o quadro no Tralla</a></p>';
                 $sent = $address !== '' && tralla_queue_email($address, '[URE] Tralla — ' . $subject, $html,
                     (int) ($card['board_entities_id'] ?? 0), $cardId);
                 self::logNotification($cardId, $type, 'email', $address, $sent ? 'queued' : 'failed', $text);
@@ -325,7 +328,7 @@ class PluginTrallaCron extends CommonDBTM
             }
             if (!empty($card['board_notify_whatsapp'])) {
                 $phone = trim((string) ($user['mobile'] ?: $user['phone']));
-                $sent = $phone !== '' && tralla_whatsapp_send($phone, $text . "\n" . $link);
+                $sent = $phone !== '' && tralla_whatsapp_send($phone, $text);
                 self::logNotification($cardId, $type, 'whatsapp', $phone, $sent ? 'sent' : 'failed', $text);
                 self::$delivery[$sent ? 'whatsapp_sent' : 'whatsapp_failed']++;
             }
