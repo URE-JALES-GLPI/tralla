@@ -54,6 +54,8 @@ Na coluna F, cards de manutenção mostram a quantidade por modelo
 (`1x Notebook | 2x Tablet`); chamados mostram a descrição informada ao criar
 o card. A coluna H mostra o nome completo do técnico responsável no GLPI,
 ficando vazia até que um técnico seja atribuído.
+Na coluna E, cards em retirada aparecem como `Concluido` e cards pausados
+aparecem como `Em andamento`, sem alterar o status exibido no Tralla.
 
 Para autorizar o servidor:
 

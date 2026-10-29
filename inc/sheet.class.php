@@ -95,9 +95,11 @@ class PluginTrallaSheetSync
         $modelNames = PluginTrallaMachineModel::getModelNames(array_values($modelIds));
         foreach ($cards as $card) {
             $code = tralla_display_code($card, 'maintenance');
-            $label = !empty($card['is_paused']) ? 'Pausado'
-                : ($pausedList !== null && (int) $card['plugin_tralla_lists_id'] === (int) $pausedList['id']
-                    ? 'Pausa em aprovação' : tralla_status_label((string) $card['status']));
+            $status = (string) $card['status'];
+            $isPaused = !empty($card['is_paused'])
+                || ($pausedList !== null && (int) $card['plugin_tralla_lists_id'] === (int) $pausedList['id']);
+            $label = $isPaused ? 'Em andamento'
+                : ($status === 'withdrawal' ? 'Concluido' : tralla_status_label($status));
             $kind = (string) ($card['workflow_type'] ?? 'maintenance');
             $description = $kind === 'call'
                 ? (string) ($card['description'] ?? '')
