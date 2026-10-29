@@ -842,6 +842,12 @@ class PluginTrallaCard extends CommonDBTM
             Session::haveRight(self::$rightname, DELETE),
             $isAdmin
         );
+        // Concluído fica travado; o SuperAdmin do quadro ainda pode pedir a exclusão (passa por aprovação).
+        if (!$canRequestDeletion && $isAdmin && $boardType === 'maintenance' && $stage === 1
+            && $status === 'done' && empty($card['is_deleted']) && empty($card['is_archived'])
+            && (int) ($card['approval_cards_id'] ?? 0) === 0) {
+            $canRequestDeletion = true;
+        }
 
         $canTabletEdit = $isTablet
             && $boardType === 'maintenance'
