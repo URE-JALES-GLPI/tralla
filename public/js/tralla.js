@@ -1624,14 +1624,16 @@
     }
 
     function renderPausedCodes(card) {
-        if (!Number(card.is_paused) || Number(card.stage) !== 1) { return ''; }
         var codes = card.pause_codes || {};
+        var paused = !!Number(card.is_paused);
+        // Aparece em todo card principal pausado ou que já tenha CRM / Chamado Externo.
+        if (Number(card.stage) !== 1 || (!paused && !codes.crm_code && !codes.external_ticket_code)) { return ''; }
         var editable = !!(card.permissions || {}).edit_pause_codes;
         var view = '<div class="tralla-detail-description">CRM: ' + esc(codes.crm_code || 'Não informado')
             + '<br>Chamado Externo: ' + esc(codes.external_ticket_code || 'Não informado') + '</div>';
         // Fechado por padrão: "Editar códigos" abre o formulário e, ao salvar, ele fecha de novo.
         return '<section class="tralla-detail-section">'
-            + '<h3><i class="ti ti-ticket"></i> Códigos da pausa</h3>'
+            + '<h3><i class="ti ti-ticket"></i> ' + (paused ? 'Códigos da pausa' : 'Códigos') + '</h3>'
             + (editable
                 ? '<div data-pause-codes-view>' + view
                     + '<div class="tralla-detail-edit-actions">'
