@@ -29,6 +29,7 @@ class PluginTrallaBoardUser
             'glpi_users.realname AS realname',
             'glpi_users.firstname AS firstname',
             'glpi_users.is_deleted AS is_deleted',
+            'glpi_users.is_active AS is_active',
         ];
         if (self::hasApproverColumn()) {
             $select[] = 'glpi_plugin_tralla_boards_users.can_approve AS can_approve';
@@ -60,6 +61,7 @@ class PluginTrallaBoardUser
                 'realname'      => (string) ($row['realname'] ?? ''),
                 'firstname'     => (string) ($row['firstname'] ?? ''),
                 'is_deleted'    => (int) ($row['is_deleted'] ?? 0),
+                'is_active'     => (int) ($row['is_active'] ?? 0),
             ];
         }
 

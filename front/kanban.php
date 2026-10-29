@@ -66,6 +66,15 @@ $bootstrap = [
         ];
     }, $lists),
     'cards' => $cards,
+    'technicians' => array_values(array_map(static function (array $member): array {
+        return [
+            'id' => (int) $member['users_id'],
+            'name' => tralla_user_name((int) $member['users_id']),
+        ];
+    }, array_filter(PluginTrallaBoardUser::getMembers($boards_id), static function (array $member): bool {
+        return in_array($member['role'], ['member', 'admin', 'superadmin'], true)
+            && empty($member['is_deleted']) && !empty($member['is_active']);
+    }))),
     'deleted_cards' => $deletedCards,
     'activity_cursor' => PluginTrallaHistory::getLatestIdForBoard($boards_id),
     'version'         => PluginTrallaBoard::getVersion($boards_id),

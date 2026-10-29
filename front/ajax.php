@@ -538,6 +538,11 @@ try {
             $detail = PluginTrallaCard::take($cardId, $userId);
             tralla_json(['ok' => true, 'data' => ['card' => $detail, 'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id'])]]);
 
+        case 'assign_technician':
+            tralla_ajax_require(UPDATE);
+            $detail = PluginTrallaCard::assignTechnician(tralla_post_int('id'), tralla_post_int('technician_id'), $userId);
+            tralla_json(['ok' => true, 'data' => ['card' => $detail, 'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id'])]]);
+
         case 'machine_update':
             tralla_ajax_require(UPDATE);
             $machineId = tralla_post_int('machine_id');

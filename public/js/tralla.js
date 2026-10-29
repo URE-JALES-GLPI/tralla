@@ -1349,6 +1349,10 @@
             ? '<button type="button" class="tralla-card-take" data-card-take="' + cardId + '" title="Pegar para mim">'
                 + '<i class="ti ti-hand-stop" aria-hidden="true"></i> Pegar</button>'
             : '');
+        var assignButton = !departing && card.permissions && card.permissions.assign_technician
+            ? '<button type="button" class="tralla-card-assign" data-card-assign="' + cardId
+                + '" title="Atribuir a um técnico do quadro"><i class="ti ti-user-plus" aria-hidden="true"></i> Atribuir técnico</button>'
+            : '';
         var noticeButton = !departing && isMaintenance && card.status === 'withdrawal'
             && Number(card.stage) === 1 && card.permissions && card.permissions.toggle_withdrawal_notice
             ? '<button type="button" class="tralla-card-notice'
@@ -1405,6 +1409,7 @@
                     + signButton
                     + '</div>'
                 : '')
+            + assignButton
             + termButton
             + '</article>';
     }
@@ -1900,6 +1905,10 @@
         if (permissions.take) {
             buttons += '<button type="button" class="tralla-btn tralla-btn-primary" data-card-action="take">'
                 + '<i class="ti ti-hand-stop"></i> Pegar para mim</button>';
+        }
+        if (permissions.assign_technician) {
+            buttons += '<button type="button" class="tralla-btn tralla-btn-ghost" data-card-action="assign_technician">'
+                + '<i class="ti ti-user-plus"></i> Atribuir técnico</button>';
         }
 
         if (permissions.request_call_release) {
@@ -2896,6 +2905,61 @@
         }
     }
 
+    async function handleAssignTechnician(cardId, button) {
+        var technicians = (state.technicians || []).filter(function (item) { return Number(item.id) > 0; });
+        if (!technicians.length) {
+            toast('Adicione um técnico ao quadro antes de atribuir o card.', 'error');
+            return;
+        }
+        var layer = document.createElement('div');
+        layer.className = 'tralla-dialog-layer';
+        layer.innerHTML = '<div class="tralla-dialog-backdrop" data-close></div>'
+            + '<div class="tralla-modal tralla-dialog" role="dialog" aria-modal="true" aria-label="Atribuir técnico">'
+            + '<div class="tralla-dialog-head"><span class="tralla-dialog-icon"><i class="ti ti-user-plus"></i></span>'
+            + '<div class="tralla-dialog-copy"><h2 class="tralla-dialog-title">Atribuir técnico</h2>'
+            + '<p class="tralla-dialog-message">O card irá para Em Andamento e os prazos seguirão o mesmo fluxo de Pegar.</p></div></div>'
+            + '<div class="tralla-dialog-field"><label for="tralla-assign-select">Técnico do quadro</label>'
+            + '<select id="tralla-assign-select" class="tralla-select"><option value="">Selecione um técnico...</option>'
+            + technicians.map(function (item) { return '<option value="' + Number(item.id) + '">' + esc(item.name) + '</option>'; }).join('')
+            + '</select></div><p class="tralla-dialog-error" hidden></p>'
+            + '<div class="tralla-dialog-actions"><button type="button" class="tralla-btn tralla-btn-ghost" data-close>Cancelar</button>'
+            + '<button type="button" class="tralla-btn tralla-btn-primary" data-assign disabled>Atribuir</button></div></div>';
+        document.body.appendChild(layer);
+        document.body.classList.add('tralla-dialog-open');
+        var select = layer.querySelector('select');
+        var submit = layer.querySelector('[data-assign]');
+        var previousFocus = document.activeElement;
+        function close() {
+            document.removeEventListener('keydown', onKeydown, true);
+            layer.remove();
+            document.body.classList.remove('tralla-dialog-open');
+            if (previousFocus && document.contains(previousFocus)) previousFocus.focus();
+        }
+        function onKeydown(event) {
+            if (event.key === 'Escape') { event.preventDefault(); close(); }
+        }
+        document.addEventListener('keydown', onKeydown, true);
+        layer.querySelectorAll('[data-close]').forEach(function (el) { el.addEventListener('click', close); });
+        select.addEventListener('change', function () { submit.disabled = !select.value; });
+        submit.addEventListener('click', async function () {
+            if (!select.value) return;
+            setBusy(submit, true);
+            try {
+                var data = await api('assign_technician', { id: cardId, technician_id: Number(select.value) });
+                close();
+                applyState(data);
+                toast('Card atribuído a ' + (technicians.find(function (item) { return Number(item.id) === Number(select.value); }) || {}).name + '.', 'success');
+                if (activeCard && Number(activeCard.id) === Number(cardId)) await openCard(cardId);
+            } catch (error) {
+                var errorEl = layer.querySelector('.tralla-dialog-error');
+                errorEl.hidden = false;
+                errorEl.textContent = error.message;
+                setBusy(submit, false);
+            }
+        });
+        select.focus();
+    }
+
     async function toggleWithdrawalNotice(cardId, button) {
         setBusy(button, true);
         try {
@@ -3275,6 +3339,10 @@
                 applyState(data);
                 toast('Card atribuído a você.', 'success');
                 await openCard(cardId);
+            } else if (action === 'assign_technician') {
+                setBusy(button, false);
+                await handleAssignTechnician(cardId, button);
+                return;
             } else if (action === 'finalize') {
                 data = await api('finalize_card', { id: cardId });
                 applyState(data);
@@ -4965,6 +5033,14 @@
             return;
         }
 
+        var assignButton = event.target.closest('[data-card-assign]');
+        if (assignButton) {
+            event.preventDefault();
+            event.stopPropagation();
+            handleAssignTechnician(Number(assignButton.dataset.cardAssign), assignButton);
+            return;
+        }
+
         var noticeButton = event.target.closest('[data-card-notice]');
         if (noticeButton) {
             event.preventDefault();
@@ -4995,7 +5071,7 @@
         if (event.key !== 'Enter' && event.key !== ' ') {
             return;
         }
-        if (event.target.closest('[data-card-take], [data-card-notice], [data-update-take], .tralla-card-term, .tralla-card-sign')) {
+        if (event.target.closest('[data-card-take], [data-card-assign], [data-card-notice], [data-update-take], .tralla-card-term, .tralla-card-sign')) {
             return;
         }
         var cardElement = event.target.closest('.tralla-card');

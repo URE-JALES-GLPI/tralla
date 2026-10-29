@@ -767,6 +767,7 @@ class PluginTrallaCard extends CommonDBTM
             'split'            => $canSplit,
             'edit_request'     => $canEditRequest,
             'take'             => $canTake,
+            'assign_technician' => $canTake && $isAdmin,
             'request_call_release' => $canRequestCallRelease,
             'finalize'         => $canFinalize,
             'approve'          => $canApprove,
@@ -1941,6 +1942,63 @@ class PluginTrallaCard extends CommonDBTM
         }
 
         return self::getCardDetail($id, $userId);
+    }
+
+    public static function assignTechnician(int $id, int $technicianId, int $actorId = 0): array
+    {
+        global $DB;
+
+        $actorId = $actorId > 0 ? $actorId : (int) Session::getLoginUserID();
+        $card = self::getCard($id);
+        if ($card === null) {
+            throw new RuntimeException('Card não encontrado.');
+        }
+        self::assertBoardAccess($card);
+        $boardId = (int) $card['plugin_tralla_boards_id'];
+        if (PluginTrallaBoardUser::getRole($boardId, $actorId) !== 'superadmin'
+            || !Session::haveRight(self::$rightname, UPDATE)) {
+            throw new RuntimeException('Apenas SuperAdmins do quadro podem atribuir técnicos.');
+        }
+        $technician = new User();
+        $role = PluginTrallaBoardUser::getRole($boardId, $technicianId);
+        if ($technicianId <= 0 || !in_array($role, ['member', 'admin', 'superadmin'], true)
+            || !$technician->getFromDB($technicianId)
+            || !empty($technician->fields['is_deleted']) || empty($technician->fields['is_active'])) {
+            throw new RuntimeException('Selecione um técnico ativo com acesso ao quadro.');
+        }
+        if (!tralla_can_transition($card, 'take', self::getBoardType($boardId))) {
+            throw new RuntimeException('Este card ainda não está disponível para atribuição.');
+        }
+        $list = PluginTrallaBoard::findListByCategory($boardId, 'maintenance_in_progress');
+        if ($list === null) {
+            throw new RuntimeException('O quadro não possui a lista Em Andamento.');
+        }
+
+        $now = tralla_now();
+        $DB->beginTransaction();
+        try {
+            self::lockCardRow($id);
+            $card = self::getCard($id);
+            if ($card === null || !tralla_can_transition($card, 'take', self::getBoardType($boardId))) {
+                throw new RuntimeException('Este card já foi atribuído ou não está disponível.');
+            }
+            $DB->update('glpi_plugin_tralla_cards', [
+                'plugin_tralla_lists_id' => (int) $list['id'],
+                'technician_id' => $technicianId,
+                'status' => 'in_progress',
+                'date_taken' => $now,
+                'date_mod' => $now,
+                'rank' => self::nextRankForList((int) $list['id']),
+            ], ['id' => $id]);
+            PluginTrallaHistory::log($id, $actorId, 'card_taken',
+                'Card atribuído a ' . tralla_user_name($technicianId) . ' por ' . tralla_user_name($actorId) . '.');
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
+        }
+
+        return self::getCardDetail($id, $actorId);
     }
 
     public static function updateMachine(int $machineId, array $data, int $userId = 0, bool $isAdmin = false): array
