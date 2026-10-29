@@ -68,7 +68,7 @@ class PluginTrallaSheetSync
         $updates = [];
         $appends = [];
         $pausedList = PluginTrallaBoard::findListByCategory($boardId, 'maintenance_paused');
-        foreach ($DB->request([
+        $cards = iterator_to_array($DB->request([
             'FROM' => 'glpi_plugin_tralla_cards',
             'WHERE' => [
                 'plugin_tralla_boards_id' => $boardId,
@@ -77,21 +77,42 @@ class PluginTrallaSheetSync
                 'is_deleted' => 0,
             ],
             'ORDER' => 'code_number ASC, id ASC',
-        ]) as $card) {
+        ]));
+        $machinesByCard = [];
+        $modelIds = [];
+        $cardIds = array_map(static fn(array $card): int => (int) $card['id'], $cards);
+        if ($cardIds !== []) {
+            foreach ($DB->request([
+                'FROM' => 'glpi_plugin_tralla_machines',
+                'WHERE' => ['plugin_tralla_cards_id' => $cardIds],
+                'ORDER' => 'rank ASC, id ASC',
+            ]) as $machine) {
+                $machinesByCard[(int) $machine['plugin_tralla_cards_id']][] = $machine;
+                $modelId = (int) ($machine['plugin_tralla_machine_models_id'] ?? 0);
+                if ($modelId > 0) { $modelIds[$modelId] = $modelId; }
+            }
+        }
+        $modelNames = PluginTrallaMachineModel::getModelNames(array_values($modelIds));
+        foreach ($cards as $card) {
             $code = tralla_display_code($card, 'maintenance');
             $label = !empty($card['is_paused']) ? 'Pausado'
                 : ($pausedList !== null && (int) $card['plugin_tralla_lists_id'] === (int) $pausedList['id']
                     ? 'Pausa em aprovação' : tralla_status_label((string) $card['status']));
             $kind = (string) ($card['workflow_type'] ?? 'maintenance');
+            $description = $kind === 'call'
+                ? (string) ($card['description'] ?? '')
+                : str_replace(' · ', ' | ', PluginTrallaMachine::summarizeModels(
+                    $machinesByCard[(int) $card['id']] ?? [], $modelNames
+                ));
             $record = [
                 $code,
                 self::formatDate((string) ($card['date_taken'] ?? '')),
                 self::formatDate((string) ($card['date_finalized'] ?? '')),
                 $kind === 'call' ? (string) ($card['call_category'] ?? '') : 'Equipamentos',
                 $label,
-                $kind === 'call' ? (string) ($card['service_report'] ?? '') : (string) (int) ($card['machines_total'] ?? 0),
+                $description,
                 (string) $card['name'],
-                (string) ($card['description'] ?? ''),
+                tralla_user_name((int) ($card['technician_id'] ?? 0)),
             ];
             if (isset($byCode[$code])) {
                 $rowNumber = $byCode[$code];

@@ -50,6 +50,10 @@ confirme o nome da aba (`Página1`) e ative a sincronização. O cron já existe
 do Tralla verifica a planilha a cada 30 minutos. Cada card principal do quadro
 ocupa uma linha, identificada pelo código visual na coluna A; aprovações não
 geram linhas separadas. As colunas A:H seguem o cabeçalho da planilha.
+Na coluna F, cards de manutenção mostram a quantidade por modelo
+(`1x Notebook | 2x Tablet`); chamados mostram a descrição informada ao criar
+o card. A coluna H mostra o nome completo do técnico responsável no GLPI,
+ficando vazia até que um técnico seja atribuído.
 
 Para autorizar o servidor:
 
