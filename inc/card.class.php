@@ -538,16 +538,18 @@ class PluginTrallaCard extends CommonDBTM
         $card['permissions'] = self::permissionsFor($card, $boardType, $userId, $isAdmin);
         $card['update_items'] = [];
         $card['update_files'] = [];
+        // Card excluído não lista anexos: a busca de arquivos recusa card excluído e
+        // derrubava o detalhe (inclusive a resposta da aprovação de exclusão).
         if ($boardType === 'updates' && (string) ($card['workflow_type'] ?? '') === 'update') {
             $card['update_items'] = PluginTrallaUpdate::items($id);
-            $card['update_files'] = PluginTrallaFile::listForCard($id, $userId);
+            $card['update_files'] = empty($card['is_deleted']) ? PluginTrallaFile::listForCard($id, $userId) : [];
             $card['permissions']['upload_update_file'] = PluginTrallaFile::canUpload($card, $userId);
         }
         $card['call_files'] = [];
         $card['permissions']['upload_call_file'] = false;
         if ($boardType === 'maintenance' && (string) ($card['workflow_type'] ?? '') === 'call') {
             $fileCard = (int) $card['stage'] === 2 ? $parentCard : $card;
-            if (is_array($fileCard) && (int) ($fileCard['stage'] ?? 0) === 1) {
+            if (is_array($fileCard) && (int) ($fileCard['stage'] ?? 0) === 1 && empty($fileCard['is_deleted'])) {
                 $fileCardId = (int) $fileCard['id'];
                 $card['call_files'] = PluginTrallaFile::listForCard($fileCardId, $userId);
                 if ((int) $card['stage'] === 2) {
