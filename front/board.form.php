@@ -113,7 +113,8 @@ if (isset($_POST['notify_force'])) {
                 . (!empty($board->fields['notify_whatsapp'])
                     ? $channel('WhatsApp', $result['whatsapp_sent'], 'enviada(s)', $result['whatsapp_failed'], $result['whatsapp_missing']) . '. ' : '')
                 . (!empty($board->fields['notify_email'])
-                    ? $channel('Email', $result['email_queued'], 'na fila do GLPI', $result['email_failed'], $result['email_missing']) . '.' : ''),
+                    // Sem e-mail é esperado (nem todos têm e-mail institucional): não aparece como pendência.
+                    ? $channel('Email', $result['email_queued'], 'enviado(s)', $result['email_failed'], 0) . '.' : ''),
                 $failed === 0,
                 $failed === 0 ? INFO : WARNING
             );
