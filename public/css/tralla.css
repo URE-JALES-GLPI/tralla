@@ -1342,6 +1342,7 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
 [data-create-machines-section][hidden], [data-create-call-section][hidden] { display: none !important; }
 [data-call-release-section][hidden] { display: none !important; }
 [data-update-description][hidden], [data-update-checklist][hidden] { display: none !important; }
+[data-transfer-user-field][hidden] { display: none !important; }
 .tralla-update-item {
     background: var(--tr-surface);
     border: 1px solid var(--tr-border);

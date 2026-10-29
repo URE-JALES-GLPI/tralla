@@ -743,6 +743,12 @@
         if (kind === 'resume') {
             return 'Aprovação para despausar';
         }
+        if (kind === 'transfer') {
+            return 'Aprovação de transferência';
+        }
+        if (kind === 'takeover') {
+            return 'Aprovação para pegar card';
+        }
         return 'Aprovação de finalização';
     }
 
@@ -1621,19 +1627,27 @@
         if (!Number(card.is_paused) || Number(card.stage) !== 1) { return ''; }
         var codes = card.pause_codes || {};
         var editable = !!(card.permissions || {}).edit_pause_codes;
+        var view = '<div class="tralla-detail-description">CRM: ' + esc(codes.crm_code || 'Não informado')
+            + '<br>Chamado Externo: ' + esc(codes.external_ticket_code || 'Não informado') + '</div>';
+        // Fechado por padrão: "Editar códigos" abre o formulário e, ao salvar, ele fecha de novo.
         return '<section class="tralla-detail-section">'
             + '<h3><i class="ti ti-ticket"></i> Códigos da pausa</h3>'
             + (editable
-                ? '<div class="tralla-form-grid">'
+                ? '<div data-pause-codes-view>' + view
+                    + '<div class="tralla-detail-edit-actions">'
+                    + '<button type="button" class="tralla-btn tralla-btn-ghost" data-edit-pause-codes>'
+                    + '<i class="ti ti-pencil"></i> Editar códigos</button></div></div>'
+                    + '<div data-pause-codes-editor hidden>'
+                    + '<div class="tralla-form-grid">'
                     + '<div class="tralla-field"><label for="tralla-pause-crm">Código CRM</label>'
                     + '<input id="tralla-pause-crm" type="text" maxlength="100" value="' + attr(codes.crm_code || '') + '"></div>'
                     + '<div class="tralla-field"><label for="tralla-pause-external">Chamado Externo</label>'
                     + '<input id="tralla-pause-external" type="text" maxlength="100" value="' + attr(codes.external_ticket_code || '') + '"></div>'
                     + '</div><div class="tralla-detail-edit-actions">'
+                    + '<button type="button" class="tralla-btn tralla-btn-ghost" data-cancel-pause-codes>Cancelar</button>'
                     + '<button type="button" class="tralla-btn tralla-btn-primary" data-save-pause-codes>'
-                    + '<i class="ti ti-device-floppy"></i> Salvar códigos</button></div>'
-                : '<div class="tralla-detail-description">CRM: ' + esc(codes.crm_code || 'Não informado')
-                    + '<br>Chamado Externo: ' + esc(codes.external_ticket_code || 'Não informado') + '</div>')
+                    + '<i class="ti ti-device-floppy"></i> Salvar códigos</button></div></div>'
+                : view)
             + '</section>';
     }
 
@@ -1770,6 +1784,92 @@
             + '<div class="tralla-sla-priority is-' + attr(String(sla.priority).toLowerCase()) + '">' + esc(sla.label) + '</div>'
             + (sla.start ? '<small class="tralla-sla-start">Contando desde ' + esc(formatDate(sla.start)) + '</small>' : '')
             + '<div class="tralla-sla-rows">' + rows + '</div></div>';
+    }
+
+    function transferDialog(card) {
+        var targets = Array.isArray(card.transfer_targets) ? card.transfer_targets : [];
+        return new Promise(function (resolve) {
+            var uid = 'tralla-transfer-' + Date.now();
+            var previousFocus = document.activeElement;
+            var layer = document.createElement('div');
+            layer.className = 'tralla-dialog-layer';
+            layer.innerHTML = '<div class="tralla-dialog-backdrop" data-dialog-backdrop></div>'
+                + '<div class="tralla-modal tralla-dialog tralla-dialog-primary tralla-confirm-dialog tralla-priority-dialog" role="dialog" aria-modal="true"'
+                + ' aria-labelledby="' + uid + '-title">'
+                + '<div class="tralla-dialog-head">'
+                + '<span class="tralla-dialog-icon" aria-hidden="true"><i class="ti ti-arrows-exchange"></i></span>'
+                + '<div class="tralla-dialog-copy">'
+                + '<h2 class="tralla-dialog-title" id="' + uid + '-title">Transferir card</h2>'
+                + '<p class="tralla-dialog-message">Escolha para onde o card vai. A transferência passa por aprovação.</p>'
+                + '</div></div>'
+                + '<div class="tralla-confirm-card"><span>Card</span><strong><span class="tralla-confirm-code">'
+                + esc(displayCardCode(card.code, card.id)) + '</span> ' + esc(card.name) + '</strong></div>'
+                + '<div class="tralla-priority-options" role="radiogroup" aria-label="Destino">'
+                + '<label class="tralla-priority-option"><input type="radio" name="' + uid + '-target" value="pending">'
+                + '<span class="tralla-priority-tag"><i class="ti ti-inbox"></i></span>'
+                + '<span class="tralla-priority-text"><strong>Pendente</strong><small>Volta para a lista Pendente, sem técnico, para outro pegar.</small></span></label>'
+                + '<label class="tralla-priority-option"><input type="radio" name="' + uid + '-target" value="technician"' + (targets.length ? '' : ' disabled') + '>'
+                + '<span class="tralla-priority-tag"><i class="ti ti-user"></i></span>'
+                + '<span class="tralla-priority-text"><strong>Técnico</strong><small>'
+                + (targets.length ? 'Passa o card para outro técnico do quadro.' : 'Não há outros técnicos neste quadro.') + '</small></span></label>'
+                + '</div>'
+                + '<label class="tralla-field" data-transfer-user-field hidden style="margin:16px 0 0">'
+                + '<span>Técnico</span><select data-transfer-user><option value="">Selecione o técnico</option>'
+                + targets.map(function (target) {
+                    return '<option value="' + Number(target.id) + '">' + esc(target.name) + '</option>';
+                }).join('')
+                + '</select></label>'
+                + '<div class="tralla-dialog-actions">'
+                + '<button type="button" class="tralla-btn tralla-btn-ghost" data-dialog-cancel>Cancelar</button>'
+                + '<button type="button" class="tralla-btn tralla-btn-primary" data-dialog-confirm disabled>'
+                + '<i class="ti ti-arrows-exchange" aria-hidden="true"></i> Continuar</button>'
+                + '</div></div>';
+            document.body.appendChild(layer);
+            document.body.classList.add('tralla-dialog-open');
+            var confirmEl = layer.querySelector('[data-dialog-confirm]');
+            var userField = layer.querySelector('[data-transfer-user-field]');
+            var userEl = layer.querySelector('[data-transfer-user]');
+            var finished = false;
+            function selected() {
+                var checked = layer.querySelector('input[type="radio"]:checked');
+                return checked ? checked.value : '';
+            }
+            function finish(value) {
+                if (finished) { return; }
+                finished = true;
+                document.removeEventListener('keydown', onKeydown, true);
+                layer.remove();
+                if (!document.querySelector('.tralla-dialog-layer')) {
+                    document.body.classList.remove('tralla-dialog-open');
+                }
+                if (previousFocus && document.contains(previousFocus)) { previousFocus.focus(); }
+                resolve(value);
+            }
+            function onKeydown(event) {
+                if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); finish(null); }
+            }
+            function ready() {
+                var target = selected();
+                userField.hidden = target !== 'technician';
+                confirmEl.disabled = !target || (target === 'technician' && !userEl.value);
+            }
+            layer.querySelectorAll('input[type="radio"]').forEach(function (radio) {
+                radio.addEventListener('change', ready);
+            });
+            userEl.addEventListener('change', ready);
+            confirmEl.addEventListener('click', function () {
+                if (!confirmEl.disabled) {
+                    finish({ target: selected(), users_id: selected() === 'technician' ? Number(userEl.value) : 0 });
+                }
+            });
+            layer.querySelector('[data-dialog-backdrop]').addEventListener('click', function () { finish(null); });
+            layer.querySelector('[data-dialog-cancel]').addEventListener('click', function () { finish(null); });
+            document.addEventListener('keydown', onKeydown, true);
+            window.setTimeout(function () {
+                var first = layer.querySelector('input[type="radio"]');
+                if (first) { first.focus(); }
+            }, 30);
+        });
     }
 
     function priorityDialog(card) {
@@ -1992,6 +2092,14 @@
         if (permissions.request_resume) {
             buttons += '<button type="button" class="tralla-btn tralla-btn-primary" data-card-action="resume">'
                 + '<i class="ti ti-player-play"></i> Despausar</button>';
+        }
+        if (permissions.transfer) {
+            buttons += '<button type="button" class="tralla-btn tralla-btn-ghost" data-card-action="transfer">'
+                + '<i class="ti ti-arrows-exchange"></i> Transferir card</button>';
+        }
+        if (permissions.request_takeover) {
+            buttons += '<button type="button" class="tralla-btn tralla-btn-ghost" data-card-action="takeover">'
+                + '<i class="ti ti-hand-grab"></i> Pegar card</button>';
         }
 
         if (permissions.split) {
@@ -2263,6 +2371,22 @@
                 + '</div>';
         }
 
+        if (kind === 'transfer' || kind === 'takeover') {
+            var request = card.transfer_request || {};
+            var destination = request.target === 'pending'
+                ? 'Voltar para Pendente, sem técnico'
+                : 'Passar para ' + (request.user_name || 'outro técnico');
+            return '<div class="tralla-approval-banner is-edit">'
+                + '<i class="ti ' + (kind === 'takeover' ? 'ti-hand-grab' : 'ti-arrows-exchange') + '"></i>'
+                + '<div class="tralla-approval-content"><strong>'
+                + (kind === 'takeover' ? 'Pedido para pegar o card' : 'Transferência aguardando aprovação') + '</strong>'
+                + parentLine
+                + '<small>Técnico atual: ' + esc(request.from_name || 'sem técnico') + ' · ' + esc(destination) + '</small>'
+                + '<small>Ao aprovar, informe o Código CRM.</small></div>'
+                + openParent
+                + '</div>';
+        }
+
         if (kind === 'pause' || kind === 'resume') {
             return '<div class="tralla-approval-banner is-paused">'
                 + '<i class="ti ' + (kind === 'pause' ? 'ti-player-pause' : 'ti-player-play') + '"></i>'
@@ -2304,15 +2428,19 @@
 
         var kind = String(card.pending_approval_kind || 'maintenance');
         var kindClass = kind === 'deletion' ? 'deletion' : (kind === 'call_release' ? 'call-release'
-            : (kind === 'edit' || kind === 'split' ? 'edit' : (kind === 'pause' || kind === 'resume' ? 'paused' : 'finalization')));
-        var label = kind === 'pause' ? 'Pausa pendente de aprovação'
+            : (kind === 'edit' || kind === 'split' || kind === 'transfer' || kind === 'takeover' ? 'edit'
+                : (kind === 'pause' || kind === 'resume' ? 'paused' : 'finalization')));
+        var label = kind === 'transfer' ? 'Transferência pendente de aprovação'
+            : kind === 'takeover' ? 'Pedido para pegar o card pendente de aprovação'
+            : kind === 'pause' ? 'Pausa pendente de aprovação'
             : kind === 'resume' ? 'Despausa pendente de aprovação'
             : kind === 'deletion'
             ? 'Exclusão pendente de aprovação'
             : (kind === 'edit' ? 'Edição pendente de aprovação'
                 : (kind === 'split' ? 'Separação pendente de aprovação'
                     : (kind === 'call_release' ? 'Liberação pendente de aprovação' : 'Finalização pendente de aprovação')));
-        var icon = kind === 'pause' ? 'ti-player-pause' : kind === 'resume' ? 'ti-player-play'
+        var icon = kind === 'transfer' ? 'ti-arrows-exchange' : kind === 'takeover' ? 'ti-hand-grab'
+            : kind === 'pause' ? 'ti-player-pause' : kind === 'resume' ? 'ti-player-play'
             : kind === 'deletion' ? 'ti-trash' : (kind === 'edit' ? 'ti-pencil'
             : (kind === 'split' ? 'ti-git-branch' : (kind === 'call_release' ? 'ti-lock-open' : 'ti-shield-check')));
 
@@ -3152,6 +3280,29 @@
         }
 
         try {
+            if (action === 'transfer' || action === 'takeover') {
+                var choice = action === 'takeover' ? { target: 'takeover', users_id: 0 } : await transferDialog(activeCard);
+                if (!choice) {
+                    return;
+                }
+                if (!await checkboxConfirmation({
+                    title: action === 'takeover' ? 'Pegar card' : 'Transferir card',
+                    message: action === 'takeover'
+                        ? 'Pedir para assumir este card? O pedido vai para aprovação e o técnico atual continua com ele até a decisão.'
+                        : 'Enviar a transferência para aprovação? O card fica bloqueado até a decisão.',
+                    card: activeCard,
+                    confirmLabel: action === 'takeover' ? 'Pedir para pegar' : 'Solicitar transferência'
+                })) {
+                    return;
+                }
+                setBusy(button, true);
+                var transferResult = await api('request_transfer', { id: cardId, target: choice.target, users_id: choice.users_id });
+                applyState(transferResult);
+                toast(action === 'takeover' ? 'Pedido para pegar o card enviado para aprovação.' : 'Transferência enviada para aprovação.', 'success');
+                await openCard(cardId);
+                return;
+            }
+
             if (action === 'pause' || action === 'resume') {
                 var pausing = action === 'pause';
                 var pauseReason = await promptDialog({
@@ -3228,6 +3379,13 @@
                         message: 'Nenhuma máquina será movida; o card de origem será liberado.',
                         label: 'Motivo (opcional)',
                         confirmLabel: 'Recusar separação'
+                    };
+                } else if (kind === 'transfer' || kind === 'takeover') {
+                    rejectConfig = {
+                        title: kind === 'takeover' ? 'Recusar pedido' : 'Recusar transferência',
+                        message: 'O card continua com o técnico atual.',
+                        label: 'Motivo (opcional)',
+                        confirmLabel: 'Recusar'
                     };
                 } else if (kind === 'pause' || kind === 'resume') {
                     rejectConfig = {
@@ -3342,6 +3500,16 @@
                         icon: 'ti-git-branch',
                         confirmLabel: 'Aprovar separação'
                     };
+                } else if (kind === 'transfer' || kind === 'takeover') {
+                    var transferInfo = activeCard.transfer_request || {};
+                    approveConfig = {
+                        title: kind === 'takeover' ? 'Aprovar pedido para pegar' : 'Aprovar transferência',
+                        message: transferInfo.target === 'pending'
+                            ? 'Devolver o card para Pendente, sem técnico?'
+                            : 'Passar o card para ' + (transferInfo.user_name || 'o técnico escolhido') + '?',
+                        icon: 'ti-arrows-exchange',
+                        confirmLabel: 'Aprovar'
+                    };
                 } else if (kind === 'pause' || kind === 'resume') {
                     approveConfig = {
                         title: kind === 'pause' ? 'Aprovar pausa' : 'Aprovar despausa',
@@ -3368,10 +3536,10 @@
                     }
                     chosenPriority = releaseChoice.priority;
                     chosenCode = releaseChoice.code;
-                } else if (kind === 'pause' || kind === 'resume') {
+                } else if (kind === 'pause' || kind === 'resume' || kind === 'transfer' || kind === 'takeover') {
                     var approvalCodeLabel = kind === 'pause' ? 'Chamado Externo' : 'Código CRM';
                     chosenCode = await promptDialog({
-                        title: kind === 'pause' ? 'Aprovar pausa' : 'Aprovar despausa',
+                        title: approveConfig.title,
                         message: 'Informe ' + approvalCodeLabel + ' para concluir a aprovação.',
                         label: approvalCodeLabel,
                         required: true,
@@ -3437,6 +3605,9 @@
                     await openCard(data.card.id);
                 } else if (isSplitApproval) {
                     toast('Separação aprovada. Novo card criado.', 'success');
+                    await openCard(data.card.id);
+                } else if (kind === 'transfer' || kind === 'takeover') {
+                    toast('Transferência aprovada.', 'success');
                     await openCard(data.card.id);
                 } else if (kind === 'pause' || kind === 'resume') {
                     toast(kind === 'pause' ? 'Card pausado.' : 'Card despausado.', 'success');
@@ -5370,6 +5541,22 @@
         var saveDescriptionButton = event.target.closest('[data-save-description]');
         if (saveDescriptionButton) {
             saveDescription(saveDescriptionButton);
+            return;
+        }
+        var editPauseCodesButton = event.target.closest('[data-edit-pause-codes]');
+        if (editPauseCodesButton) {
+            modalRoot.querySelector('[data-pause-codes-view]').hidden = true;
+            modalRoot.querySelector('[data-pause-codes-editor]').hidden = false;
+            modalRoot.querySelector('#tralla-pause-crm').focus();
+            return;
+        }
+        var cancelPauseCodesButton = event.target.closest('[data-cancel-pause-codes]');
+        if (cancelPauseCodesButton) {
+            var savedCodes = activeCard.pause_codes || {};
+            modalRoot.querySelector('#tralla-pause-crm').value = savedCodes.crm_code || '';
+            modalRoot.querySelector('#tralla-pause-external').value = savedCodes.external_ticket_code || '';
+            modalRoot.querySelector('[data-pause-codes-editor]').hidden = true;
+            modalRoot.querySelector('[data-pause-codes-view]').hidden = false;
             return;
         }
         var savePauseCodesButton = event.target.closest('[data-save-pause-codes]');

@@ -406,6 +406,8 @@ class PluginTrallaCard extends CommonDBTM
         $card['edit_changes'] = [];
         $card['split_machine_ids'] = [];
         $card['pause_request_reason'] = '';
+        $card['transfer_targets'] = [];
+        $card['transfer_request'] = null;
         if (!empty($card['is_paused'])) {
             $card['status_label'] = 'Pausado';
         }
@@ -564,6 +566,21 @@ class PluginTrallaCard extends CommonDBTM
                 $card['permissions']['split'] = false;
             }
         }
+        if (!empty($card['permissions']['transfer'])) {
+            $card['transfer_targets'] = self::transferTargets($card);
+        }
+        if ((int) $card['stage'] === 2 && in_array((string) ($card['approval_kind'] ?? ''), ['transfer', 'takeover'], true)) {
+            $payload = json_decode($rawEditPayload, true);
+            if (is_array($payload)) {
+                $card['transfer_request'] = [
+                    'target'    => (string) ($payload['target'] ?? ''),
+                    'users_id'  => (int) ($payload['users_id'] ?? 0),
+                    'user_name' => tralla_user_name((int) ($payload['users_id'] ?? 0)),
+                    'from_name' => tralla_user_name((int) ($payload['from_users_id'] ?? 0)),
+                ];
+            }
+        }
+
         if ($card['split_snapshot'] !== null) {
             $card['permissions'] = array_map(static fn ($allowed) => false, $card['permissions']);
             $card['status'] = 'approved';
@@ -777,6 +794,14 @@ class PluginTrallaCard extends CommonDBTM
             && in_array($status, ['pending', 'in_progress'], true);
         $canRequestResume = $canAskPause && $paused;
 
+        // Transferir (dono do card) ou pedir para pegar (outro membro) um card em andamento.
+        $canMoveOwner = $isMember && $canUpdate && $boardType === 'maintenance' && $stage === 1
+            && $status === 'in_progress' && !$locked && !$paused && !$awaitingDecision
+            && (int) ($card['technician_id'] ?? 0) > 0
+            && empty($card['is_archived']) && empty($card['is_deleted']);
+        $canTransfer = $canMoveOwner && $isTechnician;
+        $canRequestTakeover = $canMoveOwner && !$isTechnician;
+
         $canRequestCallRelease = $isMember
             && (PluginTrallaBoardUser::getRole($boardId, $userId) === 'superadmin'
                 || (int) ($card['users_id'] ?? 0) === $userId)
@@ -831,6 +856,8 @@ class PluginTrallaCard extends CommonDBTM
             'tablet_edit'      => $canTabletEdit,
             'request_pause'    => $canRequestPause,
             'request_resume'   => $canRequestResume,
+            'transfer'         => $canTransfer,
+            'request_takeover' => $canRequestTakeover,
             'edit_pause_codes' => $boardType === 'maintenance' && $stage === 1 && $paused
                 && $isMember && self::userIsApprover($userId, $boardId),
             'edit_card'        => $canEditCard,
@@ -2511,6 +2538,9 @@ class PluginTrallaCard extends CommonDBTM
         if ($kind === 'call_release') {
             return self::decideCallRelease($approvalId, $approve, $reason, $userId, $priority, $code);
         }
+        if ($kind === 'transfer' || $kind === 'takeover') {
+            return self::decideTransfer($approvalId, $approve, $reason, $userId, $code);
+        }
         if ($kind === 'pause' || $kind === 'resume') {
             return self::decidePauseChange($approvalId, $approve, $reason, $userId, $code);
         }
@@ -2915,6 +2945,242 @@ class PluginTrallaCard extends CommonDBTM
      * Cria um card de aprovação. O pedido de pausa já coloca o card na lista de pausados;
      * a suspensão efetiva dos prazos acontece somente depois da aprovação.
      */
+    /** Membros do quadro (sem Tablet) que podem receber o card, exceto o técnico atual. */
+    private static function transferTargets(array $card): array
+    {
+        global $DB;
+
+        $targets = [];
+        foreach ($DB->request([
+            'SELECT' => ['users_id'],
+            'FROM'   => 'glpi_plugin_tralla_boards_users',
+            'WHERE'  => [
+                'plugin_tralla_boards_id' => (int) $card['plugin_tralla_boards_id'],
+                'role'                    => ['member', 'admin', 'superadmin'],
+                'NOT'                     => ['users_id' => (int) ($card['technician_id'] ?? 0)],
+            ],
+        ]) as $row) {
+            $name = tralla_user_name((int) $row['users_id']);
+            if ($name !== '') {
+                $targets[] = ['id' => (int) $row['users_id'], 'name' => $name];
+            }
+        }
+        usort($targets, static fn (array $a, array $b): int => strcasecmp($a['name'], $b['name']));
+
+        return $targets;
+    }
+
+    /**
+     * O técnico do card pede para devolvê-lo a Pendente ($target = 'pending') ou passá-lo a
+     * outro técnico ($target = 'technician'); outro membro pede para pegá-lo ($target = 'takeover').
+     * Cria um card de aprovação; nada muda até a decisão.
+     */
+    public static function requestTransfer(int $id, string $target, int $targetUserId = 0, int $userId = 0): array
+    {
+        global $DB;
+
+        if ($userId <= 0) {
+            $userId = (int) Session::getLoginUserID();
+        }
+        if (!in_array($target, ['pending', 'technician', 'takeover'], true)) {
+            throw new RuntimeException('Escolha para onde transferir o card.');
+        }
+        $card = self::getCard($id);
+        if ($card === null) {
+            throw new RuntimeException('Card não encontrado.');
+        }
+        self::assertBoardAccess($card);
+        $boards_id = (int) $card['plugin_tralla_boards_id'];
+        $boardType = self::getBoardType($boards_id);
+        $kind = $target === 'takeover' ? 'takeover' : 'transfer';
+
+        $approvalId = 0;
+        $DB->beginTransaction();
+        try {
+            self::lockCardRow(self::codeRoot($card));
+            self::lockCardRow($id);
+            $fresh = self::getCard($id);
+            if ($fresh === null) {
+                throw new RuntimeException('Card não encontrado.');
+            }
+            $permissions = self::permissionsFor($fresh, $boardType, $userId, false);
+            if (empty($permissions[$kind === 'takeover' ? 'request_takeover' : 'transfer'])) {
+                throw new RuntimeException($kind === 'takeover'
+                    ? 'Este card não pode ser pego agora.' : 'Somente o técnico do card em andamento pode transferi-lo.');
+            }
+            if ($target === 'takeover') {
+                $targetUserId = $userId;
+            } elseif ($target === 'technician') {
+                if (!in_array($targetUserId, array_column(self::transferTargets($fresh), 'id'), true)) {
+                    throw new RuntimeException('Escolha um técnico do quadro.');
+                }
+            } else {
+                $targetUserId = 0;
+            }
+            $approvalList = PluginTrallaBoard::findListByCategory($boards_id, 'maintenance_approval');
+            if ($approvalList === null) {
+                throw new RuntimeException('O quadro não possui a lista "Manutenção Aprovação".');
+            }
+
+            $codeRoot = self::codeRoot($fresh);
+            $now = tralla_now();
+            $DB->insert('glpi_plugin_tralla_cards', [
+                'plugin_tralla_boards_id' => $boards_id,
+                'plugin_tralla_lists_id'  => (int) $approvalList['id'],
+                'name'                    => (string) $fresh['name'],
+                'description'             => $fresh['description'],
+                'call_category'           => (string) ($fresh['call_category'] ?? ''),
+                'call_subcategory'        => (string) ($fresh['call_subcategory'] ?? ''),
+                'rank'                    => self::nextRankForList((int) $approvalList['id']),
+                'users_id'                => $userId,
+                'technician_id'           => (int) $fresh['technician_id'],
+                'stage'                   => 2,
+                'parent_cards_id'         => $id,
+                'approval_cards_id'       => 0,
+                'family_cards_id'         => self::familyRoot($fresh),
+                'code_root_cards_id'      => $codeRoot,
+                'family_seq'              => self::nextCodeSequence($codeRoot),
+                'split_from_cards_id'     => 0,
+                'approval_kind'           => $kind,
+                'workflow_type'           => (string) ($fresh['workflow_type'] ?? 'maintenance'),
+                'edit_payload'            => json_encode([
+                    'target'        => $target === 'pending' ? 'pending' : 'technician',
+                    'users_id'      => $targetUserId,
+                    'from_users_id' => (int) $fresh['technician_id'],
+                ], JSON_UNESCAPED_UNICODE),
+                'status'                  => 'waiting_approval',
+                'is_locked'               => 0,
+                'is_archived'             => 0,
+                'source'                  => (string) $fresh['source'],
+                'machines_total'          => (int) ($fresh['machines_total'] ?? 0),
+                'date_creation'           => $now,
+                'date_mod'                => $now,
+            ]);
+            $approvalId = (int) $DB->insertId();
+            $DB->update('glpi_plugin_tralla_cards', [
+                'approval_cards_id' => $approvalId,
+                'date_mod'          => $now,
+            ], ['id' => $id]);
+
+            $message = $target === 'pending'
+                ? 'Transferência para Pendente solicitada; aguardando aprovação.'
+                : ($target === 'takeover'
+                    ? tralla_user_name($userId) . ' pediu para pegar o card; aguardando aprovação.'
+                    : 'Transferência para ' . tralla_user_name($targetUserId) . ' solicitada; aguardando aprovação.');
+            PluginTrallaHistory::log($id, $userId, 'transfer_requested', $message);
+            PluginTrallaHistory::log($approvalId, $userId, 'approval_created', $message);
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
+        }
+
+        return [
+            'card'     => self::getCardDetail($id, $userId),
+            'approval' => self::getCardDetail($approvalId, $userId),
+        ];
+    }
+
+    /** Aprovar exige o Código CRM, gravado nos códigos do card. */
+    private static function decideTransfer(int $approvalId, bool $approve, string $reason, int $userId, string $code): array
+    {
+        global $DB;
+
+        $approval = self::getCard($approvalId);
+        $kind = (string) ($approval['approval_kind'] ?? '');
+        if ($approval === null || (int) $approval['stage'] !== 2 || !in_array($kind, ['transfer', 'takeover'], true)
+            || (string) $approval['status'] !== 'waiting_approval' || !empty($approval['is_archived'])) {
+            throw new RuntimeException('Pedido não encontrado.');
+        }
+        $parentId = (int) $approval['parent_cards_id'];
+        $parent = self::getCard($parentId);
+        if ($parent === null) {
+            throw new RuntimeException('Card de origem não encontrado.');
+        }
+        self::assertBoardAccess($parent);
+        $boardId = (int) $parent['plugin_tralla_boards_id'];
+        if (!self::userIsApprover($userId, $boardId)) {
+            throw new RuntimeException('Sem permissão para aprovar ou recusar.');
+        }
+        $reason = trim(strip_tags($reason));
+        $code = trim($code);
+        if ($approve && (mb_strlen($code) > 100 || !preg_match('/^[\p{L}\p{N}][\p{L}\p{N} ._\/-]*$/u', $code))) {
+            throw new RuntimeException('Informe um Código CRM válido (letras e números, até 100 caracteres).');
+        }
+        $payload = json_decode((string) ($approval['edit_payload'] ?? ''), true);
+        $payload = is_array($payload) ? $payload : [];
+        $toPending = (string) ($payload['target'] ?? '') === 'pending';
+        $targetUserId = (int) ($payload['users_id'] ?? 0);
+        $pendingList = PluginTrallaBoard::findListByCategory($boardId, 'maintenance_pending');
+        if ($approve && $toPending && $pendingList === null) {
+            throw new RuntimeException('O quadro não possui a lista "Manutenção Pendente".');
+        }
+        if ($approve && !$toPending && !in_array(PluginTrallaBoard::roleFor($boardId, $targetUserId), ['member', 'admin', 'superadmin'], true)) {
+            throw new RuntimeException('O técnico escolhido não é mais membro do quadro.');
+        }
+
+        $DB->beginTransaction();
+        try {
+            self::lockCardRow($parentId);
+            $approval = self::getCard($approvalId);
+            $parent = self::getCard($parentId);
+            if ($approval === null || $parent === null
+                || (string) $approval['status'] !== 'waiting_approval' || !empty($approval['is_archived'])
+                || (int) ($parent['approval_cards_id'] ?? 0) !== $approvalId
+                || (string) $parent['status'] !== 'in_progress' || !empty($parent['is_paused'])) {
+                throw new RuntimeException('Este pedido não está mais aguardando aprovação.');
+            }
+
+            $now = tralla_now();
+            $fields = ['approval_cards_id' => 0, 'date_mod' => $now];
+            if ($approve && $toPending) {
+                $fields += [
+                    'status'                 => 'pending',
+                    'technician_id'          => 0,
+                    'plugin_tralla_lists_id' => (int) $pendingList['id'],
+                    'rank'                   => self::nextRankForList((int) $pendingList['id']),
+                    'pending_reminded_at'    => $now,
+                ];
+            } elseif ($approve) {
+                $fields += ['technician_id' => $targetUserId, 'sla_alerts_sent' => ''];
+            }
+            if ($approve) {
+                $parentPayload = json_decode((string) ($parent['edit_payload'] ?? ''), true);
+                $parentPayload = is_array($parentPayload) ? $parentPayload : [];
+                $parentPayload['crm_code'] = $code;
+                $fields['edit_payload'] = json_encode($parentPayload, JSON_UNESCAPED_UNICODE);
+            }
+            $DB->update('glpi_plugin_tralla_cards', $fields, ['id' => $parentId]);
+            $DB->update('glpi_plugin_tralla_cards', [
+                'status'            => $approve ? 'approved' : 'rejected',
+                'is_archived'       => 1,
+                'edit_payload'      => json_encode($payload + ($approve ? ['crm_code' => $code] : []), JSON_UNESCAPED_UNICODE),
+                'users_id_approver' => $userId,
+                'rejection_reason'  => !$approve && $reason !== '' ? $reason : null,
+                'date_mod'          => $now,
+            ], ['id' => $approvalId]);
+
+            $from = tralla_user_name((int) ($payload['from_users_id'] ?? 0));
+            if ($approve) {
+                $message = ($toPending
+                    ? 'Card devolvido a Pendente, sem técnico'
+                    : 'Card transferido de ' . ($from !== '' ? $from : 'sem técnico') . ' para ' . tralla_user_name($targetUserId))
+                    . '. Código CRM: ' . $code . '.';
+            } else {
+                $message = 'Transferência recusada; o card continua com ' . ($from !== '' ? $from : 'o técnico atual') . '.'
+                    . ($reason !== '' ? ' Motivo: ' . $reason : '');
+            }
+            PluginTrallaHistory::log($parentId, $userId, $approve ? 'transfer_approved' : 'transfer_rejected', $message);
+            PluginTrallaHistory::log($approvalId, $userId, $approve ? 'approval_approved' : 'approval_rejected', $message);
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
+        }
+
+        return self::getCardDetail($parentId, $userId);
+    }
+
     public static function requestPauseChange(int $id, string $kind, string $reason, int $userId = 0): array
     {
         global $DB;

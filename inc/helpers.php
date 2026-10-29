@@ -406,6 +406,8 @@ if (!function_exists('tralla_approval_kind_labels')) {
             'whatsapp'    => 'Acompanhamento (WhatsApp)',
             'pause'       => 'Aprovação de pausa',
             'resume'      => 'Aprovação para despausar',
+            'transfer'    => 'Aprovação de transferência',
+            'takeover'    => 'Aprovação para pegar card',
         ];
     }
 }

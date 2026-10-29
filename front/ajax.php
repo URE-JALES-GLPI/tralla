@@ -512,6 +512,20 @@ try {
                 'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id']),
             ]]);
 
+        case 'request_transfer':
+            tralla_ajax_require(UPDATE);
+            $result = PluginTrallaCard::requestTransfer(
+                tralla_post_int('id'),
+                tralla_post_string('target'),
+                tralla_post_int('users_id'),
+                $userId
+            );
+            tralla_json(['ok' => true, 'data' => [
+                'state'    => tralla_ajax_state((int) $result['card']['plugin_tralla_boards_id']),
+                'card'     => $result['card'],
+                'approval' => $result['approval'],
+            ]]);
+
         case 'deleted_cards':            $boards_id = tralla_post_int('boards_id');
             if (!PluginTrallaBoard::canAdminBoard($boards_id)) {
                 throw new RuntimeException('Você não tem acesso aos cards excluídos deste quadro.');
