@@ -81,15 +81,30 @@
         }
     }
 
-    function toast(message, type) {
+    var toastQueue = [];
+    var visibleToasts = 0;
+
+    function showNextToast() {
+        if (!toastRoot || visibleToasts >= 2 || !toastQueue.length) {
+            return;
+        }
+        var next = toastQueue.shift();
         var element = document.createElement('div');
-        element.className = 'tralla-toast' + (type === 'error' ? ' is-error' : (type === 'success' ? ' is-success' : ''));
-        element.innerHTML = '<i class="ti ' + (type === 'error' ? 'ti-alert-triangle' : 'ti-circle-check') + '"></i>'
-            + '<span>' + esc(message) + '</span>';
+        element.className = 'tralla-toast' + (next.type === 'error' ? ' is-error' : (next.type === 'success' ? ' is-success' : ''));
+        element.innerHTML = '<i class="ti ' + (next.type === 'error' ? 'ti-alert-triangle' : 'ti-circle-check') + '"></i>'
+            + '<span>' + esc(next.message) + '</span>';
         toastRoot.appendChild(element);
+        visibleToasts++;
         window.setTimeout(function () {
             element.remove();
+            visibleToasts--;
+            showNextToast();
         }, 4200);
+    }
+
+    function toast(message, type) {
+        toastQueue.push({ message: message, type: type });
+        showNextToast();
     }
 
     /**

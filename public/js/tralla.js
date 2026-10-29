@@ -807,29 +807,44 @@
             + '</div>';
     }
 
-    function toast(message, type, duration) {
-        if (!toastRoot) {
+    var toastQueue = [];
+    var visibleToasts = 0;
+
+    function showNextToast() {
+        if (!toastRoot || visibleToasts >= 2 || !toastQueue.length) {
             return;
         }
+        var next = toastQueue.shift();
         var element = document.createElement('div');
-        var toastType = type === 'error'
+        var toastType = next.type === 'error'
             ? ' is-error'
-            : (type === 'success' ? ' is-success' : (type === 'activity' ? ' is-activity' : ''));
+            : (next.type === 'success' ? ' is-success' : (next.type === 'activity' ? ' is-activity' : ''));
         element.className = 'tralla-toast' + toastType;
-        var icon = type === 'error'
+        var icon = next.type === 'error'
             ? 'ti-alert-triangle'
-            : (type === 'success'
+            : (next.type === 'success'
                 ? 'ti-circle-check'
-                : (type === 'activity' ? 'ti-activity' : 'ti-info-circle'));
-        element.innerHTML = '<i class="ti ' + icon + '"></i><span>' + esc(message) + '</span>';
+                : (next.type === 'activity' ? 'ti-activity' : 'ti-info-circle'));
+        element.innerHTML = '<i class="ti ' + icon + '"></i><span>' + esc(next.message) + '</span>';
         toastRoot.appendChild(element);
+        visibleToasts++;
         window.setTimeout(function () {
             element.style.opacity = '0';
             element.style.transform = 'translateY(6px)';
             window.setTimeout(function () {
                 element.remove();
+                visibleToasts--;
+                showNextToast();
             }, 220);
-        }, duration || 3800);
+        }, next.duration || 3800);
+    }
+
+    function toast(message, type, duration) {
+        if (!toastRoot) {
+            return;
+        }
+        toastQueue.push({ message: message, type: type, duration: duration });
+        showNextToast();
     }
 
     async function api(action, payload) {
