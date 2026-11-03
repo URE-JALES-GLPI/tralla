@@ -10,6 +10,27 @@
     var boardModal = document.getElementById('tralla-board-create');
     var organizer = document.querySelector('[data-board-organizer]');
 
+    // Quadro ocupa exatamente o espaço visível: sem barra de rolagem da página (só a do quadro).
+    if (root) {
+        var fitBoard = function () {
+            if (window.innerWidth <= 900) {
+                document.documentElement.classList.remove('tralla-board-fit');
+                root.style.height = root.style.width = root.style.marginRight = '';
+                return;
+            }
+            document.documentElement.classList.add('tralla-board-fit');
+            var rect = root.getBoundingClientRect();
+            var top = rect.top + window.scrollY;
+            var left = rect.left + window.scrollX;
+            root.style.height = Math.max(320, window.innerHeight - top) + 'px';
+            root.style.width = Math.max(320, document.documentElement.clientWidth - left) + 'px';
+            root.style.marginRight = '0';
+        };
+        fitBoard();
+        window.addEventListener('resize', fitBoard);
+        window.addEventListener('load', fitBoard);
+    }
+
     if (organizer) {
         var draggedBoard = null;
         var placeholder = document.createElement('div');

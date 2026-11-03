@@ -5397,3 +5397,18 @@ body[data-theme="dark"] .tralla-dialog-danger .tralla-finalize-requirements {
     display: inline-block;
     min-width: 32px;
 }
+
+/* Desktop: o quadro cabe na janela (altura/largura ajustadas no JS); só o quadro rola. */
+html.tralla-board-fit,
+html.tralla-board-fit body {
+    overflow: hidden !important;
+}
+html.tralla-board-fit .tralla-kanban-page {
+    min-height: 0;
+}
+html.tralla-board-fit .tralla-board-scroll {
+    min-height: 0;
+}
+html.tralla-board-fit .tralla-list {
+    max-height: 100%;
+}
