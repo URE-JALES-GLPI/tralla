@@ -1245,6 +1245,164 @@
         return Number(left.rank) - Number(right.rank) || Number(left.id) - Number(right.id);
     }
 
+    // Filtro por lista (Em Andamento, Retirada, Concluído): data, SLA e técnico.
+    // Fica salvo neste navegador por quadro e lista.
+    var filterableCategories = {
+        maintenance_in_progress: true,
+        maintenance_withdrawal: true,
+        maintenance_done: true
+    };
+    var listFilterDateFields = {
+        date_creation: 'Criação',
+        date_taken: 'Pego em',
+        date_finalized: 'Finalização',
+        date_withdrawn: 'Retirada / conclusão'
+    };
+    var listFilterSlaStates = {
+        running: 'No prazo',
+        overdue: 'Atrasado',
+        met: 'Cumprido',
+        late_met: 'Cumprido com atraso',
+        paused: 'Pausado',
+        none: 'Sem prioridade'
+    };
+    var listFilterStorageKey = 'tralla-list-filters-' + Number((state.board || {}).id || 0);
+    var listFilters = (function () {
+        try {
+            var saved = JSON.parse(window.localStorage.getItem(listFilterStorageKey) || '{}');
+            return saved && typeof saved === 'object' ? saved : {};
+        } catch (error) {
+            return {};
+        }
+    })();
+
+    function saveListFilters() {
+        try {
+            window.localStorage.setItem(listFilterStorageKey, JSON.stringify(listFilters));
+        } catch (error) {
+            /* sem armazenamento: o filtro vale só até recarregar */
+        }
+    }
+
+    function listFilterActive(filter) {
+        return !!(filter && (filter.from || filter.to || filter.sla || filter.technician));
+    }
+
+    function cardSlaState(card) {
+        var sla = card && card.sla;
+        if (!sla || !sla.priority) {
+            return 'none';
+        }
+        if (sla.next) {
+            return String(sla.next.state || '');
+        }
+        var steps = Array.isArray(sla.steps) ? sla.steps : [];
+        return steps.length ? String(steps[steps.length - 1].state || '') : 'none';
+    }
+
+    function cardMatchesListFilter(card, filter) {
+        if (!listFilterActive(filter)) {
+            return true;
+        }
+        if (filter.from || filter.to) {
+            var day = String(card[filter.date_field || 'date_creation'] || '').slice(0, 10);
+            if (!day || (filter.from && day < filter.from) || (filter.to && day > filter.to)) {
+                return false;
+            }
+        }
+        if (filter.sla && cardSlaState(card) !== filter.sla) {
+            return false;
+        }
+        if (filter.technician) {
+            var technicianId = Number(card.technician_id || 0);
+            if (filter.technician === 'none' ? technicianId > 0 : technicianId !== Number(filter.technician)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function listFilterDialog(list) {
+        var listId = Number(list.id);
+        var current = listFilters[listId] || {};
+        var technicians = (state.technicians || []).filter(function (item) { return Number(item.id) > 0; });
+        var option = function (value, label, selected) {
+            return '<option value="' + attr(value) + '"' + (String(selected || '') === String(value) ? ' selected' : '') + '>'
+                + esc(label) + '</option>';
+        };
+        var layer = document.createElement('div');
+        layer.className = 'tralla-dialog-layer';
+        layer.innerHTML = '<div class="tralla-dialog-backdrop" data-close></div>'
+            + '<div class="tralla-modal tralla-dialog tralla-dialog-primary tralla-confirm-dialog tralla-priority-dialog tralla-filter-dialog" role="dialog" aria-modal="true" aria-label="Filtrar lista">'
+            + '<div class="tralla-dialog-head"><span class="tralla-dialog-icon" aria-hidden="true"><i class="ti ti-filter"></i></span>'
+            + '<div class="tralla-dialog-copy"><h2 class="tralla-dialog-title">Filtrar ' + esc(list.name) + '</h2>'
+            + '<p class="tralla-dialog-message">Mostra só os cards desta lista que atendem aos filtros. Deixe em branco o que não quiser filtrar.</p></div></div>'
+            + '<label class="tralla-field"><span>Data</span><select data-filter="date_field">'
+            + Object.keys(listFilterDateFields).map(function (key) {
+                return option(key, listFilterDateFields[key], current.date_field || 'date_creation');
+            }).join('') + '</select></label>'
+            + '<div class="tralla-filter-dates">'
+            + '<label class="tralla-field"><span>De</span><input type="date" data-filter="from" value="' + attr(current.from || '') + '"></label>'
+            + '<label class="tralla-field"><span>Até</span><input type="date" data-filter="to" value="' + attr(current.to || '') + '"></label>'
+            + '</div>'
+            + '<label class="tralla-field"><span>SLA</span><select data-filter="sla">' + option('', 'Todos', current.sla)
+            + Object.keys(listFilterSlaStates).map(function (key) {
+                return option(key, listFilterSlaStates[key], current.sla);
+            }).join('') + '</select></label>'
+            + '<label class="tralla-field"><span>Técnico</span><select data-filter="technician">' + option('', 'Todos', current.technician)
+            + option('none', 'Sem técnico', current.technician)
+            + technicians.map(function (item) { return option(String(Number(item.id)), item.name, current.technician); }).join('')
+            + '</select></label>'
+            + '<div class="tralla-dialog-actions">'
+            + '<button type="button" class="tralla-btn tralla-btn-ghost" data-filter-clear>Limpar filtros</button>'
+            + '<button type="button" class="tralla-btn tralla-btn-ghost" data-close>Cancelar</button>'
+            + '<button type="button" class="tralla-btn tralla-btn-primary" data-filter-apply><i class="ti ti-filter"></i> Aplicar</button>'
+            + '</div></div>';
+        document.body.appendChild(layer);
+        document.body.classList.add('tralla-dialog-open');
+        var previousFocus = document.activeElement;
+        function close() {
+            document.removeEventListener('keydown', onKeydown, true);
+            layer.remove();
+            if (!document.querySelector('.tralla-dialog-layer')) {
+                document.body.classList.remove('tralla-dialog-open');
+            }
+            if (previousFocus && document.contains(previousFocus)) { previousFocus.focus(); }
+        }
+        function onKeydown(event) {
+            if (event.key === 'Escape') { event.preventDefault(); close(); }
+        }
+        function value(name) {
+            return String(layer.querySelector('[data-filter="' + name + '"]').value || '');
+        }
+        document.addEventListener('keydown', onKeydown, true);
+        layer.querySelectorAll('[data-close]').forEach(function (el) { el.addEventListener('click', close); });
+        layer.querySelector('[data-filter-clear]').addEventListener('click', function () {
+            delete listFilters[listId];
+            saveListFilters();
+            close();
+            renderBoard();
+        });
+        layer.querySelector('[data-filter-apply]').addEventListener('click', function () {
+            var from = value('from');
+            var to = value('to');
+            if (from && to && from > to) {
+                toast('A data inicial precisa ser anterior à final.', 'error');
+                return;
+            }
+            var next = { date_field: value('date_field'), from: from, to: to, sla: value('sla'), technician: value('technician') };
+            if (listFilterActive(next)) {
+                listFilters[listId] = next;
+            } else {
+                delete listFilters[listId];
+            }
+            saveListFilters();
+            close();
+            renderBoard();
+        });
+        window.setTimeout(function () { layer.querySelector('[data-filter="date_field"]').focus(); }, 30);
+    }
+
     function renderList(list, cards) {
         var listId = Number(list.id);
         var sortBySla = isMaintenance && !!slaSortedCategories[list.category];
@@ -1253,6 +1411,17 @@
         }).sort(sortBySla ? compareBySla : function (left, right) {
             return Number(left.rank) - Number(right.rank) || Number(left.id) - Number(right.id);
         });
+        var filterable = isMaintenance && !!filterableCategories[list.category];
+        var activeFilter = filterable && listFilterActive(listFilters[listId]) ? listFilters[listId] : null;
+        var unfilteredCount = listCards.length;
+        if (activeFilter) {
+            listCards = listCards.filter(function (card) { return cardMatchesListFilter(card, activeFilter); });
+        }
+        var filterButton = filterable
+            ? '<button type="button" class="tralla-icon-btn tralla-list-filter-btn' + (activeFilter ? ' is-active' : '')
+                + '" data-list-filter="' + listId + '" title="' + (activeFilter ? 'Filtro ativo: clique para alterar' : 'Filtrar por data, SLA ou técnico')
+                + '" aria-label="Filtrar lista"><i class="ti ti-filter' + (activeFilter ? '-filled' : '') + '"></i></button>'
+            : '';
 
         var color = safeColor(list.color, palette[list.category] || palette['']);
         var actions = '';
@@ -1281,7 +1450,10 @@
         return '<section class="tralla-list" data-list-id="' + listId + '">'
             + '<header class="tralla-list-head" style="--tr-list-color:' + attr(color) + '">'
             + '<div class="tralla-list-title">' + categoryDot + '<h3>' + esc(list.name) + '</h3>'
-            + '<span class="tralla-list-count">' + listCards.length + '</span></div>'
+            + '<span class="tralla-list-count' + (activeFilter ? ' is-filtered' : '') + '"'
+            + (activeFilter ? ' title="' + attr(listCards.length + ' de ' + unfilteredCount + ' cards (filtro ativo)') + '"' : '') + '>'
+            + (activeFilter ? listCards.length + ' de ' + unfilteredCount : listCards.length) + '</span></div>'
+            + filterButton
             + (actions ? '<div class="tralla-list-head-actions">' + actions + '</div>' : '')
             + '</header>'
             + '<div class="tralla-cards" data-list-id="' + listId + '">'
@@ -5253,6 +5425,15 @@
         if (cancelInline) {
             event.preventDefault();
             closeInlineCardComposer();
+            return;
+        }
+
+        var filterListButton = event.target.closest('[data-list-filter]');
+        if (filterListButton) {
+            var filterList = (state.lists || []).find(function (item) {
+                return Number(item.id) === Number(filterListButton.dataset.listFilter);
+            });
+            if (filterList) { listFilterDialog(filterList); }
             return;
         }
 

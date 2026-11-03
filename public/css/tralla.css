@@ -1047,6 +1047,25 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
     opacity: 1;
 }
 
+/* Filtro da lista: sempre visível e destacado quando ativo. */
+.tralla-list-filter-btn { flex: none; margin-left: auto; }
+.tralla-list-head .tralla-list-filter-btn.is-active {
+    background: var(--tr-primary-soft);
+    color: var(--tr-primary);
+}
+.tralla-list-count.is-filtered {
+    background: var(--tr-primary-soft);
+    color: var(--tr-primary);
+    font-weight: 700;
+}
+.tralla-filter-dialog .tralla-filter-dates {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: 1fr 1fr;
+    margin: 0 24px;
+}
+.tralla-filter-dialog .tralla-filter-dates > .tralla-field { margin: 16px 0 0 !important; }
+
 .tralla-list-head .tralla-icon-btn {
     color: var(--tr-muted);
     height: 26px;
