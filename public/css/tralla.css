@@ -5314,3 +5314,18 @@ body[data-theme="dark"] .tralla-dialog-danger .tralla-finalize-requirements {
     background: var(--tr-primary-soft);
     border-color: var(--tr-primary);
 }
+
+/* Liberação pela Seintec/estagiário: CRM opcional (só SuperAdmin). */
+.tralla-priority-seintec {
+    align-items: center;
+    cursor: pointer;
+    display: flex;
+    font-size: 13px;
+    font-weight: 600;
+    gap: 8px;
+    margin: 16px 0 0;
+}
+.tralla-priority-seintec small {
+    color: var(--tr-muted);
+    font-weight: 400;
+}

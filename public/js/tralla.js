@@ -2081,8 +2081,12 @@
                         + ' · Definitiva: ' + esc(item.definitive) + '</small></span></label>';
                 }).join('')
                 + '</div>'
-                + '<label class="tralla-field" style="display:block;margin:16px 0 0">'
-                + '<span>CRM <strong aria-hidden="true">*</strong></span>'
+                + (state.board && state.board.can_defer_call
+                    ? '<label class="tralla-priority-seintec"><input type="checkbox" data-approval-seintec>'
+                        + '<span>Seintec/Estagiário <small>(CRM opcional)</small></span></label>'
+                    : '')
+                + '<label class="tralla-field" style="display:block;margin:16px 0 0" data-approval-code-field>'
+                + '<span>CRM <strong aria-hidden="true" data-approval-code-required>*</strong></span>'
                 + '<input type="text" data-approval-code maxlength="255" required placeholder="Informe o CRM para liberar"></label>'
                 + '<div class="tralla-dialog-actions">'
                 + '<button type="button" class="tralla-btn tralla-btn-ghost" data-dialog-cancel>Cancelar</button>'
@@ -2093,7 +2097,9 @@
             document.body.classList.add('tralla-dialog-open');
             var confirmEl = layer.querySelector('[data-dialog-confirm]');
             var crmEl = layer.querySelector('[data-approval-code]');
+            var seintecEl = layer.querySelector('[data-approval-seintec]');
             var finished = false;
+            function crmOptional() { return !!(seintecEl && seintecEl.checked); }
             function selected() {
                 var checked = layer.querySelector('input[type="radio"]:checked');
                 return checked ? checked.value : '';
@@ -2112,12 +2118,21 @@
             function onKeydown(event) {
                 if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); finish(null); }
             }
-            function ready() { confirmEl.disabled = !selected() || !crmEl.value.trim(); }
+            function ready() { confirmEl.disabled = !selected() || (!crmOptional() && !crmEl.value.trim()); }
+            if (seintecEl) {
+                seintecEl.addEventListener('change', function () {
+                    var optional = crmOptional();
+                    crmEl.required = !optional;
+                    crmEl.placeholder = optional ? 'CRM (opcional)' : 'Informe o CRM para liberar';
+                    layer.querySelector('[data-approval-code-required]').hidden = optional;
+                    ready();
+                });
+            }
             layer.querySelectorAll('input[type="radio"]').forEach(function (radio) {
                 radio.addEventListener('change', ready);
             });
             crmEl.addEventListener('input', ready);
-            confirmEl.addEventListener('click', function () { if (!confirmEl.disabled) { finish({ priority: selected(), code: crmEl.value.trim() }); } });
+            confirmEl.addEventListener('click', function () { if (!confirmEl.disabled) { finish({ priority: selected(), code: crmEl.value.trim(), seintec: crmOptional() }); } });
             layer.querySelector('[data-dialog-backdrop]').addEventListener('click', function () { finish(null); });
             layer.querySelector('[data-dialog-cancel]').addEventListener('click', function () { finish(null); });
             document.addEventListener('keydown', onKeydown, true);
@@ -3433,6 +3448,7 @@
         var isCallReleaseApproval = kind === 'call_release';
         var chosenPriority = '';
         var chosenCode = '';
+        var chosenSeintec = 0;
         var departingCard = Object.assign({}, activeCard);
 
         if (action === 'split') {
@@ -3751,6 +3767,7 @@
                     }
                     chosenPriority = releaseChoice.priority;
                     chosenCode = releaseChoice.code;
+                    chosenSeintec = releaseChoice.seintec ? 1 : 0;
                 } else if (kind === 'pause' || kind === 'resume' || kind === 'transfer' || kind === 'takeover') {
                     var approvalCodeLabel = kind === 'pause' ? 'Chamado Externo' : 'Código CRM';
                     chosenCode = await promptDialog({
@@ -3809,7 +3826,7 @@
                 var approvalPosition = isCallReleaseApproval
                     ? approvalCardsInBoard().findIndex(function (item) { return Number(item.id) === Number(cardId); })
                     : -1;
-                data = await api('approve_card', { id: cardId, priority: chosenPriority, code: chosenCode });
+                data = await api('approve_card', { id: cardId, priority: chosenPriority, code: chosenCode, seintec: chosenSeintec });
                 applyState(data);
                 scheduleDepartingCard(departingCard, 'approved');
                 if (isDeletionApproval) {

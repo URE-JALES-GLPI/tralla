@@ -2600,7 +2600,7 @@ class PluginTrallaCard extends CommonDBTM
         ];
     }
 
-    public static function decide(int $approvalId, bool $approve, string $reason = '', int $userId = 0, bool $isAdmin = false, string $priority = '', string $code = ''): array
+    public static function decide(int $approvalId, bool $approve, string $reason = '', int $userId = 0, bool $isAdmin = false, string $priority = '', string $code = '', bool $seintec = false): array
     {
         global $DB;
 
@@ -2623,7 +2623,7 @@ class PluginTrallaCard extends CommonDBTM
             return self::decideSplit($approvalId, $approve, $reason, $userId, $isAdmin);
         }
         if ($kind === 'call_release') {
-            return self::decideCallRelease($approvalId, $approve, $reason, $userId, $priority, $code);
+            return self::decideCallRelease($approvalId, $approve, $reason, $userId, $priority, $code, $seintec);
         }
         if ($kind === 'transfer' || $kind === 'takeover') {
             return self::decideTransfer($approvalId, $approve, $reason, $userId, $code);
@@ -2764,7 +2764,8 @@ class PluginTrallaCard extends CommonDBTM
         return $detail;
     }
 
-    private static function decideCallRelease(int $approvalId, bool $approve, string $reason, int $userId, string $priority = '', string $crm = ''): array
+    /** $seintec: liberação feita pela Seintec/estagiário, sem CRM obrigatório (só SuperAdmin do quadro). */
+    private static function decideCallRelease(int $approvalId, bool $approve, string $reason, int $userId, string $priority = '', string $crm = '', bool $seintec = false): array
     {
         global $DB;
         $priority = strtoupper(trim($priority));
@@ -2772,7 +2773,7 @@ class PluginTrallaCard extends CommonDBTM
             throw new RuntimeException('Escolha a prioridade (P1 a P4) para liberar o card.');
         }
         $crm = trim(strip_tags($crm));
-        if ($approve && ($crm === '' || mb_strlen($crm) > 255)) {
+        if ($approve && mb_strlen($crm) > 255) {
             throw new RuntimeException('Informe o CRM (até 255 caracteres) para liberar o card.');
         }
         $approval = self::getCard($approvalId);
@@ -2790,6 +2791,10 @@ class PluginTrallaCard extends CommonDBTM
         $boardId = (int) $parent['plugin_tralla_boards_id'];
         if (!self::userIsApprover($userId, $boardId)) {
             throw new RuntimeException('Sem permissão para liberar chamados.');
+        }
+        $seintec = $approve && $seintec && PluginTrallaBoardUser::getRole($boardId, $userId) === 'superadmin';
+        if ($approve && $crm === '' && !$seintec) {
+            throw new RuntimeException('Informe o CRM (até 255 caracteres) para liberar o card.');
         }
 
         $DB->beginTransaction();
@@ -2837,14 +2842,16 @@ class PluginTrallaCard extends CommonDBTM
             $DB->update('glpi_plugin_tralla_cards', [
                 'status' => $approve ? 'approved' : 'rejected',
                 'is_archived' => 1,
-                'edit_payload' => $approve ? json_encode(['crm' => $crm], JSON_UNESCAPED_UNICODE) : ($approval['edit_payload'] ?? null),
+                'edit_payload' => $approve ? json_encode(['crm' => $crm, 'seintec' => $seintec], JSON_UNESCAPED_UNICODE) : ($approval['edit_payload'] ?? null),
                 'users_id_approver' => $userId,
                 'rejection_reason' => !$approve && $reason !== '' ? $reason : null,
                 'date_mod' => $now,
             ], ['id' => $approvalId]);
             $what = (string) ($parent['workflow_type'] ?? '') === 'call' ? 'Chamado' : 'Card';
             $message = $approve
-                ? $what . ' liberado com prioridade ' . (tralla_priorities()[$priority]['label'] ?? $priority) . '. CRM: ' . $crm . '; já pode ser assumido por um técnico.'
+                ? $what . ' liberado com prioridade ' . (tralla_priorities()[$priority]['label'] ?? $priority)
+                    . ($seintec ? '. Seintec/Estagiário' . ($crm !== '' ? ', CRM: ' . $crm : ' (sem CRM)') : '. CRM: ' . $crm)
+                    . '; já pode ser assumido por um técnico.'
                 : 'Liberação recusada.' . ($reason !== '' ? ' Motivo: ' . $reason : '');
             PluginTrallaHistory::log($parentId, $userId, $approve ? 'call_released' : 'call_release_rejected', $message);
             PluginTrallaHistory::log($approvalId, $userId, $approve ? 'approval_approved' : 'approval_rejected', $message);
