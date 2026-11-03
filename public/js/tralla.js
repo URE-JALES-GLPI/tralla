@@ -3474,9 +3474,9 @@
             if (action === 'finalize' && activeCard.workflow_type === 'call') {
                 var finalizeConfirmed = await checkboxConfirmation({
                     title: 'Finalizar chamado',
-                    message: 'Confira as informações antes de enviar este card para aprovação.',
+                    message: 'Confira as informações antes de finalizar este chamado.',
                     card: activeCard,
-                    impact: 'Após a aprovação, o chamado irá para Concluído.',
+                    impact: 'O chamado irá direto para Concluído, sem aprovação.',
                     icon: 'ti-checkup-list',
                     confirmLabel: 'Finalizar'
                 });

@@ -2379,10 +2379,10 @@ class PluginTrallaCard extends CommonDBTM
                 throw new RuntimeException('Conclua ou marque como Inservível todas as máquinas do chamado antes de finalizar.');
             }
 
-            // Manutenção finaliza sem aprovação e segue para Retirada; Chamado continua passando pela aprovação.
-            $approvalList = $isCall ? PluginTrallaBoard::findListByCategory($boards_id, 'maintenance_approval') : null;
-            if ($isCall && $approvalList === null) {
-                throw new RuntimeException('O quadro não possui a lista "Manutenção Aprovação".');
+            // Finalizar não passa por aprovação: Manutenção segue para Retirada e Chamado vai direto para Concluído.
+            $doneList = $isCall ? PluginTrallaBoard::findListByCategory($boards_id, 'maintenance_done') : null;
+            if ($isCall && $doneList === null) {
+                throw new RuntimeException('O quadro não possui a lista "Manutenção Concluído".');
             }
 
             $now = tralla_now();
@@ -2444,45 +2444,21 @@ class PluginTrallaCard extends CommonDBTM
                     'date_mod'          => $now,
                 ], ['id' => $id]);
             } else {
-                $approvalSeq = self::nextCodeSequence($codeRoot);
-                $DB->insert('glpi_plugin_tralla_cards', [
-                    'plugin_tralla_boards_id' => $boards_id,
-                    'plugin_tralla_lists_id'  => (int) $approvalList['id'],
-                    'name'                    => $card['name'],
-                    'description'             => $card['description'],
-                    'call_category'           => (string) ($card['call_category'] ?? ''),
-                    'call_subcategory'        => (string) ($card['call_subcategory'] ?? ''),
-                    'rank'                    => self::nextRankForList((int) $approvalList['id']),
-                    'users_id'                => $userId,
-                    'technician_id'           => (int) $card['technician_id'],
-                    'stage'                   => 2,
-                    'parent_cards_id'         => $id,
-                    'approval_cards_id'       => 0,
-                    'family_cards_id'         => $familyRoot,
-                    'code_root_cards_id'      => $codeRoot,
-                    'family_seq'              => $approvalSeq,
-                    'split_from_cards_id'     => 0,
-                    'approval_kind'           => 'maintenance',
-                    'status'                  => 'waiting_approval',
-                    'workflow_type'           => (string) ($card['workflow_type'] ?? 'maintenance'),
-                    'service_report'          => (string) ($card['service_report'] ?? ''),
-                    'is_locked'               => 0,
-                    'is_archived'             => 0,
-                    'source'                  => (string) $card['source'],
-                    'machines_total'          => count($partition['ready']),
-                    'date_finalized'          => $now,
-                    'date_creation'           => $now,
-                    'date_mod'                => $now,
-                ]);
-                $approvalId = (int) $DB->insertId();
-
                 $DB->update('glpi_plugin_tralla_cards', [
-                    'status'            => 'waiting_approval',
-                    'is_locked'         => 1,
-                    'approval_cards_id' => $approvalId,
-                    'date_finalized'    => $now,
-                    'date_mod'          => $now,
+                    'plugin_tralla_lists_id' => (int) $doneList['id'],
+                    'rank'                   => self::nextRankForList((int) $doneList['id']),
+                    'status'                 => 'done',
+                    'is_locked'              => 0,
+                    'approval_cards_id'      => 0,
+                    'date_finalized'         => $now,
+                    'date_approved'          => $now,
+                    'rejection_reason'       => null,
+                    'date_mod'               => $now,
                 ], ['id' => $id]);
+                foreach (self::whatsappWatchIds($id) as $watchId) {
+                    $DB->update('glpi_plugin_tralla_cards', ['is_archived' => 1, 'date_mod' => $now], ['id' => $watchId]);
+                    PluginTrallaHistory::log($watchId, $userId, 'whatsapp_watch_closed', 'Card de origem concluído; acompanhamento encerrado.');
+                }
             }
 
             if ($pendingCardId > 0) {
@@ -2497,16 +2473,8 @@ class PluginTrallaCard extends CommonDBTM
                 PluginTrallaHistory::log($pendingCardId, $userId, 'card_split', 'Card criado com as máquinas pendentes de ' . tralla_display_code($card, $boardType) . '.');
             }
             if ($isCall) {
-                $approvalCode = tralla_display_code([
-                    'id'              => $approvalId,
-                    'stage'           => 2,
-                    'parent_cards_id' => $id,
-                    'family_cards_id' => $familyRoot,
-                    'code_root_cards_id' => $codeRoot,
-                    'family_seq'      => $approvalSeq,
-                ], $boardType);
-                PluginTrallaHistory::log($id, $userId, 'card_finalized', 'Chamado finalizado; card de aprovação ' . $approvalCode . ' criado.');
-                PluginTrallaHistory::log($approvalId, $userId, 'approval_created', 'Aguardando decisão de aprovação.');
+                PluginTrallaHistory::log($id, $userId, 'card_finalized',
+                    'Chamado finalizado por ' . tralla_user_name($userId) . ' e concluído direto, sem aprovação.');
             } else {
                 $familyReady = self::syncFamilyWithdrawal($boards_id, $familyRoot, $userId);
                 PluginTrallaHistory::log($id, $userId, 'card_finalized', $familyReady
