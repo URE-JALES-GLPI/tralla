@@ -71,6 +71,49 @@ if (!function_exists('tralla_duration_label')) {
     }
 }
 
+if (!function_exists('tralla_holiday_map')) {
+    /** Feriados (nacionais, SP e Jales) do ano, os mesmos do calendário de lembretes do KanPro. */
+    function tralla_holiday_map(int $year): array
+    {
+        $map = [];
+        foreach ([
+            '01-01' => 'Confraternização Universal', '04-15' => 'Fundação de Jales (municipal)',
+            '04-21' => 'Tiradentes', '05-01' => 'Dia do Trabalho', '07-09' => 'Revolução Constitucionalista (SP)',
+            '08-15' => 'Assunção de N. Sra. (municipal Jales)', '09-07' => 'Independência',
+            '10-12' => 'N. Sra. Aparecida', '11-02' => 'Finados', '11-15' => 'Proclamação da República',
+            '11-20' => 'Consciência Negra', '12-25' => 'Natal',
+        ] as $day => $name) {
+            $map[sprintf('%04d-', $year) . $day] = $name;
+        }
+        // Páscoa (algoritmo de Meeus/Jones/Butcher) e as datas móveis que dependem dela.
+        $a = $year % 19; $b = intdiv($year, 100); $c = $year % 100; $d = intdiv($b, 4); $e = $b % 4;
+        $f = intdiv($b + 8, 25); $g = intdiv($b - $f + 1, 3); $h = (19 * $a + $b - $d - $g + 15) % 30;
+        $i = intdiv($c, 4); $k = $c % 4; $l = (32 + 2 * $e + 2 * $i - $h - $k) % 7;
+        $m = intdiv($a + 11 * $h + 22 * $l, 451);
+        $month = intdiv($h + $l - 7 * $m + 114, 31);
+        $day = (($h + $l - 7 * $m + 114) % 31) + 1;
+        $easter = new DateTimeImmutable(sprintf('%04d-%02d-%02d', $year, $month, $day));
+        foreach (['-48 days' => 'Carnaval (seg)', '-47 days' => 'Carnaval (ter)', '-2 days' => 'Sexta-feira Santa',
+            '+0 days' => 'Páscoa', '+60 days' => 'Corpus Christi'] as $offset => $name) {
+            $map[$easter->modify($offset)->format('Y-m-d')] = $name;
+        }
+
+        return $map;
+    }
+}
+
+if (!function_exists('tralla_is_business_day')) {
+    /** Dia útil: de segunda a sexta e fora dos feriados de tralla_holiday_map(). */
+    function tralla_is_business_day(int $timestamp): bool
+    {
+        if ((int) date('N', $timestamp) >= 6) {
+            return false;
+        }
+
+        return !isset(tralla_holiday_map((int) date('Y', $timestamp))[date('Y-m-d', $timestamp)]);
+    }
+}
+
 if (!function_exists('tralla_role_rank')) {
     function tralla_role_rank(string $role): int
     {
