@@ -3299,6 +3299,28 @@
             toast('Adicione um técnico ao quadro antes de atribuir o card.', 'error');
             return;
         }
+        // Resumo do card no diálogo: descrição (Chamado) ou quantidades por modelo (Manutenção).
+        var assignCard = getCard(cardId) || (activeCard && Number(activeCard.id) === Number(cardId) ? activeCard : null);
+        var assignSummary = '';
+        if (assignCard) {
+            var assignHead = '<span>Card</span><strong><span class="tralla-confirm-code">'
+                + esc(displayCardCode(assignCard.code, assignCard.id)) + '</span> ' + esc(assignCard.name) + '</strong>';
+            if (assignCard.workflow_type === 'call') {
+                var assignDescription = String(assignCard.description || '').trim();
+                assignSummary = assignHead + '<div class="tralla-assign-summary-label">Descrição</div>'
+                    + '<p class="tralla-assign-description">' + (assignDescription ? esc(assignDescription) : '<em>Sem descrição.</em>') + '</p>';
+            } else {
+                var assignModels = String(assignCard.machine_summary || '').split(' · ').filter(function (part) { return part.trim(); });
+                assignSummary = assignHead + '<div class="tralla-assign-summary-label">Máquinas</div>'
+                    + (assignModels.length
+                        ? '<ul class="tralla-assign-machines">' + assignModels.map(function (part) {
+                            var match = part.match(/^(\d+)x (.*)$/);
+                            return '<li>' + (match ? '<b>' + esc(match[1]) + 'x</b> ' + esc(match[2]) : esc(part)) + '</li>';
+                        }).join('') + '</ul>'
+                        : '<p class="tralla-assign-description"><em>Nenhuma máquina cadastrada.</em></p>');
+            }
+            assignSummary = '<div class="tralla-confirm-card tralla-assign-summary">' + assignSummary + '</div>';
+        }
         var layer = document.createElement('div');
         layer.className = 'tralla-dialog-layer';
         layer.setAttribute('data-assign-dialog', '');
@@ -3307,6 +3329,7 @@
             + '<div class="tralla-dialog-head"><span class="tralla-dialog-icon"><i class="ti ti-user-plus"></i></span>'
             + '<div class="tralla-dialog-copy"><h2 class="tralla-dialog-title">Atribuir técnico</h2>'
             + '<p class="tralla-dialog-message">O card irá para Em Andamento e os prazos seguirão o mesmo fluxo de Pegar.</p></div></div>'
+            + assignSummary
             + '<div class="tralla-dialog-field"><label for="tralla-assign-select">Técnico do quadro</label>'
             + '<select id="tralla-assign-select" class="tralla-select"><option value="">Selecione um técnico...</option>'
             + technicians.map(function (item) { return '<option value="' + Number(item.id) + '">' + esc(item.name) + '</option>'; }).join('')

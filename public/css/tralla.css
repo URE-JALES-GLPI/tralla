@@ -5359,3 +5359,41 @@ body[data-theme="dark"] .tralla-dialog-danger .tralla-finalize-requirements {
     background: var(--tr-primary);
     color: #fff;
 }
+
+/* Atribuir técnico: resumo do card (descrição do chamado ou máquinas da manutenção). */
+.tralla-assign-summary-label {
+    color: var(--tr-muted);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .05em;
+    margin-top: 6px;
+    text-transform: uppercase;
+}
+.tralla-assign-description {
+    color: var(--tr-text-soft);
+    font-size: 13px;
+    line-height: 1.45;
+    margin: 0;
+    max-height: 160px;
+    overflow-y: auto;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+.tralla-assign-machines {
+    display: grid;
+    gap: 4px;
+    list-style: none;
+    margin: 0;
+    max-height: 160px;
+    overflow-y: auto;
+    padding: 0;
+}
+.tralla-assign-machines li {
+    color: var(--tr-text-soft);
+    font-size: 13px;
+}
+.tralla-assign-machines b {
+    color: var(--tr-text);
+    display: inline-block;
+    min-width: 32px;
+}
