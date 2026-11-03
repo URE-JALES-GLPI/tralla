@@ -1800,9 +1800,9 @@
     function renderPausedCodes(card) {
         var codes = card.pause_codes || {};
         var paused = !!Number(card.is_paused);
-        // Aparece em todo card principal pausado ou que já tenha CRM / Chamado Externo.
-        if (Number(card.stage) !== 1 || (!paused && !codes.crm_code && !codes.external_ticket_code)) { return ''; }
         var editable = !!(card.permissions || {}).edit_pause_codes;
+        // Aparece em card principal pausado, que já tenha CRM / Chamado Externo ou que o usuário possa editar.
+        if (Number(card.stage) !== 1 || (!paused && !editable && !codes.crm_code && !codes.external_ticket_code)) { return ''; }
         var view = '<div class="tralla-detail-description">CRM: ' + esc(codes.crm_code || 'Não informado')
             + '<br>Chamado Externo: ' + esc(codes.external_ticket_code || 'Não informado') + '</div>';
         // Fechado por padrão: "Editar códigos" abre o formulário e, ao salvar, ele fecha de novo.
@@ -3224,7 +3224,7 @@
                 external_ticket_code: external.value.trim()
             });
             applyState(data);
-            toast('Códigos da pausa salvos.', 'success');
+            toast('Códigos salvos.', 'success');
             await openCard(data.card.id);
         } catch (error) {
             toast(error.message, 'error');

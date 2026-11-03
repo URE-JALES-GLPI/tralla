@@ -866,8 +866,7 @@ class PluginTrallaCard extends CommonDBTM
             'request_resume'   => $canRequestResume,
             'transfer'         => $canTransfer,
             'request_takeover' => $canRequestTakeover,
-            'edit_pause_codes' => $boardType === 'maintenance' && $stage === 1 && $paused
-                && $isMember && self::userIsApprover($userId, $boardId),
+            'edit_pause_codes' => $isMember && self::canEditCodes($card, $boardType, $userId),
             'edit_card'        => $canEditCard,
             'edit_description' => $canEditDescription,
             'edit_machines'    => $canEditMachines,
@@ -2875,6 +2874,24 @@ class PluginTrallaCard extends CommonDBTM
     }
 
     /** Permite ao aprovador corrigir os identificadores de um card já pausado. */
+    /**
+     * Quem edita CRM e Chamado Externo: o SuperAdmin do quadro em qualquer card ativo,
+     * ou um aprovador enquanto o card está pausado.
+     */
+    private static function canEditCodes(array $card, string $boardType, int $userId): bool
+    {
+        if ($boardType !== 'maintenance' || (int) ($card['stage'] ?? 1) !== 1
+            || !empty($card['is_archived']) || !empty($card['is_deleted'])) {
+            return false;
+        }
+        $boardId = (int) $card['plugin_tralla_boards_id'];
+        if (PluginTrallaBoardUser::getRole($boardId, $userId) === 'superadmin') {
+            return true;
+        }
+
+        return !empty($card['is_paused']) && self::userIsApprover($userId, $boardId);
+    }
+
     public static function updatePauseCodes(int $id, string $crmCode, string $externalCode, int $userId = 0): array
     {
         global $DB;
@@ -2891,18 +2908,15 @@ class PluginTrallaCard extends CommonDBTM
         if ($card === null) { throw new RuntimeException('Card não encontrado.'); }
         self::assertBoardAccess($card);
         $boardId = (int) $card['plugin_tralla_boards_id'];
-        if (self::getBoardType($boardId) !== 'maintenance' || (int) $card['stage'] !== 1
-            || empty($card['is_paused']) || !empty($card['is_archived']) || !empty($card['is_deleted'])
-            || !self::userIsApprover($userId, $boardId)) {
-            throw new RuntimeException('Somente aprovadores podem editar códigos de cards pausados.');
+        if (!self::canEditCodes($card, self::getBoardType($boardId), $userId)) {
+            throw new RuntimeException('Somente o SuperAdmin do quadro, ou um aprovador com o card pausado, pode editar os códigos.');
         }
         $DB->beginTransaction();
         try {
             self::lockCardRow($id);
             $card = self::getCard($id);
-            if ($card === null || empty($card['is_paused']) || !empty($card['is_archived'])
-                || !empty($card['is_deleted'])) {
-                throw new RuntimeException('O card não está mais pausado.');
+            if ($card === null || !self::canEditCodes($card, self::getBoardType($boardId), $userId)) {
+                throw new RuntimeException('Os códigos deste card não podem mais ser editados.');
             }
             $payload = json_decode((string) ($card['edit_payload'] ?? ''), true);
             $payload = is_array($payload) ? $payload : [];
