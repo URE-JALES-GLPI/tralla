@@ -78,7 +78,7 @@ function plugin_version_tralla(): array
     return [
         'name'         => '[URE] Tralla',
         'version'      => PLUGIN_TRALLA_VERSION,
-        'author'       => 'URE',
+        'author'       => 'Leonardo Poiatti Fação',
         'license'      => 'GPLv3+',
         'homepage'     => '',
         'requirements' => [
