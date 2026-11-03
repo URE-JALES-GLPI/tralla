@@ -5204,6 +5204,10 @@ body[data-theme="dark"] .tralla-dialog-danger .tralla-finalize-requirements {
     gap: 6px;
     margin: 16px 24px 0 !important;
 }
+/* Respiro entre o último campo (CRM) e a barra de botões. */
+.tralla-priority-dialog > .tralla-field:last-of-type {
+    margin-bottom: 20px !important;
+}
 .tralla-priority-dialog > .tralla-field > span {
     color: var(--tr-text);
     font-size: 13px;
