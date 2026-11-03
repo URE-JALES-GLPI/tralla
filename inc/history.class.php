@@ -566,6 +566,8 @@ class PluginTrallaHistory extends CommonDBTM
             'resume_approved'       => 'Card despausado',
             'resume_rejected'       => 'Despausa recusada',
             'transfer_requested'    => 'Transferência solicitada',
+            'draft_set'             => 'Card virou rascunho',
+            'draft_published'       => 'Rascunho publicado',
             'transfer_approved'     => 'Card transferido',
             'transfer_rejected'     => 'Transferência recusada',
             'edit_approved'         => 'Edição aprovada',

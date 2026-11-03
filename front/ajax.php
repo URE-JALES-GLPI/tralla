@@ -297,6 +297,7 @@ try {
                 'workflow_type' => tralla_post_string('workflow_type', 'maintenance'),
                 'release_mode' => tralla_post_string('release_mode', 'later'),
                 'confirm_p1'  => tralla_post_int('confirm_p1', 0),
+                'is_draft'    => tralla_post_int('is_draft', 0),
                 'machines'    => $machines,
             ], $userId);
             tralla_json([
@@ -510,6 +511,14 @@ try {
             tralla_json(['ok' => true, 'data' => [
                 'card' => $detail,
                 'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id']),
+            ]]);
+
+        case 'card_draft':
+            tralla_ajax_require(UPDATE);
+            $detail = PluginTrallaCard::setDraft(tralla_post_int('id'), tralla_post_int('draft') === 1, $userId);
+            tralla_json(['ok' => true, 'data' => [
+                'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id']),
+                'card'  => $detail,
             ]]);
 
         case 'request_transfer':

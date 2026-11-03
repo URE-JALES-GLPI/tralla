@@ -82,6 +82,7 @@ class PluginTrallaSheetSync
                 'plugin_tralla_boards_id' => $boardId,
                 'stage' => 1,
                 'is_deleted' => 0,
+                'is_draft' => 0,
             ],
             'ORDER' => 'code_number ASC, id ASC',
         ]));

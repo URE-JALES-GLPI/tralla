@@ -480,7 +480,7 @@ if (!function_exists('tralla_can_transition')) {
         $locked = !empty($card['is_locked']);
         $archived = !empty($card['is_archived']);
         // Card pausado ou com pausa/despausa aguardando aprovação não avança no fluxo.
-        $blocked = !empty($card['is_paused']) || (int) ($card['approval_cards_id'] ?? 0) > 0;
+        $blocked = !empty($card['is_paused']) || !empty($card['is_draft']) || (int) ($card['approval_cards_id'] ?? 0) > 0;
 
         if ($archived) {
             return false;
@@ -848,6 +848,10 @@ if (!function_exists('tralla_board_state')) {
         PluginTrallaBoard::ensurePausedList($boards_id);
         $lists = PluginTrallaList::getListsForBoard($boards_id);
         $cards = PluginTrallaCard::getCardsForBoard($boards_id);
+        // Rascunhos do Pendente só aparecem para o SuperAdmin do quadro.
+        if (PluginTrallaBoardUser::getRole($boards_id, (int) Session::getLoginUserID()) !== 'superadmin') {
+            $cards = array_values(array_filter($cards, static fn (array $card): bool => empty($card['is_draft'])));
+        }
 
         if ($canApprove) {
             return ['lists' => $lists, 'cards' => $cards];

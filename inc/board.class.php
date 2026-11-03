@@ -452,6 +452,7 @@ class PluginTrallaBoard extends CommonDBTM
                 'plugin_tralla_boards_id' => $boards_id,
                 'is_archived'             => 0,
                 'is_deleted'              => 0,
+                'is_draft'                => 0,
             ],
             'GROUPBY' => ['status'],
         ]) as $row) {

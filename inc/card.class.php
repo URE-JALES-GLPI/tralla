@@ -325,6 +325,10 @@ class PluginTrallaCard extends CommonDBTM
         if (!PluginTrallaBoard::canViewBoard($boards_id)) {
             throw new RuntimeException('Você não tem acesso a este card.');
         }
+        if (!empty($card['is_draft'])
+            && PluginTrallaBoardUser::getRole($boards_id, $userId > 0 ? $userId : (int) Session::getLoginUserID()) !== 'superadmin') {
+            throw new RuntimeException('Card não encontrado.');
+        }
 
         $boardType = self::getBoardType($boards_id);
         $list = PluginTrallaList::getList((int) $card['plugin_tralla_lists_id']);
@@ -859,8 +863,13 @@ class PluginTrallaCard extends CommonDBTM
             && empty($card['is_archived'])
             && empty($card['is_deleted']);
 
+        $isDraft = !empty($card['is_draft']);
+        $draftable = $isAdmin && $boardType === 'maintenance' && $stage === 1 && $status === 'pending'
+            && !$paused && empty($card['is_archived']) && empty($card['is_deleted']);
         $permissions = [
             'view'             => true,
+            'publish_draft'    => $draftable && $isDraft,
+            'make_draft'       => $draftable && !$isDraft && self::draftAllowedApproval($card),
             'tablet_edit'      => $canTabletEdit,
             'request_pause'    => $canRequestPause,
             'request_resume'   => $canRequestResume,
@@ -888,6 +897,14 @@ class PluginTrallaCard extends CommonDBTM
             'request_deletion' => $canRequestDeletion,
             'move'             => $isMember && $boardType === 'normal' && $canUpdate,
         ];
+
+        if ($isDraft) {
+            // Rascunho: ninguém pega, atribui, separa, pausa ou pede liberação até publicar.
+            foreach (['take', 'assign_technician', 'split', 'request_pause', 'request_call_release',
+                'transfer', 'request_takeover', 'edit_request'] as $name) {
+                $permissions[$name] = false;
+            }
+        }
 
         if ($paused) {
             // Pausado: nada além de ver o card e pedir para despausar.
@@ -989,6 +1006,8 @@ class PluginTrallaCard extends CommonDBTM
                 throw new RuntimeException('Para disponibilizar agora, confirme que o chamado é P1 (Alta).');
             }
             $deferCall = !$releaseNow;
+            // Rascunho: só o SuperAdmin vê; a liberação e o chamado GLPI ficam para a publicação.
+            $isDraft = $isSuperAdmin && !empty($data['is_draft']);
             $approvalList = null;
             if ($deferCall) {
                 $approvalList = PluginTrallaBoard::findListByCategory($boards_id, 'maintenance_approval');
@@ -1039,6 +1058,7 @@ class PluginTrallaCard extends CommonDBTM
                 'split_from_cards_id'     => 0,
                 'status'                  => 'pending',
                 'workflow_type'           => $workflowType,
+                'is_draft'                => $isDraft ? 1 : 0,
                 'is_locked'               => $deferCall ? 1 : 0,
                 'priority'                => $releaseNow ? 'P1' : '',
                 'date_sla_start'          => $releaseNow ? $now : null,
@@ -1067,12 +1087,16 @@ class PluginTrallaCard extends CommonDBTM
                 $rank += 1024.0;
             }
 
-            if ($deferCall) {
+            if ($isDraft) {
+                PluginTrallaHistory::log($cardId, $userId, 'draft_set',
+                    'Criado como rascunho: visível só para SuperAdmins do quadro até ser publicado.');
+            } elseif ($deferCall) {
                 $approvalId = self::createCallReleaseApproval($cardId, $boards_id, $approvalList, $userId, $now);
                 $DB->update('glpi_plugin_tralla_cards', ['approval_cards_id' => $approvalId], ['id' => $cardId]);
                 PluginTrallaHistory::log($cardId, $userId, 'call_release_requested',
                     ($workflowType === 'call' ? 'Chamado' : 'Card') . ' criado bloqueado; aguardando aprovação e definição de prioridade.');
-            } else {
+            }
+            if (!$deferCall) {
                 PluginTrallaHistory::log($cardId, $userId, 'priority_set', 'Disponibilizado na criação como P1 (Alta), confirmado por quem criou.');
             }
 
@@ -1724,6 +1748,87 @@ class PluginTrallaCard extends CommonDBTM
         }
 
         return self::finalize($id, $userId, false)['card'];
+    }
+
+    /** Só vira rascunho o card sem pedido pendente, ou com a liberação ainda aguardando. */
+    private static function draftAllowedApproval(array $card): bool
+    {
+        $approvalId = (int) ($card['approval_cards_id'] ?? 0);
+        if ($approvalId <= 0) {
+            return true;
+        }
+        $approval = self::getCard($approvalId);
+
+        return $approval !== null && (string) ($approval['approval_kind'] ?? '') === 'call_release'
+            && (string) $approval['status'] === 'waiting_approval' && empty($approval['is_archived']);
+    }
+
+    /**
+     * Transforma um card do Pendente em rascunho ($draft = true) ou publica o rascunho.
+     * Rascunho fica visível só para SuperAdmins do quadro; a liberação pendente é cancelada e
+     * recriada na publicação, quando o SLA e os lembretes passam a contar.
+     */
+    public static function setDraft(int $id, bool $draft, int $userId = 0): array
+    {
+        global $DB;
+
+        $userId = $userId > 0 ? $userId : (int) Session::getLoginUserID();
+        $card = self::getCard($id);
+        if ($card === null) {
+            throw new RuntimeException('Card não encontrado.');
+        }
+        self::assertBoardAccess($card);
+        $boardId = (int) $card['plugin_tralla_boards_id'];
+        $boardType = self::getBoardType($boardId);
+
+        $DB->beginTransaction();
+        try {
+            self::lockCardRow($id);
+            $card = self::getCard($id);
+            $permissions = $card === null ? [] : self::permissionsFor($card, $boardType, $userId, false);
+            if (empty($permissions[$draft ? 'make_draft' : 'publish_draft'])) {
+                throw new RuntimeException($draft
+                    ? 'Só o SuperAdmin do quadro transforma em rascunho cards do Pendente.'
+                    : 'Só o SuperAdmin do quadro publica rascunhos.');
+            }
+            $now = tralla_now();
+            if ($draft) {
+                $approvalId = (int) ($card['approval_cards_id'] ?? 0);
+                if ($approvalId > 0) {
+                    $DB->update('glpi_plugin_tralla_cards', [
+                        'status' => 'rejected', 'is_archived' => 1, 'users_id_approver' => $userId,
+                        'rejection_reason' => 'Cancelada: o card virou rascunho.', 'date_mod' => $now,
+                    ], ['id' => $approvalId]);
+                    PluginTrallaHistory::log($approvalId, $userId, 'approval_rejected', 'Liberação cancelada: o card virou rascunho.');
+                }
+                $DB->update('glpi_plugin_tralla_cards', ['is_draft' => 1, 'approval_cards_id' => 0, 'date_mod' => $now], ['id' => $id]);
+                PluginTrallaHistory::log($id, $userId, 'draft_set', 'Card transformado em rascunho: visível só para SuperAdmins do quadro.');
+            } else {
+                $fields = ['is_draft' => 0, 'date_mod' => $now];
+                $message = 'Rascunho publicado: o card aparece para todos no Pendente.';
+                if (!empty($card['is_locked']) && (string) ($card['priority'] ?? '') === '') {
+                    // Ainda sem prioridade: segue para Liberação e prioridade, como na criação.
+                    $approvalList = PluginTrallaBoard::findListByCategory($boardId, 'maintenance_approval');
+                    if ($approvalList === null) {
+                        throw new RuntimeException('O quadro não possui a lista "Manutenção Aprovação".');
+                    }
+                    $DB->update('glpi_plugin_tralla_cards', $fields, ['id' => $id]);
+                    $fields = ['approval_cards_id' => self::createCallReleaseApproval($id, $boardId, $approvalList, $userId, $now)];
+                    $message .= ' Enviado para Liberação e prioridade.';
+                } elseif ((string) ($card['priority'] ?? '') !== '') {
+                    // Já liberado: SLA e lembretes contam a partir da publicação.
+                    $fields += ['date_sla_start' => $now, 'pending_reminded_at' => $now, 'sla_alerts_sent' => ''];
+                }
+                $DB->update('glpi_plugin_tralla_cards', $fields, ['id' => $id]);
+                PluginTrallaHistory::log($id, $userId, 'draft_published', $message);
+            }
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
+        }
+
+        return self::getCardDetail($id, $userId);
     }
 
     private static function createCallReleaseApproval(int $cardId, int $boardId, array $list, int $userId, string $now): int

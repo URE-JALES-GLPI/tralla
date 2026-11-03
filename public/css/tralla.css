@@ -5269,3 +5269,48 @@ body[data-theme="dark"] .tralla-dialog-danger .tralla-finalize-requirements {
 .tralla-withdrawal-sign-bar .tralla-btn:disabled { cursor: not-allowed; opacity: .55; }
 .tralla-withdrawal-sign-bar small { color: var(--tr-muted); font-size: 11px; line-height: 1.35; }
 @media (max-width: 900px) { .tralla-withdrawal-pick { flex-basis: 220px; } .tralla-withdrawal-pick .tralla-approval-navigation-item { flex-basis: auto; } .tralla-withdrawal-sign-bar { padding-top: 8px; } }
+
+/* Rascunho do Pendente: só o SuperAdmin vê, meio transparente até publicar. */
+.tralla-card.is-draft {
+    border-style: dashed;
+    opacity: 0.55;
+    transition: opacity 120ms ease;
+}
+.tralla-card.is-draft:hover,
+.tralla-card.is-draft:focus-within {
+    opacity: 0.85;
+}
+.tralla-card-badge.tralla-card-draft {
+    background: var(--tr-surface-2);
+    color: var(--tr-text-soft);
+    font-weight: 700;
+}
+.tralla-create-draft-check {
+    align-items: flex-start;
+    border: 1px dashed var(--tr-border-strong);
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    gap: 10px;
+    margin: 12px 0 0;
+    padding: 12px 14px;
+}
+.tralla-create-draft-check input {
+    margin-top: 3px;
+}
+.tralla-create-draft-check span {
+    display: grid;
+    gap: 2px;
+}
+.tralla-create-draft-check strong {
+    align-items: center;
+    display: inline-flex;
+    gap: 6px;
+}
+.tralla-create-draft-check small {
+    color: var(--tr-muted);
+}
+.tralla-create-draft-check:has(input:checked) {
+    background: var(--tr-primary-soft);
+    border-color: var(--tr-primary);
+}

@@ -1497,6 +1497,10 @@
         var lock = card.is_locked
             ? '<span class="tralla-card-badge tralla-card-lock" title="Card bloqueado"><i class="ti ti-lock" aria-hidden="true"></i></span>'
             : '';
+        if (Number(card.is_draft)) {
+            lock += '<span class="tralla-card-badge tralla-card-draft" title="Rascunho: visível só para SuperAdmins do quadro">'
+                + '<i class="ti ti-file-pencil" aria-hidden="true"></i> Rascunho</span>';
+        }
         if (Number(card.is_paused)) {
             lock += '<span class="tralla-card-badge tralla-card-paused" title="Card pausado: ações e prazos de SLA suspensos">'
                 + '<i class="ti ti-player-pause" aria-hidden="true"></i> Pausado</span>';
@@ -1567,7 +1571,7 @@
 
         return '<article class="tralla-card' + (card.workflow_type === 'call' ? ' is-call' : '')
             + (isUpdates ? ' is-update' : '')
-            + (card.is_locked ? ' is-locked' : '') + (cardApprovalClass ? ' ' + cardApprovalClass : '') + departingClass
+            + (card.is_locked ? ' is-locked' : '') + (Number(card.is_draft) ? ' is-draft' : '') + (cardApprovalClass ? ' ' + cardApprovalClass : '') + departingClass
             + '" data-card-id="' + cardId + '"'
             + (canDrag ? ' draggable="true"' : '')
             + ' tabindex="0" role="button" aria-label="Abrir card ' + attr(card.name) + '">'
@@ -2262,6 +2266,14 @@
                 + '<i class="ti ti-shield-x"></i> ' + rejectLabel + '</button>';
         }
 
+        if (permissions.publish_draft) {
+            buttons += '<button type="button" class="tralla-btn tralla-btn-primary" data-card-action="publish_draft">'
+                + '<i class="ti ti-eye-check"></i> Publicar rascunho</button>';
+        }
+        if (permissions.make_draft) {
+            buttons += '<button type="button" class="tralla-btn tralla-btn-ghost" data-card-action="make_draft">'
+                + '<i class="ti ti-file-pencil"></i> Transformar em rascunho</button>';
+        }
         if (permissions.request_pause) {
             buttons += '<button type="button" class="tralla-btn tralla-btn-ghost" data-card-action="pause">'
                 + '<i class="ti ti-player-pause"></i> Pausar</button>';
@@ -3481,6 +3493,27 @@
                 var transferResult = await api('request_transfer', { id: cardId, target: choice.target, users_id: choice.users_id });
                 applyState(transferResult);
                 toast(action === 'takeover' ? 'Pedido para pegar o card enviado para aprovação.' : 'Transferência enviada para aprovação.', 'success');
+                await openCard(cardId);
+                return;
+            }
+
+            if (action === 'publish_draft' || action === 'make_draft') {
+                var publishing = action === 'publish_draft';
+                var draftConfirmed = await confirmDialog({
+                    title: publishing ? 'Publicar rascunho' : 'Transformar em rascunho',
+                    message: publishing
+                        ? 'O card passa a aparecer para todos no Pendente. Se ainda não tiver prioridade, vai para Liberação e prioridade; os lembretes e o SLA contam a partir de agora.'
+                        : 'O card some para quem não é SuperAdmin do quadro. Uma liberação aguardando aprovação é cancelada e volta a ser pedida na publicação.',
+                    confirmLabel: publishing ? 'Publicar' : 'Transformar em rascunho',
+                    icon: publishing ? 'ti-eye-check' : 'ti-file-pencil'
+                });
+                if (!draftConfirmed) {
+                    return;
+                }
+                setBusy(button, true);
+                var draftResult = await api('card_draft', { id: cardId, draft: publishing ? 0 : 1 });
+                applyState(draftResult);
+                toast(publishing ? 'Rascunho publicado.' : 'Card transformado em rascunho.', 'success');
                 await openCard(cardId);
                 return;
             }
@@ -5063,6 +5096,11 @@
                     + '<span>Tenho certeza de que este chamado é <b>NÍVEL P1 (ALTO)</b></span></label>'
                     + '</div></fieldset>'
                 : '')
+            + (isMaintenance && state.board && state.board.can_defer_call
+                ? '<label class="tralla-create-draft-check"><input type="checkbox" name="is_draft" value="1">'
+                    + '<span><i class="ti ti-file-pencil" aria-hidden="true"></i><strong>Criar como rascunho</strong>'
+                    + '<small>Só os SuperAdmins do quadro veem o card até ele ser publicado. Liberação, lembretes e SLA começam na publicação.</small></span></label>'
+                : '')
             + (isMaintenance ? '<p class="tralla-create-approval-note" data-approval-note>'
                 + '<i class="ti ti-info-circle" aria-hidden="true"></i>'
                 + '<span>O card será criado <b>bloqueado</b> em Manutenção Pendente e enviado para <b>Manutenção Aprovação</b>, '
@@ -5156,6 +5194,8 @@
         var releaseMode = workflowType === 'call' && releaseModeField ? releaseModeField.value : 'later';
         var confirmP1Field = form.querySelector('[name="confirm_p1"]');
         var confirmP1 = !!(confirmP1Field && confirmP1Field.checked);
+        var draftField = form.querySelector('[name="is_draft"]');
+        var isDraft = !!(draftField && draftField.checked);
         if (!inline && isMaintenance && releaseMode === 'now' && !confirmP1) {
             toast('Para disponibilizar agora, marque a confirmação de que o chamado é P1 (ALTO).', 'error');
             if (confirmP1Field) {
@@ -5235,6 +5275,7 @@
                 workflow_type: workflowType,
                 release_mode: releaseMode,
                 confirm_p1: confirmP1 ? 1 : 0,
+                is_draft: isDraft ? 1 : 0,
                 machines: machines
             });
 

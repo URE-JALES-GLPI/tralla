@@ -39,7 +39,8 @@ class PluginTrallaTicketSync
                 'glpi_plugin_tralla_cards AS c' => ['ON' => ['h' => 'plugin_tralla_cards_id', 'c' => 'id']],
                 'glpi_plugin_tralla_boards AS b' => ['ON' => ['c' => 'plugin_tralla_boards_id', 'b' => 'id']],
             ],
-            'WHERE' => ['h.id' => ['>', $start], 'h.ticket_followups_id' => 0, 'b.type' => 'maintenance'],
+            // Rascunho ainda não gera chamado: os eventos ficam na fila até a publicação.
+            'WHERE' => ['h.id' => ['>', $start], 'h.ticket_followups_id' => 0, 'b.type' => 'maintenance', 'c.is_draft' => 0],
             'ORDER' => 'h.id ASC',
             'LIMIT' => max(1, min(500, $limit)),
         ]);
