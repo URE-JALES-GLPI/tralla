@@ -1064,7 +1064,35 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
     grid-template-columns: 1fr 1fr;
     margin: 0 24px;
 }
-.tralla-filter-dialog .tralla-filter-dates > .tralla-field { margin: 16px 0 0 !important; }
+/* Diálogo de filtro mais compacto: campos próximos e respiro antes dos botões. */
+.tralla-filter-dialog > .tralla-field { margin: 14px 24px 0 !important; }
+.tralla-filter-dialog .tralla-filter-dates > .tralla-field { gap: 6px; margin: 12px 0 0 !important; }
+.tralla-filter-dialog .tralla-dialog-head { padding-bottom: 4px; }
+.tralla-filter-dialog .tralla-dialog-actions { margin-top: 20px; }
+.tralla-filter-dialog .tralla-field > span {
+    color: var(--tr-text);
+    font-size: 13px;
+    font-weight: 600;
+}
+.tralla-filter-dialog .tralla-field input,
+.tralla-filter-dialog .tralla-field select {
+    background: var(--tr-surface);
+    border: 1px solid var(--tr-border-strong);
+    border-radius: var(--tr-radius-sm);
+    color: var(--tr-text);
+    font-size: 14px;
+    padding: 8px 10px;
+    width: 100%;
+}
+.tralla-filter-dialog .tralla-field input:focus,
+.tralla-filter-dialog .tralla-field select:focus {
+    border-color: var(--tr-primary);
+    box-shadow: 0 0 0 3px var(--tr-primary-soft);
+    outline: none;
+}
+@media (max-width: 520px) {
+    .tralla-filter-dialog .tralla-filter-dates { grid-template-columns: 1fr; gap: 0; }
+}
 
 .tralla-list-head .tralla-icon-btn {
     color: var(--tr-muted);

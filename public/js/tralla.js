@@ -1345,6 +1345,7 @@
             + '<label class="tralla-field"><span>De</span><input type="date" data-filter="from" value="' + attr(current.from || '') + '"></label>'
             + '<label class="tralla-field"><span>Até</span><input type="date" data-filter="to" value="' + attr(current.to || '') + '"></label>'
             + '</div>'
+            + '<div class="tralla-filter-dates">'
             + '<label class="tralla-field"><span>SLA</span><select data-filter="sla">' + option('', 'Todos', current.sla)
             + Object.keys(listFilterSlaStates).map(function (key) {
                 return option(key, listFilterSlaStates[key], current.sla);
@@ -1353,6 +1354,7 @@
             + option('none', 'Sem técnico', current.technician)
             + technicians.map(function (item) { return option(String(Number(item.id)), item.name, current.technician); }).join('')
             + '</select></label>'
+            + '</div>'
             + '<div class="tralla-dialog-actions">'
             + '<button type="button" class="tralla-btn tralla-btn-ghost" data-filter-clear>Limpar filtros</button>'
             + '<button type="button" class="tralla-btn tralla-btn-ghost" data-close>Cancelar</button>'
