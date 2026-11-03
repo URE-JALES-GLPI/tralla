@@ -1306,7 +1306,7 @@
     }
 
     function listFilterActive(filter) {
-        return !!(filter && (filter.from || filter.to || filter.sla || filter.technician));
+        return !!(filter && (filter.from || filter.to || filter.sla || filter.technician || filter.priority));
     }
 
     function cardSlaState(card) {
@@ -1332,6 +1332,9 @@
             }
         }
         if (filter.sla && cardSlaState(card) !== filter.sla) {
+            return false;
+        }
+        if (filter.priority && String(card.priority || '') !== (filter.priority === 'none' ? '' : filter.priority)) {
             return false;
         }
         if (filter.technician) {
@@ -1367,15 +1370,21 @@
             + '<label class="tralla-field"><span>Até</span><input type="date" data-filter="to" value="' + attr(current.to || '') + '"></label>'
             + '</div>'
             + '<div class="tralla-filter-dates">'
+            + '<label class="tralla-field"><span>Prioridade</span><select data-filter="priority">' + option('', 'Todas', current.priority)
+            + (Array.isArray(labels.priorities) ? labels.priorities : []).map(function (item) {
+                return option(item.key, item.key + ' · ' + item.name, current.priority);
+            }).join('')
+            + option('none', 'Sem prioridade', current.priority)
+            + '</select></label>'
             + '<label class="tralla-field"><span>SLA</span><select data-filter="sla">' + option('', 'Todos', current.sla)
             + Object.keys(listFilterSlaStates).map(function (key) {
                 return option(key, listFilterSlaStates[key], current.sla);
             }).join('') + '</select></label>'
+            + '</div>'
             + '<label class="tralla-field"><span>Técnico</span><select data-filter="technician">' + option('', 'Todos', current.technician)
             + option('none', 'Sem técnico', current.technician)
             + technicians.map(function (item) { return option(String(Number(item.id)), item.name, current.technician); }).join('')
             + '</select></label>'
-            + '</div>'
             + '<div class="tralla-dialog-actions">'
             + '<button type="button" class="tralla-btn tralla-btn-ghost" data-filter-clear>Limpar filtros</button>'
             + '<button type="button" class="tralla-btn tralla-btn-ghost" data-close>Cancelar</button>'
@@ -1413,7 +1422,7 @@
                 toast('A data inicial precisa ser anterior à final.', 'error');
                 return;
             }
-            var next = { date_field: value('date_field'), from: from, to: to, sla: value('sla'), technician: value('technician') };
+            var next = { date_field: value('date_field'), from: from, to: to, sla: value('sla'), technician: value('technician'), priority: value('priority') };
             if (listFilterActive(next)) {
                 listFilters[listId] = next;
             } else {

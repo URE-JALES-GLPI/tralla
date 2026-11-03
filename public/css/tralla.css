@@ -5412,3 +5412,8 @@ html.tralla-board-fit .tralla-board-scroll {
 html.tralla-board-fit .tralla-list {
     max-height: 100%;
 }
+
+/* Filtro da lista: Técnico ocupa a linha toda; sem espaço duplo antes dos botões. */
+.tralla-filter-dialog > .tralla-field:last-of-type {
+    margin-bottom: 0 !important;
+}
