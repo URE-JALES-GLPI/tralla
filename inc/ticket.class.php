@@ -134,20 +134,25 @@ class PluginTrallaTicketSync
             $description = trim((string) ($primary['description'] ?? ''));
             $category = trim((string) ($primary['call_category'] ?? ''));
             $subcategory = trim((string) ($primary['call_subcategory'] ?? ''));
+            // Conteúdo em HTML: um campo por linha e o link curto "Abrir card no Tralla"
+            // (o endereço inteiro estourava a linha no e-mail do GLPI).
+            $field = static fn (string $label, string $value): string
+                => '<strong>' . htmlspecialchars($label) . ':</strong> ' . nl2br(htmlspecialchars($value));
             $lines = [
-                'Card Tralla: ' . $code,
-                'Quadro: ' . self::boardName((int) $primary['plugin_tralla_boards_id']),
-                'Tipo: ' . ((string) ($primary['workflow_type'] ?? '') === 'call' ? 'Chamado' : 'Manutenção'),
+                $field('Card Tralla', '#' . $code),
+                $field('Quadro', self::boardName((int) $primary['plugin_tralla_boards_id'])),
+                $field('Tipo', (string) ($primary['workflow_type'] ?? '') === 'call' ? 'Chamado' : 'Manutenção'),
             ];
-            if ($category !== '') { $lines[] = 'Categoria: ' . $category; }
-            if ($subcategory !== '') { $lines[] = 'Subcategoria: ' . $subcategory; }
-            if ($description !== '') { $lines[] = 'Descrição: ' . $description; }
-            $lines[] = 'Abrir card: ' . rtrim((string) ($CFG_GLPI['url_base'] ?? $CFG_GLPI['root_doc'] ?? ''), '/')
+            if ($category !== '') { $lines[] = $field('Categoria', $category); }
+            if ($subcategory !== '') { $lines[] = $field('Subcategoria', $subcategory); }
+            if ($description !== '') { $lines[] = $field('Descrição', $description); }
+            $cardUrl = rtrim((string) ($CFG_GLPI['url_base'] ?? $CFG_GLPI['root_doc'] ?? ''), '/')
                 . '/plugins/tralla/front/kanban.php?boards_id=' . (int) $primary['plugin_tralla_boards_id']
                 . '&card_id=' . (int) $primary['id'];
             $ticketId = (int) $ticket->add([
                 'name' => '[Tralla ' . $code . '] ' . (string) $primary['name'],
-                'content' => implode("\n", $lines),
+                'content' => '<p>' . implode('<br>', $lines) . '</p>'
+                    . '<p><a href="' . htmlspecialchars($cardUrl) . '">Abrir card no Tralla</a></p>',
                 'entities_id' => $entityId,
                 'status' => self::ticketStatus($primary),
                 'type' => (string) ($primary['workflow_type'] ?? '') === 'call'
