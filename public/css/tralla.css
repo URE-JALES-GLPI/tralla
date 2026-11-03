@@ -5318,14 +5318,40 @@ body[data-theme="dark"] .tralla-dialog-danger .tralla-finalize-requirements {
 /* Liberação pela Seintec/estagiário: CRM opcional (só SuperAdmin). */
 .tralla-priority-seintec {
     align-items: center;
+    background: var(--tr-surface-2);
+    border: 1px dashed var(--tr-border-strong);
+    border-radius: var(--tr-radius-sm);
     cursor: pointer;
     display: flex;
-    font-size: 13px;
-    font-weight: 600;
-    gap: 8px;
-    margin: 16px 0 0;
+    gap: 12px;
+    margin: 16px 24px 0;
+    padding: 10px 12px;
+    transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
 }
-.tralla-priority-seintec small {
+.tralla-priority-seintec:hover { border-color: var(--tr-primary); }
+.tralla-priority-seintec input { flex: none; margin: 0; }
+.tralla-priority-seintec-icon {
+    align-items: center;
+    background: var(--tr-surface);
+    border-radius: 8px;
     color: var(--tr-muted);
-    font-weight: 400;
+    display: inline-flex;
+    flex: none;
+    font-size: 18px;
+    height: 32px;
+    justify-content: center;
+    width: 32px;
+}
+.tralla-priority-seintec-text { display: flex; flex-direction: column; min-width: 0; }
+.tralla-priority-seintec-text strong { color: var(--tr-text); font-size: 13px; }
+.tralla-priority-seintec-text small { color: var(--tr-muted); font-size: 12px; }
+.tralla-priority-seintec:has(input:checked) {
+    background: var(--tr-primary-soft);
+    border-color: var(--tr-primary);
+    border-style: solid;
+    box-shadow: 0 0 0 2px var(--tr-primary-soft);
+}
+.tralla-priority-seintec:has(input:checked) .tralla-priority-seintec-icon {
+    background: var(--tr-primary);
+    color: #fff;
 }

@@ -2083,7 +2083,9 @@
                 + '</div>'
                 + (state.board && state.board.can_defer_call
                     ? '<label class="tralla-priority-seintec"><input type="checkbox" data-approval-seintec>'
-                        + '<span>Seintec/Estagiário <small>(CRM opcional)</small></span></label>'
+                        + '<span class="tralla-priority-seintec-icon" aria-hidden="true"><i class="ti ti-school"></i></span>'
+                        + '<span class="tralla-priority-seintec-text"><strong>Seintec/Estagiário</strong>'
+                        + '<small>Marque para liberar sem informar o CRM</small></span></label>'
                     : '')
                 + '<label class="tralla-field" style="display:block;margin:16px 0 0" data-approval-code-field>'
                 + '<span>CRM <strong aria-hidden="true" data-approval-code-required>*</strong></span>'
