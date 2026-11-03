@@ -2076,6 +2076,13 @@ class PluginTrallaCard extends CommonDBTM
             || !empty($technician->fields['is_deleted']) || empty($technician->fields['is_active'])) {
             throw new RuntimeException('Selecione um técnico ativo com acesso ao quadro.');
         }
+        // Repetição da mesma atribuição (clique duplo) não é erro.
+        if ((string) $card['status'] === 'in_progress' && (int) $card['technician_id'] === $technicianId) {
+            return self::getCardDetail($id, $actorId);
+        }
+        if ((string) $card['status'] === 'in_progress' && (int) $card['technician_id'] > 0) {
+            throw new RuntimeException('Este card já está com ' . tralla_user_name((int) $card['technician_id']) . '.');
+        }
         if (!tralla_can_transition($card, 'take', self::getBoardType($boardId))) {
             throw new RuntimeException('Este card ainda não está disponível para atribuição.');
         }

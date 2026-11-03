@@ -3087,6 +3087,10 @@
     }
 
     async function handleAssignTechnician(cardId, button) {
+        // Clique duplo não abre um segundo diálogo por cima do primeiro.
+        if (document.querySelector('[data-assign-dialog]')) {
+            return;
+        }
         var technicians = (state.technicians || []).filter(function (item) { return Number(item.id) > 0; });
         if (!technicians.length) {
             toast('Adicione um técnico ao quadro antes de atribuir o card.', 'error');
@@ -3094,6 +3098,7 @@
         }
         var layer = document.createElement('div');
         layer.className = 'tralla-dialog-layer';
+        layer.setAttribute('data-assign-dialog', '');
         layer.innerHTML = '<div class="tralla-dialog-backdrop" data-close></div>'
             + '<div class="tralla-modal tralla-dialog" role="dialog" aria-modal="true" aria-label="Atribuir técnico">'
             + '<div class="tralla-dialog-head"><span class="tralla-dialog-icon"><i class="ti ti-user-plus"></i></span>'
