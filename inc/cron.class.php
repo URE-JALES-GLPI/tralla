@@ -118,28 +118,12 @@ class PluginTrallaCron extends CommonDBTM
         return 1;
     }
 
-    /**
-     * Hoje é dia de enviar mensagens? Usa o calendário de lembretes do KanPro quando ativo
-     * (feriados e dias tirados/forçados por lá); senão, tralla_is_business_day().
-     */
+    /** Hoje é dia de enviar mensagens? Fim de semana, feriado e dias tirados no calendário do Tralla não. */
     private static function isNotificationDay(int $timestamp): bool
     {
-        try {
-            if (Plugin::isPluginActive('kanpro') && class_exists('PluginKanproMaintenanceZap')
-                && method_exists('PluginKanproMaintenanceZap', 'lembreteBusinessCheck')) {
-                $override = method_exists('PluginKanproMaintenanceZap', 'lembreteDayOverride')
-                    ? (string) PluginKanproMaintenanceZap::lembreteDayOverride(date('Y-m-d', $timestamp)) : '';
-                if ($override === 'skip' || $override === 'force') {
-                    return $override === 'force';
-                }
+        require_once __DIR__ . '/calendar.class.php';
 
-                return !empty(PluginKanproMaintenanceZap::lembreteBusinessCheck($timestamp)['business']);
-            }
-        } catch (Throwable $e) {
-            error_log('[Tralla] Calendário do KanPro indisponível: ' . $e->getMessage());
-        }
-
-        return tralla_is_business_day($timestamp);
+        return PluginTrallaCalendar::isNotificationDay($timestamp);
     }
 
     /** Resultado dos envios da execução atual (usado pelo "Forçar notificações"). */

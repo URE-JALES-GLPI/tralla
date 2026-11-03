@@ -72,7 +72,7 @@ if (!function_exists('tralla_duration_label')) {
 }
 
 if (!function_exists('tralla_holiday_map')) {
-    /** Feriados (nacionais, SP e Jales) do ano, os mesmos do calendário de lembretes do KanPro. */
+    /** Feriados automáticos (nacionais, SP e municipais de Jales) do ano. */
     function tralla_holiday_map(int $year): array
     {
         $map = [];

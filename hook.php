@@ -466,6 +466,32 @@ function plugin_tralla_install(): bool
         ") or die($DB->error());
     }
 
+    // Calendário de envios: dias tirados do envio ou forçados (além dos feriados automáticos).
+    if (!$DB->tableExists('glpi_plugin_tralla_calendar_days')) {
+        $DB->doQuery("
+            CREATE TABLE `glpi_plugin_tralla_calendar_days` (
+                `id`            INT {$sign} NOT NULL AUTO_INCREMENT,
+                `day`           DATE         NOT NULL,
+                `mode`          VARCHAR(10)  NOT NULL DEFAULT 'skip' COMMENT 'skip=sem envio, force=envio forçado',
+                `reason`        VARCHAR(255) NOT NULL DEFAULT '',
+                `users_id`      INT {$sign} NOT NULL DEFAULT '0',
+                `date_creation` DATETIME     DEFAULT NULL,
+                `date_mod`      DATETIME     DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `day` (`day`)
+            ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}
+        ") or die($DB->error());
+        // Traz as exceções futuras do calendário de lembretes do KanPro, que será desativado.
+        if ($DB->tableExists('glpi_plugin_kanpro_lembrete_days')) {
+            $DB->doQuery("
+                INSERT IGNORE INTO `glpi_plugin_tralla_calendar_days` (`day`, `mode`, `reason`, `users_id`, `date_creation`, `date_mod`)
+                SELECT `date`, `mode`, COALESCE(`reason`, ''), `users_id`, NOW(), NOW()
+                FROM `glpi_plugin_kanpro_lembrete_days`
+                WHERE `mode` IN ('skip', 'force') AND `date` >= CURDATE()
+            ") or die($DB->error());
+        }
+    }
+
     if (!$DB->tableExists('glpi_plugin_tralla_update_items')) {
         $DB->doQuery("
             CREATE TABLE `glpi_plugin_tralla_update_items` (
@@ -640,6 +666,7 @@ function plugin_tralla_uninstall(): bool
     }
 
     $tables = [
+        'glpi_plugin_tralla_calendar_days',
         'glpi_plugin_tralla_files',
         'glpi_plugin_tralla_update_items',
         'glpi_plugin_tralla_notifications',

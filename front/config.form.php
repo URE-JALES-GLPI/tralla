@@ -143,6 +143,27 @@ if (isset($_POST['model_archive']) || isset($_POST['model_restore'])) {
     Html::back();
 }
 
+if (isset($_POST['calendar_add']) || isset($_POST['calendar_remove'])) {
+    require_once GLPI_ROOT . '/plugins/tralla/inc/calendar.class.php';
+    try {
+        if (isset($_POST['calendar_remove'])) {
+            PluginTrallaCalendar::remove(tralla_post_int('calendar_id'));
+            Session::addMessageAfterRedirect('Dia removido do calendário.', true);
+        } else {
+            PluginTrallaCalendar::save(
+                tralla_post_string('calendar_day'),
+                tralla_post_string('calendar_mode'),
+                tralla_post_string('calendar_reason'),
+                (int) Session::getLoginUserID()
+            );
+            Session::addMessageAfterRedirect('Calendário de envios atualizado.', true);
+        }
+    } catch (RuntimeException $e) {
+        Session::addMessageAfterRedirect($e->getMessage(), false, ERROR);
+    }
+    Html::redirect($pluginUrl . '/front/config.form.php#tralla-calendar');
+}
+
 if (isset($_POST['test_email'])) {
     $userId = (int) Session::getLoginUserID();
     $email = '';
@@ -363,6 +384,82 @@ echo "<script>document.title = 'Tralla';</script>";
             <i class="ti ti-refresh"></i> Sincronizar planilha agora
         </button>
     </form>
+
+<?php
+require_once GLPI_ROOT . '/plugins/tralla/inc/calendar.class.php';
+$calendarDays = PluginTrallaCalendar::upcoming(date('Y-m-d'));
+$holidays = tralla_holiday_map((int) date('Y')) + tralla_holiday_map((int) date('Y') + 1);
+ksort($holidays);
+$holidays = array_filter($holidays, static fn (string $name, string $day): bool => $day >= date('Y-m-d'), ARRAY_FILTER_USE_BOTH);
+?>
+<section class="tralla-card tralla-config-card tralla-models-card" id="tralla-calendar">
+    <header>
+        <h2><i class="ti ti-calendar-off"></i> Calendário de envios</h2>
+        <p>Lembretes e avisos automáticos não saem em fim de semana nem nos feriados automáticos abaixo. Cadastre aqui dias extras sem envio (ponto facultativo, recesso) ou force o envio num dia que seria feriado.</p>
+    </header>
+
+    <form method="post" action="<?= tralla_h($pluginUrl) ?>/front/config.form.php" class="tralla-model-add-form">
+        <?= Html::hidden('_glpi_csrf_token', ['value' => tralla_csrf_token()]) ?>
+        <div class="tralla-form-row">
+            <div class="tralla-field">
+                <label for="tralla-calendar-day">Data *</label>
+                <input id="tralla-calendar-day" type="date" name="calendar_day" required min="<?= tralla_h(date('Y-m-d')) ?>">
+            </div>
+            <div class="tralla-field">
+                <label for="tralla-calendar-mode">Envio neste dia</label>
+                <select id="tralla-calendar-mode" name="calendar_mode">
+                    <option value="skip">Sem envio</option>
+                    <option value="force">Forçar envio</option>
+                </select>
+            </div>
+            <div class="tralla-field">
+                <label for="tralla-calendar-reason">Motivo</label>
+                <input id="tralla-calendar-reason" type="text" name="calendar_reason" maxlength="255" placeholder="Ex.: ponto facultativo">
+            </div>
+        </div>
+        <button type="submit" name="calendar_add" value="1" class="tralla-btn tralla-btn-primary">
+            <i class="ti ti-calendar-plus"></i> Salvar dia
+        </button>
+    </form>
+
+    <?php if ($calendarDays === []): ?>
+        <p class="tralla-empty-mini">Nenhum dia extra cadastrado.</p>
+    <?php else: ?>
+        <div class="tralla-table-scroll">
+            <table class="tralla-data-table">
+                <thead><tr><th>Data</th><th>Envio</th><th>Motivo</th><th>Cadastrado por</th><th></th></tr></thead>
+                <tbody>
+                <?php foreach ($calendarDays as $calendarDay): ?>
+                    <tr>
+                        <td><?= tralla_h(date('d/m/Y', (int) strtotime((string) $calendarDay['day']))) ?></td>
+                        <td><?= (string) $calendarDay['mode'] === 'force' ? 'Forçado' : 'Sem envio' ?></td>
+                        <td><?= tralla_h((string) $calendarDay['reason']) ?: '—' ?></td>
+                        <td><?= tralla_h((string) $calendarDay['user_name']) ?: '—' ?></td>
+                        <td>
+                            <form method="post" action="<?= tralla_h($pluginUrl) ?>/front/config.form.php">
+                                <?= Html::hidden('_glpi_csrf_token', ['value' => tralla_csrf_token()]) ?>
+                                <?= Html::hidden('calendar_id', ['value' => (int) $calendarDay['id']]) ?>
+                                <button type="submit" name="calendar_remove" value="1" class="tralla-btn tralla-btn-ghost">
+                                    <i class="ti ti-trash"></i> Remover
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    <?php endif; ?>
+
+    <details>
+        <summary>Próximos feriados automáticos</summary>
+        <ul>
+            <?php foreach ($holidays as $holidayDay => $holidayName): ?>
+                <li><?= tralla_h(date('d/m/Y', (int) strtotime($holidayDay))) ?> — <?= tralla_h($holidayName) ?></li>
+            <?php endforeach; ?>
+        </ul>
+    </details>
+</section>
 
 <?php $models = PluginTrallaMachineModel::getModels(true); ?>
 <section class="tralla-card tralla-config-card tralla-models-card">

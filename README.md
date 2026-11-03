@@ -233,7 +233,7 @@ Ela:
 
 O e-mail usa o endereço padrão do usuário no GLPI. O WhatsApp usa o **Celular** do cadastro do usuário (ou o **Telefone**, se o celular estiver vazio) e a EvolutionAPI configurada no plugin WhatsAppSimples. Cada envio fica registrado em `glpi_plugin_tralla_notifications`.
 
-Lembretes e avisos automáticos só saem em **dia útil**: fim de semana e feriado (nacionais, SP e Jales) ficam para o próximo dia útil. Com o KanPro ativo, vale o calendário de lembretes dele, inclusive os dias tirados ou forçados por lá. O botão **Forçar notificações** envia em qualquer dia.
+Lembretes e avisos automáticos só saem em **dia útil**: fim de semana e feriado (nacionais, SP e Jales) ficam para o próximo dia útil. Dias extras sem envio (ponto facultativo, recesso) ou com envio forçado são cadastrados em **Configurações → Calendário de envios**; na atualização para a 1.7.7, as exceções futuras do calendário do KanPro são copiadas para lá. O botão **Forçar notificações** envia em qualquer dia.
 
 O cron do GLPI precisa rodar a cada minuto (ex.: `* * * * * www-data php /var/www/glpi/front/cron.php`) para os lembretes de 5 minutos.
 
