@@ -2495,6 +2495,10 @@ class PluginTrallaCard extends CommonDBTM
                 if ($pendingList === null) {
                     throw new RuntimeException('O quadro não possui a lista "Manutenção Pendente".');
                 }
+                $pendingApprovalList = PluginTrallaBoard::findListByCategory($boards_id, 'maintenance_approval');
+                if ($pendingApprovalList === null) {
+                    throw new RuntimeException('O quadro não possui a lista "Manutenção Aprovação".');
+                }
                 // As pendentes viram um card novo, com número próprio no quadro (não 28/3).
                 $DB->doQuery(sprintf('SELECT `id` FROM `glpi_plugin_tralla_boards` WHERE `id` = %d FOR UPDATE', $boards_id));
                 $numberRow = $DB->request([
@@ -2522,11 +2526,11 @@ class PluginTrallaCard extends CommonDBTM
                     'family_seq'              => 1,
                     'split_from_cards_id'     => 0,
                     'approval_kind'           => 'maintenance',
-                    'priority'                => (string) ($card['priority'] ?? ''),
-                    'date_sla_start'          => $card['date_sla_start'] ?? null,
+                    'priority'                => '',
+                    'date_sla_start'          => null,
                     'status'                  => 'pending',
                     'workflow_type'           => (string) ($card['workflow_type'] ?? 'maintenance'),
-                    'is_locked'               => 0,
+                    'is_locked'               => 1,
                     'is_archived'             => 0,
                     'source'                  => (string) $card['source'],
                     'machines_total'          => count($partition['pending']),
@@ -2582,6 +2586,12 @@ class PluginTrallaCard extends CommonDBTM
             if ($pendingCardId > 0) {
                 PluginTrallaHistory::log($id, $userId, 'card_split', 'Máquinas pendentes reunidas no novo card #' . $pendingNumber . '.');
                 PluginTrallaHistory::log($pendingCardId, $userId, 'card_split', 'Card criado com as máquinas pendentes de #' . tralla_display_code($card, $boardType) . '.');
+                // SLA recomeça: prioridade e CRM são definidos de novo em Liberação e prioridade.
+                $DB->update('glpi_plugin_tralla_cards', [
+                    'approval_cards_id' => self::createCallReleaseApproval($pendingCardId, $boards_id, $pendingApprovalList, $userId, $now),
+                ], ['id' => $pendingCardId]);
+                PluginTrallaHistory::log($pendingCardId, $userId, 'call_release_requested',
+                    'Card criado bloqueado; aguardando aprovação e definição de prioridade.');
             }
             if ($isCall) {
                 PluginTrallaHistory::log($id, $userId, 'card_finalized',
