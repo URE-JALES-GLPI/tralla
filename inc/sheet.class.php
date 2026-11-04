@@ -54,6 +54,14 @@ class PluginTrallaSheetSync
             throw new RuntimeException('O JSON da conta de serviço Google é inválido.');
         }
         $token = self::accessToken($credentials);
+        $meta = self::request('GET', 'https://sheets.googleapis.com/v4/spreadsheets/' . self::SHEET_ID
+            . '?fields=sheets.properties.title', $token);
+        $titles = array_map(static fn($sheet): string => (string) ($sheet['properties']['title'] ?? ''),
+            (array) ($meta['sheets'] ?? []));
+        if (!in_array($tab, $titles, true)) {
+            throw new RuntimeException('A aba "' . $tab . '" não existe na planilha. Abas encontradas: '
+                . implode(', ', $titles) . '. Ajuste o nome da aba na configuração do Tralla.');
+        }
         $range = "'" . str_replace("'", "''", $tab) . "'!A:H";
         $endpoint = 'https://sheets.googleapis.com/v4/spreadsheets/' . self::SHEET_ID . '/values/';
         $existing = self::request('GET', $endpoint . rawurlencode($range), $token);
