@@ -11,6 +11,46 @@
     var organizer = document.querySelector('[data-board-organizer]');
     var categoryEditor = document.querySelector('[data-category-editor]');
 
+    // Configurações em guias. O formulário principal continua inteiro: salvar grava todas as guias.
+    var configTabs = document.querySelector('[data-config-tabs]');
+    if (configTabs) {
+        var configPanels = Array.prototype.slice.call(document.querySelectorAll('[data-config-tab]'));
+        var configForm = document.querySelector('.tralla-config-grid');
+        var configTabButtons = Array.prototype.slice.call(configTabs.querySelectorAll('[data-config-tab-button]'));
+        var showConfigTab = function (tab) {
+            configPanels.forEach(function (panel) {
+                panel.hidden = panel.getAttribute('data-config-tab') !== tab;
+            });
+            configTabButtons.forEach(function (button) {
+                var active = button.getAttribute('data-config-tab-button') === tab;
+                button.classList.toggle('is-active', active);
+                button.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+            // Sem nenhuma seção do formulário nesta guia, o botão Salvar também some.
+            configForm.hidden = !configForm.querySelector('[data-config-tab]:not([hidden])');
+            try { window.sessionStorage.setItem('tralla-config-tab', tab); } catch (error) { /* só conveniência */ }
+        };
+        var initialConfigTab = '';
+        var configHashTarget = window.location.hash.length > 1 ? document.getElementById(window.location.hash.slice(1)) : null;
+        if (configHashTarget && configHashTarget.closest('[data-config-tab]')) {
+            initialConfigTab = configHashTarget.closest('[data-config-tab]').getAttribute('data-config-tab');
+        } else {
+            try { initialConfigTab = window.sessionStorage.getItem('tralla-config-tab') || ''; } catch (error) { initialConfigTab = ''; }
+        }
+        if (!configTabs.querySelector('[data-config-tab-button="' + initialConfigTab + '"]')) {
+            initialConfigTab = configTabButtons[0].getAttribute('data-config-tab-button');
+        }
+        configTabs.hidden = false;
+        document.documentElement.classList.add('tralla-config-tabbed');
+        showConfigTab(initialConfigTab);
+        configTabs.addEventListener('click', function (event) {
+            var button = event.target.closest('[data-config-tab-button]');
+            if (button) {
+                showConfigTab(button.getAttribute('data-config-tab-button'));
+            }
+        });
+    }
+
     // Configurações: edição das categorias; só vale depois de "Salvar categorias".
     if (categoryEditor) {
         var nextCategoryIndex = categoryEditor.querySelectorAll('[data-category-block]').length;

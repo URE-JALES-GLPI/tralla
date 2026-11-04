@@ -251,10 +251,25 @@ echo "<script>document.title = 'Tralla';</script>";
         </div>
     </header>
 
+    <nav class="tralla-config-tabs" role="tablist" aria-label="Guias das configurações" data-config-tabs hidden>
+        <?php foreach ([
+            'assignature'   => ['ti-link', 'assignat-ure'],
+            'chamados'      => ['ti-ticket', 'Chamados do GLPI'],
+            'planilha'      => ['ti-table', 'Planilha SEINTEC'],
+            'notificacoes'  => ['ti-mail', 'Notificações'],
+            'categorias'    => ['ti-category', 'Categorias'],
+            'modelos'       => ['ti-device-laptop', 'Modelos de máquina'],
+        ] as $tabKey => [$tabIcon, $tabLabel]): ?>
+            <button type="button" role="tab" class="tralla-config-tab" data-config-tab-button="<?= $tabKey ?>">
+                <i class="ti <?= $tabIcon ?>" aria-hidden="true"></i> <?= tralla_h($tabLabel) ?>
+            </button>
+        <?php endforeach; ?>
+    </nav>
+
     <form method="post" action="<?= tralla_h($pluginUrl) ?>/front/config.form.php" class="tralla-config-grid">
         <?= Html::hidden('_glpi_csrf_token', ['value' => tralla_csrf_token()]) ?>
 
-        <section class="tralla-card tralla-config-card">
+        <section class="tralla-card tralla-config-card" data-config-tab="assignature">
             <header>
                 <h2><i class="ti ti-link"></i> assignat-ure</h2>
                 <p>Vincule o Tralla ao Assignat-ure para coletar a assinatura e concluir a retirada automaticamente.</p>
@@ -283,7 +298,7 @@ echo "<script>document.title = 'Tralla';</script>";
             </div>
         </section>
 
-        <section class="tralla-card tralla-config-card">
+        <section class="tralla-card tralla-config-card" data-config-tab="chamados">
             <header>
                 <h2><i class="ti ti-ticket"></i> Chamados do GLPI</h2>
                 <p>Um chamado por card principal de manutenção ou chamado. Movimentações e alterações entram como acompanhamentos no mesmo chamado.</p>
@@ -316,7 +331,7 @@ echo "<script>document.title = 'Tralla';</script>";
             </button>
         </section>
 
-        <section class="tralla-card tralla-config-card">
+        <section class="tralla-card tralla-config-card" data-config-tab="planilha">
             <header>
                 <h2><i class="ti ti-table"></i> Planilha SEINTEC</h2>
                 <p>Atualiza a aba do Google Sheets a cada 30 minutos, uma linha por card principal. Cards de aprovação não são exportados.</p>
@@ -357,7 +372,7 @@ echo "<script>document.title = 'Tralla';</script>";
             <?php endif; ?>
         </section>
 
-        <section class="tralla-card tralla-config-card">
+        <section class="tralla-card tralla-config-card" data-config-tab="notificacoes">
             <header>
                 <h2><i class="ti ti-mail"></i> Notificações</h2>
                 <p>Lembretes automáticos de cards pendentes e retiradas aguardando confirmação.</p>
@@ -396,7 +411,7 @@ echo "<script>document.title = 'Tralla';</script>";
         </footer>
     </form>
 
-    <form method="post" action="<?= tralla_h($pluginUrl) ?>/front/config.form.php">
+    <form method="post" action="<?= tralla_h($pluginUrl) ?>/front/config.form.php" class="tralla-config-sheet-sync" data-config-tab="planilha">
         <?= Html::hidden('_glpi_csrf_token', ['value' => tralla_csrf_token()]) ?>
         <button type="submit" name="sheet_sync_now" value="1" class="tralla-btn tralla-btn-ghost">
             <i class="ti ti-refresh"></i> Sincronizar planilha agora
@@ -410,7 +425,7 @@ $holidays = tralla_holiday_map((int) date('Y')) + tralla_holiday_map((int) date(
 ksort($holidays);
 $holidays = array_filter($holidays, static fn (string $name, string $day): bool => $day >= date('Y-m-d'), ARRAY_FILTER_USE_BOTH);
 ?>
-<section class="tralla-card tralla-config-card tralla-models-card" id="tralla-calendar">
+<section class="tralla-card tralla-config-card tralla-models-card" id="tralla-calendar" data-config-tab="notificacoes">
     <header>
         <h2><i class="ti ti-calendar-off"></i> Calendário de envios</h2>
         <p>Lembretes e avisos automáticos não saem em fim de semana nem nos feriados automáticos abaixo. Cadastre aqui dias extras sem envio (ponto facultativo, recesso) ou force o envio num dia que seria feriado.</p>
@@ -480,7 +495,7 @@ $holidays = array_filter($holidays, static fn (string $name, string $day): bool 
 </section>
 
 <?php $models = PluginTrallaMachineModel::getModels(true); ?>
-<section class="tralla-card tralla-config-card tralla-models-card" id="tralla-categories">
+<section class="tralla-card tralla-config-card tralla-models-card" id="tralla-categories" data-config-tab="categorias">
     <header>
         <h2><i class="ti ti-category"></i> Categorias dos chamados</h2>
         <p>Categorias e subcategorias disponíveis ao criar cards do tipo Chamado. Cards já criados mantêm a categoria que têm hoje, mesmo que ela seja renomeada ou removida aqui.</p>
@@ -516,7 +531,7 @@ $holidays = array_filter($holidays, static fn (string $name, string $day): bool 
     </form>
 </section>
 
-<section class="tralla-card tralla-config-card tralla-models-card">
+<section class="tralla-card tralla-config-card tralla-models-card" data-config-tab="modelos">
     <header>
         <h2><i class="ti ti-device-laptop"></i> Modelos de máquina</h2>
         <p>Modelos disponíveis ao criar cards de manutenção. Arquive modelos que não devem mais ser usados.</p>
