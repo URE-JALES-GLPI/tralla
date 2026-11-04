@@ -279,7 +279,8 @@ function plugin_tralla_install(): bool
 
     // A retirada usa family_cards_id; a numeração também inclui cards pendentes
     // separados que continuam o código visual da origem. Reconstitui a ordem de
-    // criação, incluindo aprovações antigas e cards arquivados.
+    // criação, incluindo cards arquivados. Aprovações não consomem número (28/2 é
+    // o primeiro separado): mostram o código do card de origem.
     $visualRoots = [];
     $visualNumbers = [];
     $codeFixes = [];
@@ -299,12 +300,16 @@ function plugin_tralla_install(): bool
             $root = (int) $codeCard['family_cards_id'] ?: $cardId;
         }
         $visualRoots[$cardId] = $root;
-        $visualNumbers[$root] = ($visualNumbers[$root] ?? 0) + 1;
+        $visualSeq = (int) $codeCard['family_seq'];
+        if ((int) $codeCard['stage'] !== 2) {
+            $visualNumbers[$root] = ($visualNumbers[$root] ?? 0) + 1;
+            $visualSeq = $visualNumbers[$root];
+        }
         if ((int) $codeCard['code_root_cards_id'] !== $root
-            || (int) $codeCard['family_seq'] !== $visualNumbers[$root]) {
+            || (int) $codeCard['family_seq'] !== $visualSeq) {
             $codeFixes[$cardId] = [
                 'code_root_cards_id' => $root,
-                'family_seq' => $visualNumbers[$root],
+                'family_seq' => $visualSeq,
             ];
         }
     }
