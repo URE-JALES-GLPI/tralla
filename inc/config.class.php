@@ -28,6 +28,7 @@ class PluginTrallaConfig
             'sheet_sync_enabled' => '0',
             'sheet_board_id' => '0',
             'sheet_tab' => 'Página1',
+            'sheet_first_row' => '463',
             'sheet_credentials_path' => '',
             'sheet_last_attempt' => '0',
             'sheet_last_success' => '0',

@@ -43,6 +43,7 @@ if (isset($_POST['save'])) {
     PluginTrallaConfig::set('sheet_sync_enabled', !empty($_POST['sheet_sync_enabled']) ? '1' : '0');
     PluginTrallaConfig::set('sheet_board_id', (string) $sheetBoardId);
     PluginTrallaConfig::set('sheet_tab', trim(tralla_post_string('sheet_tab', 'Página1')));
+    PluginTrallaConfig::set('sheet_first_row', (string) max(2, tralla_post_int('sheet_first_row', 463)));
     PluginTrallaConfig::set('sheet_credentials_path', trim(tralla_post_string('sheet_credentials_path')));
     foreach (array_keys(tralla_priorities()) as $priority) {
         foreach (['tto' => SLM::TTO, 'ttr' => SLM::TTR] as $kind => $type) {
@@ -322,6 +323,11 @@ echo "<script>document.title = 'Tralla';</script>";
             <div class="tralla-field">
                 <label for="tralla-sheet-tab">Nome da aba</label>
                 <input id="tralla-sheet-tab" type="text" name="sheet_tab" maxlength="100" value="<?= tralla_h($config['sheet_tab'] ?? 'Página1') ?>">
+            </div>
+            <div class="tralla-field">
+                <label for="tralla-sheet-first-row">Primeira linha dos cards</label>
+                <input id="tralla-sheet-first-row" type="number" name="sheet_first_row" min="2" step="1" value="<?= (int) ($config['sheet_first_row'] ?? 463) ?>">
+                <small>As linhas acima desta não são lidas nem alteradas. As novas seguem a formatação das duas linhas anteriores a ela.</small>
             </div>
             <div class="tralla-field">
                 <label for="tralla-sheet-key">Caminho do JSON da conta de serviço no servidor</label>

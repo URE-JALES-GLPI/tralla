@@ -55,26 +55,38 @@ class PluginTrallaSheetSync
         }
         $token = self::accessToken($credentials);
         $meta = self::request('GET', 'https://sheets.googleapis.com/v4/spreadsheets/' . self::SHEET_ID
-            . '?fields=sheets.properties.title', $token);
-        $titles = array_map(static fn($sheet): string => (string) ($sheet['properties']['title'] ?? ''),
-            (array) ($meta['sheets'] ?? []));
-        if (!in_array($tab, $titles, true)) {
+            . '?fields=sheets.properties(title,sheetId,gridProperties.rowCount)', $token);
+        $titles = [];
+        $sheetId = null;
+        $rowCount = 0;
+        foreach ((array) ($meta['sheets'] ?? []) as $sheet) {
+            $title = (string) ($sheet['properties']['title'] ?? '');
+            $titles[] = $title;
+            if ($title === $tab) {
+                $sheetId = (int) ($sheet['properties']['sheetId'] ?? 0);
+                $rowCount = (int) ($sheet['properties']['gridProperties']['rowCount'] ?? 0);
+            }
+        }
+        if ($sheetId === null) {
             throw new RuntimeException('A aba "' . $tab . '" não existe na planilha. Abas encontradas: '
                 . implode(', ', $titles) . '. Ajuste o nome da aba na configuração do Tralla.');
         }
+        // Linhas acima desta (cabeçalho e histórico colado à mão) nunca são lidas nem alteradas.
+        $firstRow = max(2, PluginTrallaConfig::getInt('sheet_first_row', 2));
+        $firstIndex = $firstRow - 1;
         $range = "'" . str_replace("'", "''", $tab) . "'!A:H";
         $endpoint = 'https://sheets.googleapis.com/v4/spreadsheets/' . self::SHEET_ID . '/values/';
         $existing = self::request('GET', $endpoint . rawurlencode($range), $token);
         $rows = (array) ($existing['values'] ?? []);
         $byCode = [];
         foreach ($rows as $index => $row) {
-            if ($index === 0) { continue; }
+            if ($index < $firstIndex) { continue; }
             $code = trim((string) ($row[0] ?? ''));
             if ($code !== '' && !isset($byCode[$code])) { $byCode[$code] = $index + 1; }
         }
         // Sem a linha "N", reaproveita a primeira linha "N/x" como a linha única do card.
         foreach ($rows as $index => $row) {
-            if ($index > 0 && preg_match('/^(\d+)\/\d+$/', trim((string) ($row[0] ?? '')), $match)
+            if ($index >= $firstIndex && preg_match('/^(\d+)\/\d+$/', trim((string) ($row[0] ?? '')), $match)
                 && !isset($byCode[$match[1]])) {
                 $byCode[$match[1]] = $index + 1;
             }
@@ -222,7 +234,7 @@ class PluginTrallaSheetSync
         // agora tem a linha única: removidas de baixo para cima depois de gravar.
         $obsolete = [];
         foreach ($rows as $index => $row) {
-            if ($index === 0) { continue; }
+            if ($index < $firstIndex) { continue; }
             $code = trim((string) ($row[0] ?? ''));
             $base = preg_match('/^(\d+)\/\d+$/', $code, $match) ? $match[1] : $code;
             if (isset($exported[$base]) && ($byCode[$base] ?? 0) !== $index + 1) {
@@ -230,22 +242,74 @@ class PluginTrallaSheetSync
             }
         }
 
-        if ($updates !== []) {
+        // Linhas novas vão logo depois da última usada: o append do Google escolheria a coluna
+        // pela tabela que detecta, e o histórico colado não tem nada na coluna A.
+        $lastRow = max($firstRow - 1, count($rows));
+        if ($appends !== []) {
+            $missing = $lastRow + count($appends) - $rowCount;
+            if ($missing > 0) {
+                self::batchUpdate($token, [['appendDimension' => [
+                    'sheetId' => $sheetId, 'dimension' => 'ROWS', 'length' => $missing,
+                ]]]);
+            }
+        }
+        $written = $updates;
+        foreach ($appends as $offset => $record) {
+            $rowNumber = $lastRow + $offset + 1;
+            $written[] = ['range' => "'" . str_replace("'", "''", $tab) . "'!A{$rowNumber}:H{$rowNumber}",
+                'values' => [$record]];
+        }
+        if ($written !== []) {
             self::request('POST', 'https://sheets.googleapis.com/v4/spreadsheets/' . self::SHEET_ID
                 . '/values:batchUpdate', $token,
-                ['valueInputOption' => 'RAW', 'data' => $updates]);
-        }
-        if ($appends !== []) {
-            self::request('POST', $endpoint . rawurlencode($range) . ':append?valueInputOption=RAW'
-                . '&insertDataOption=INSERT_ROWS', $token,
-                ['majorDimension' => 'ROWS', 'values' => $appends]);
+                ['valueInputOption' => 'RAW', 'data' => $written]);
         }
         if ($obsolete !== []) {
             self::deleteRows($token, $tab, $obsolete);
         }
+        if ($appends !== [] || $obsolete !== []) {
+            self::paintRows($token, $sheetId, $firstRow, $lastRow + count($appends) - count(array_unique($obsolete)));
+        }
         PluginTrallaConfig::set('sheet_last_success', (string) time());
         PluginTrallaConfig::set('sheet_last_error', '');
         return count($updates) + count($appends) + count($obsolete);
+    }
+
+    /** Repete nas linhas dos cards a formatação (cores intercaladas) das duas linhas anteriores. */
+    private static function paintRows(string $token, int $sheetId, int $firstRow, int $lastRow): void
+    {
+        $count = $lastRow - $firstRow + 1;
+        if ($firstRow < 3 || $count <= 0) {
+            return;
+        }
+        $grid = static fn(int $start, int $end): array => [
+            'sheetId' => $sheetId, 'startRowIndex' => $start, 'endRowIndex' => $end,
+            'startColumnIndex' => 0, 'endColumnIndex' => 8,
+        ];
+        $requests = [];
+        // O Google só repete a origem em múltiplos dela: linha ímpar final vai separada.
+        $pairs = $count - $count % 2;
+        if ($pairs > 0) {
+            $requests[] = ['copyPaste' => [
+                'source' => $grid($firstRow - 3, $firstRow - 1),
+                'destination' => $grid($firstRow - 1, $firstRow - 1 + $pairs),
+                'pasteType' => 'PASTE_FORMAT',
+            ]];
+        }
+        if ($count % 2 === 1) {
+            $requests[] = ['copyPaste' => [
+                'source' => $grid($firstRow - 3, $firstRow - 2),
+                'destination' => $grid($lastRow - 1, $lastRow),
+                'pasteType' => 'PASTE_FORMAT',
+            ]];
+        }
+        self::batchUpdate($token, $requests);
+    }
+
+    private static function batchUpdate(string $token, array $requests): void
+    {
+        self::request('POST', 'https://sheets.googleapis.com/v4/spreadsheets/' . self::SHEET_ID . ':batchUpdate',
+            $token, ['requests' => $requests]);
     }
 
     /** Remove linhas (índices a partir de 0) da aba, de baixo para cima. */
