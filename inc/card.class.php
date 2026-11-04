@@ -2495,7 +2495,14 @@ class PluginTrallaCard extends CommonDBTM
                 if ($pendingList === null) {
                     throw new RuntimeException('O quadro não possui a lista "Manutenção Pendente".');
                 }
-                $pendingSeq = self::nextCodeSequence($codeRoot);
+                // As pendentes viram um card novo, com número próprio no quadro (não 28/3).
+                $DB->doQuery(sprintf('SELECT `id` FROM `glpi_plugin_tralla_boards` WHERE `id` = %d FOR UPDATE', $boards_id));
+                $numberRow = $DB->request([
+                    'SELECT' => ['MAX' => 'code_number AS max_number'],
+                    'FROM'   => 'glpi_plugin_tralla_cards',
+                    'WHERE'  => ['plugin_tralla_boards_id' => $boards_id],
+                ])->current();
+                $pendingNumber = (int) ($numberRow['max_number'] ?? 0) + 1;
                 $DB->insert('glpi_plugin_tralla_cards', [
                     'plugin_tralla_boards_id' => $boards_id,
                     'plugin_tralla_lists_id'  => (int) $pendingList['id'],
@@ -2510,9 +2517,10 @@ class PluginTrallaCard extends CommonDBTM
                     'parent_cards_id'         => 0,
                     'approval_cards_id'       => 0,
                     'family_cards_id'         => 0,
-                    'code_root_cards_id'      => $codeRoot,
-                    'family_seq'              => $pendingSeq,
-                    'split_from_cards_id'     => $id,
+                    'code_root_cards_id'      => 0,
+                    'code_number'             => $pendingNumber,
+                    'family_seq'              => 1,
+                    'split_from_cards_id'     => 0,
                     'approval_kind'           => 'maintenance',
                     'priority'                => (string) ($card['priority'] ?? ''),
                     'date_sla_start'          => $card['date_sla_start'] ?? null,
@@ -2528,12 +2536,18 @@ class PluginTrallaCard extends CommonDBTM
                 $pendingCardId = (int) $DB->insertId();
                 // O card pendente inicia outra família para não bloquear a retirada do card finalizado.
                 $DB->update('glpi_plugin_tralla_cards', [
-                    'family_cards_id' => $pendingCardId,
+                    'family_cards_id'    => $pendingCardId,
+                    'code_root_cards_id' => $pendingCardId,
                 ], ['id' => $pendingCardId]);
-                $DB->update('glpi_plugin_tralla_machines', [
-                    'plugin_tralla_cards_id' => $pendingCardId,
-                    'date_mod'               => $now,
-                ], ['id' => $partition['pending']]);
+                tralla_code_cache(true);
+                // Card novo, numeração nova: as máquinas recomeçam em #1.
+                foreach (array_values($partition['pending']) as $position => $machineId) {
+                    $DB->update('glpi_plugin_tralla_machines', [
+                        'plugin_tralla_cards_id' => $pendingCardId,
+                        'machine_number'         => $position + 1,
+                        'date_mod'               => $now,
+                    ], ['id' => $machineId]);
+                }
                 PluginTrallaMachine::refreshCardTotal($id);
             }
 
@@ -2566,15 +2580,8 @@ class PluginTrallaCard extends CommonDBTM
             }
 
             if ($pendingCardId > 0) {
-                $pendingCode = tralla_display_code([
-                    'id' => $pendingCardId,
-                    'stage' => 1,
-                    'family_cards_id' => $pendingCardId,
-                    'code_root_cards_id' => $codeRoot,
-                    'family_seq' => $pendingSeq,
-                ], $boardType);
-                PluginTrallaHistory::log($id, $userId, 'card_split', 'Máquinas pendentes reunidas no novo card ' . $pendingCode . '.');
-                PluginTrallaHistory::log($pendingCardId, $userId, 'card_split', 'Card criado com as máquinas pendentes de ' . tralla_display_code($card, $boardType) . '.');
+                PluginTrallaHistory::log($id, $userId, 'card_split', 'Máquinas pendentes reunidas no novo card #' . $pendingNumber . '.');
+                PluginTrallaHistory::log($pendingCardId, $userId, 'card_split', 'Card criado com as máquinas pendentes de #' . tralla_display_code($card, $boardType) . '.');
             }
             if ($isCall) {
                 PluginTrallaHistory::log($id, $userId, 'card_finalized',

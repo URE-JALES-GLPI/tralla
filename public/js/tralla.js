@@ -2177,6 +2177,72 @@
         });
     }
 
+    function finalizePendingDialog(machines) {
+        var pendingRows = [];
+        var readyCount = 0;
+        machines.forEach(function (machine, index) {
+            if (machine.status === 'pending') {
+                pendingRows.push('<li>' + esc(machineDisplayTitle(machine, index + 1)) + '</li>');
+            } else {
+                readyCount++;
+            }
+        });
+        var plural = pendingRows.length > 1;
+        return new Promise(function (resolve) {
+            var uid = 'tralla-finalize-pending-' + Date.now();
+            var previousFocus = document.activeElement;
+            var layer = document.createElement('div');
+            layer.className = 'tralla-dialog-layer';
+            layer.innerHTML = '<div class="tralla-dialog-backdrop" data-dialog-cancel></div>'
+                + '<div class="tralla-modal tralla-dialog tralla-confirm-dialog tralla-finalize-pending-dialog" role="alertdialog" aria-modal="true"'
+                + ' aria-labelledby="' + uid + '-title">'
+                + '<div class="tralla-dialog-head">'
+                + '<span class="tralla-dialog-icon" aria-hidden="true"><i class="ti ti-alert-triangle"></i></span>'
+                + '<div class="tralla-dialog-copy">'
+                + '<span class="tralla-confirm-eyebrow">Antes de finalizar</span>'
+                + '<h2 class="tralla-dialog-title" id="' + uid + '-title">'
+                + (plural ? 'Ainda há ' + pendingRows.length + ' máquinas pendentes' : 'Ainda há 1 máquina pendente') + '</h2>'
+                + '<p class="tralla-dialog-message">' + (plural ? 'Elas não estão prontas' : 'Ela não está pronta')
+                + ' para a retirada. Se você finalizar agora, este card segue sem ' + (plural ? 'elas' : 'ela') + '.</p>'
+                + '</div></div>'
+                + '<div class="tralla-finalize-pending-flow">'
+                + '<section class="is-pending"><h3><i class="ti ti-clock" aria-hidden="true"></i> Vai para um card novo no Pendente</h3>'
+                + '<ul>' + pendingRows.join('') + '</ul></section>'
+                + '<section class="is-ready"><h3><i class="ti ti-package-export" aria-hidden="true"></i> Segue para Retirada</h3>'
+                + '<p>' + readyCount + (readyCount > 1 ? ' máquinas deste card' : ' máquina deste card') + '</p></section>'
+                + '</div>'
+                + '<p class="tralla-finalize-pending-note">O card novo recebe um número próprio, mantém a prioridade e os prazos deste card e fica sem técnico.</p>'
+                + '<div class="tralla-dialog-actions">'
+                + '<button type="button" class="tralla-btn tralla-btn-ghost" data-dialog-cancel>Voltar e revisar</button>'
+                + '<button type="button" class="tralla-btn tralla-btn-primary" data-dialog-confirm>'
+                + '<i class="ti ti-check" aria-hidden="true"></i> Finalizar e criar card novo</button>'
+                + '</div></div>';
+            document.body.appendChild(layer);
+            document.body.classList.add('tralla-dialog-open');
+            var finished = false;
+            function finish(value) {
+                if (finished) { return; }
+                finished = true;
+                document.removeEventListener('keydown', onKeydown, true);
+                layer.remove();
+                if (!document.querySelector('.tralla-dialog-layer')) {
+                    document.body.classList.remove('tralla-dialog-open');
+                }
+                if (previousFocus && document.contains(previousFocus)) { previousFocus.focus(); }
+                resolve(value);
+            }
+            function onKeydown(event) {
+                if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); finish(false); }
+            }
+            document.addEventListener('keydown', onKeydown, true);
+            layer.querySelectorAll('[data-dialog-cancel]').forEach(function (el) {
+                el.addEventListener('click', function () { finish(false); });
+            });
+            layer.querySelector('[data-dialog-confirm]').addEventListener('click', function () { finish(true); });
+            window.setTimeout(function () { layer.querySelector('[data-dialog-confirm]').focus(); }, 30);
+        });
+    }
+
     function finalizeRequirements(card) {
         var requirements = { general: [], machines: [] };
         var machines = Array.isArray(card.machines) ? card.machines : [];
@@ -3747,6 +3813,14 @@
                     confirmLabel: 'Confirmar retirada'
                 });
                 if (!withdrawConfirmed) {
+                    return;
+                }
+            }
+
+            if (action === 'finalize' && activeCard.workflow_type !== 'call') {
+                var finalizeMachines = Array.isArray(activeCard.machines) ? activeCard.machines : [];
+                var hasPendingMachines = finalizeMachines.some(function (machine) { return machine.status === 'pending'; });
+                if (hasPendingMachines && !(await finalizePendingDialog(finalizeMachines))) {
                     return;
                 }
             }

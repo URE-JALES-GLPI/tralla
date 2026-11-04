@@ -5417,3 +5417,64 @@ html.tralla-board-fit .tralla-list {
 .tralla-filter-dialog > .tralla-field:last-of-type {
     margin-bottom: 0 !important;
 }
+
+/* Finalizar com máquina pendente: o que vai para o card novo e o que segue para Retirada. */
+.tralla-finalize-pending-dialog .tralla-dialog-icon {
+    background: var(--tr-warning-soft);
+    color: var(--tr-warning);
+}
+.tralla-finalize-pending-dialog .tralla-confirm-eyebrow {
+    color: var(--tr-warning);
+}
+.tralla-finalize-pending-flow {
+    display: grid;
+    gap: 8px;
+    margin: 16px 24px 0;
+}
+.tralla-finalize-pending-flow section {
+    background: var(--tr-surface-2);
+    border: 1px solid var(--tr-border);
+    border-left-width: 3px;
+    border-radius: 8px;
+    padding: 12px 14px;
+}
+.tralla-finalize-pending-flow section.is-pending {
+    background: var(--tr-warning-soft);
+    border-left-color: var(--tr-warning);
+}
+.tralla-finalize-pending-flow section.is-ready {
+    border-left-color: var(--tr-success);
+}
+.tralla-finalize-pending-flow h3 {
+    align-items: center;
+    color: var(--tr-text);
+    display: flex;
+    font-size: 13px;
+    font-weight: 700;
+    gap: 6px;
+    margin: 0 0 6px;
+}
+.tralla-finalize-pending-flow .is-pending h3 .ti { color: var(--tr-warning); }
+.tralla-finalize-pending-flow .is-ready h3 .ti { color: var(--tr-success); }
+.tralla-finalize-pending-flow ul {
+    display: grid;
+    gap: 3px;
+    list-style: none;
+    margin: 0;
+    max-height: 132px;
+    overflow-y: auto;
+    padding: 0;
+}
+.tralla-finalize-pending-flow li,
+.tralla-finalize-pending-flow p {
+    color: var(--tr-text-soft);
+    font-size: 13px;
+    margin: 0;
+}
+.tralla-finalize-pending-note {
+    color: var(--tr-muted);
+    font-size: 12px;
+    line-height: 1.45;
+    margin: 12px 24px 0;
+}
+.tralla-finalize-pending-dialog .tralla-dialog-actions { margin-top: 20px; }
