@@ -4950,7 +4950,7 @@ class PluginTrallaCard extends CommonDBTM
             }
             $model = trim((string) ($machine['model_name'] ?? ''));
             if ($model !== '') {
-                $sequence = (int) ($machine['sequence'] ?? 0);
+                $sequence = (int) ($machine['machine_number'] ?? 0);
                 return $sequence > 0 ? $model . ' #' . $sequence : $model;
             }
 

@@ -390,6 +390,7 @@ function plugin_tralla_install(): bool
                 `id`                            INT {$sign} NOT NULL AUTO_INCREMENT,
                 `plugin_tralla_cards_id`        INT {$sign} NOT NULL DEFAULT '0',
                 `plugin_tralla_machine_models_id` INT {$sign} NOT NULL DEFAULT '0',
+                `machine_number`                INT {$sign} NOT NULL DEFAULT '0' COMMENT 'número fixo da máquina na família do card',
                 `label`                         VARCHAR(255) NOT NULL DEFAULT '',
                 `serial`                        VARCHAR(255) NOT NULL DEFAULT '',
                 `report`                        LONGTEXT     DEFAULT NULL,
@@ -582,6 +583,32 @@ function plugin_tralla_install(): bool
     if ($DB->tableExists('glpi_plugin_tralla_machines')) {
         $DB->update('glpi_plugin_tralla_machines', ['status' => 'in_progress'], ['status' => '']);
         $DB->update('glpi_plugin_tralla_machines', ['service_done' => 0], ['status' => 'in_progress', 'service_done' => 1]);
+    }
+
+    // 1.7.11: número fixo da máquina (Tablet Positivo #5 continua #5 depois de separar o card).
+    // Máquinas antigas seguem a ordem de cadastro dentro da família; já numeradas não mudam.
+    if ($DB->tableExists('glpi_plugin_tralla_machines')) {
+        if (!$DB->fieldExists('glpi_plugin_tralla_machines', 'machine_number')) {
+            $DB->doQuery("ALTER TABLE `glpi_plugin_tralla_machines` ADD COLUMN `machine_number` INT {$sign} NOT NULL DEFAULT '0' AFTER `plugin_tralla_machine_models_id`") or die($DB->error());
+        }
+        $machineRows = [];
+        $lastNumbers = [];
+        foreach ($DB->request([
+            'SELECT'     => ['m.id AS machine_id', 'm.machine_number AS machine_number', 'c.id AS card_id', 'c.code_root_cards_id AS code_root'],
+            'FROM'       => 'glpi_plugin_tralla_machines AS m',
+            'INNER JOIN' => ['glpi_plugin_tralla_cards AS c' => ['ON' => ['m' => 'plugin_tralla_cards_id', 'c' => 'id']]],
+            'ORDER'      => 'm.id ASC',
+        ]) as $machineRow) {
+            $machineRoot = (int) $machineRow['code_root'] ?: (int) $machineRow['card_id'];
+            $machineRows[] = [(int) $machineRow['machine_id'], (int) $machineRow['machine_number'], $machineRoot];
+            $lastNumbers[$machineRoot] = max($lastNumbers[$machineRoot] ?? 0, (int) $machineRow['machine_number']);
+        }
+        foreach ($machineRows as [$machineId, $machineNumber, $machineRoot]) {
+            if ($machineNumber <= 0) {
+                $lastNumbers[$machineRoot]++;
+                $DB->update('glpi_plugin_tralla_machines', ['machine_number' => $lastNumbers[$machineRoot]], ['id' => $machineId]);
+            }
+        }
     }
 
     // 1.6.0: em quadros de manutenção, "Manutenção Aprovação" fica à esquerda

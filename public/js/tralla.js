@@ -776,7 +776,9 @@
     function machineDisplayTitle(machine, sequence) {
         var model = String((machine && machine.model_name) || '').trim();
         if (model !== '') {
-            return model + (sequence ? ' #' + sequence : '');
+            // Número fixo da máquina; a posição na lista só vale se ele não vier preenchido.
+            var number = Number(machine.machine_number) || sequence;
+            return model + (number ? ' #' + number : '');
         }
 
         return 'Máquina #' + Number((machine && machine.id) || 0);

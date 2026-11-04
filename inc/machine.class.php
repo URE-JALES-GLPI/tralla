@@ -83,6 +83,28 @@ class PluginTrallaMachine extends CommonDBTM
         return implode(' · ', $parts);
     }
 
+    /** Número fixo da próxima máquina: segue a família do card, então a separação não o altera. */
+    private static function nextNumberForCard(int $cards_id): int
+    {
+        global $DB;
+
+        $card = $DB->request([
+            'SELECT' => ['code_root_cards_id'],
+            'FROM'   => 'glpi_plugin_tralla_cards',
+            'WHERE'  => ['id' => $cards_id],
+            'LIMIT'  => 1,
+        ])->current();
+        $root = (int) ($card['code_root_cards_id'] ?? 0) ?: $cards_id;
+        $row = $DB->request([
+            'SELECT'     => ['MAX' => 'm.machine_number AS max_number'],
+            'FROM'       => 'glpi_plugin_tralla_machines AS m',
+            'INNER JOIN' => ['glpi_plugin_tralla_cards AS c' => ['ON' => ['m' => 'plugin_tralla_cards_id', 'c' => 'id']]],
+            'WHERE'      => ['OR' => ['c.id' => $root, 'c.code_root_cards_id' => $root]],
+        ])->current();
+
+        return (int) ($row['max_number'] ?? 0) + 1;
+    }
+
     public static function insertForCard(int $cards_id, array $data, float $rank = 0): int
     {
         global $DB;
@@ -101,6 +123,7 @@ class PluginTrallaMachine extends CommonDBTM
         $DB->insert('glpi_plugin_tralla_machines', [
             'plugin_tralla_cards_id'          => $cards_id,
             'plugin_tralla_machine_models_id' => (int) ($data['model_id'] ?? 0),
+            'machine_number'                  => self::nextNumberForCard($cards_id),
             'label'                           => tralla_normalize_label($data['label'] ?? ''),
             'serial'                          => tralla_normalize_label($data['serial'] ?? ''),
             'report'                          => '',
