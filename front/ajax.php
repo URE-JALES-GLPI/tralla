@@ -513,6 +513,14 @@ try {
                 'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id']),
             ]]);
 
+        case 'card_change_priority':
+            tralla_ajax_require(READ);
+            $detail = PluginTrallaCard::changePriority(tralla_post_int('id'), tralla_post_string('priority'), $userId);
+            tralla_json(['ok' => true, 'data' => [
+                'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id']),
+                'card'  => $detail,
+            ]]);
+
         case 'card_draft':
             tralla_ajax_require(UPDATE);
             $detail = PluginTrallaCard::setDraft(tralla_post_int('id'), tralla_post_int('draft') === 1, $userId);

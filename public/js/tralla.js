@@ -2327,6 +2327,77 @@
         });
     }
 
+    function changePriorityDialog(card) {
+        var list = Array.isArray(labels.priorities) ? labels.priorities : [];
+        var start = card && card.sla && card.sla.start ? formatDate(card.sla.start) : '';
+        return new Promise(function (resolve) {
+            var uid = 'tralla-change-priority-' + Date.now();
+            var previousFocus = document.activeElement;
+            var layer = document.createElement('div');
+            layer.className = 'tralla-dialog-layer';
+            layer.innerHTML = '<div class="tralla-dialog-backdrop" data-dialog-cancel></div>'
+                + '<div class="tralla-modal tralla-dialog tralla-dialog-primary tralla-confirm-dialog tralla-priority-dialog" role="dialog" aria-modal="true"'
+                + ' aria-labelledby="' + uid + '-title">'
+                + '<div class="tralla-dialog-head">'
+                + '<span class="tralla-dialog-icon" aria-hidden="true"><i class="ti ti-flag"></i></span>'
+                + '<div class="tralla-dialog-copy">'
+                + '<h2 class="tralla-dialog-title" id="' + uid + '-title">Alterar prioridade</h2>'
+                + '<p class="tralla-dialog-message">O SLA não recomeça' + (start ? ': continua contando desde ' + esc(start) : '')
+                + '. Os prazos passam a seguir a nova prioridade.</p>'
+                + '</div></div>'
+                + '<div class="tralla-priority-options" role="radiogroup" aria-label="Prioridade">'
+                + list.map(function (item) {
+                    return '<label class="tralla-priority-option is-' + attr(String(item.key).toLowerCase()) + '">'
+                        + '<input type="radio" name="' + uid + '-priority" value="' + attr(item.key) + '"'
+                        + (item.key === card.priority ? ' checked' : '') + '>'
+                        + '<span class="tralla-priority-tag">' + esc(item.key) + '</span>'
+                        + '<span class="tralla-priority-text"><strong>' + esc(item.name) + '</strong>'
+                        + '<small>1º atendimento: ' + esc(item.first) + ' · Paliativa: ' + esc(item.palliative)
+                        + ' · Definitiva: ' + esc(item.definitive) + '</small></span></label>';
+                }).join('')
+                + '</div>'
+                + '<div class="tralla-dialog-actions">'
+                + '<button type="button" class="tralla-btn tralla-btn-ghost" data-dialog-cancel>Cancelar</button>'
+                + '<button type="button" class="tralla-btn tralla-btn-primary" data-dialog-confirm disabled>'
+                + '<i class="ti ti-check" aria-hidden="true"></i> Alterar prioridade</button>'
+                + '</div></div>';
+            document.body.appendChild(layer);
+            document.body.classList.add('tralla-dialog-open');
+            var confirmEl = layer.querySelector('[data-dialog-confirm]');
+            var finished = false;
+            function selected() {
+                var checked = layer.querySelector('input[type="radio"]:checked');
+                return checked ? checked.value : '';
+            }
+            function finish(value) {
+                if (finished) { return; }
+                finished = true;
+                document.removeEventListener('keydown', onKeydown, true);
+                layer.remove();
+                if (!document.querySelector('.tralla-dialog-layer')) {
+                    document.body.classList.remove('tralla-dialog-open');
+                }
+                if (previousFocus && document.contains(previousFocus)) { previousFocus.focus(); }
+                resolve(value);
+            }
+            function onKeydown(event) {
+                if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); finish(null); }
+            }
+            document.addEventListener('keydown', onKeydown, true);
+            layer.querySelectorAll('input[type="radio"]').forEach(function (radio) {
+                radio.addEventListener('change', function () { confirmEl.disabled = selected() === card.priority; });
+            });
+            layer.querySelectorAll('[data-dialog-cancel]').forEach(function (el) {
+                el.addEventListener('click', function () { finish(null); });
+            });
+            confirmEl.addEventListener('click', function () { if (!confirmEl.disabled) { finish(selected()); } });
+            window.setTimeout(function () {
+                var first = layer.querySelector('input[type="radio"]:checked') || layer.querySelector('input[type="radio"]');
+                if (first) { first.focus(); }
+            }, 30);
+        });
+    }
+
     function finalizeRequirements(card) {
         var requirements = { general: [], machines: [] };
         var machines = Array.isArray(card.machines) ? card.machines : [];
@@ -2472,6 +2543,10 @@
         if (permissions.make_draft) {
             buttons += '<button type="button" class="tralla-btn tralla-btn-ghost" data-card-action="make_draft">'
                 + '<i class="ti ti-file-pencil"></i> Transformar em rascunho</button>';
+        }
+        if (permissions.change_priority) {
+            buttons += '<button type="button" class="tralla-btn tralla-btn-ghost" data-card-action="change_priority">'
+                + '<i class="ti ti-flag"></i> Alterar prioridade</button>';
         }
         if (permissions.request_pause) {
             buttons += '<button type="button" class="tralla-btn tralla-btn-ghost" data-card-action="pause">'
@@ -3737,6 +3812,19 @@
                 var draftResult = await api('card_draft', { id: cardId, draft: publishing ? 0 : 1 });
                 applyState(draftResult);
                 toast(publishing ? 'Rascunho publicado.' : 'Card transformado em rascunho.', 'success');
+                await openCard(cardId);
+                return;
+            }
+
+            if (action === 'change_priority') {
+                var newPriority = await changePriorityDialog(activeCard);
+                if (!newPriority) {
+                    return;
+                }
+                setBusy(button, true);
+                var priorityResult = await api('card_change_priority', { id: cardId, priority: newPriority });
+                applyState(priorityResult);
+                toast('Prioridade alterada para ' + (priorityInfo(newPriority).label || newPriority) + '.', 'success');
                 await openCard(cardId);
                 return;
             }

@@ -876,6 +876,10 @@ class PluginTrallaCard extends CommonDBTM
             'transfer'         => $canTransfer,
             'request_takeover' => $canRequestTakeover,
             'edit_pause_codes' => $isMember && self::canEditCodes($card, $boardType, $userId),
+            'change_priority'  => $boardType === 'maintenance' && $stage === 1
+                && (string) ($card['priority'] ?? '') !== ''
+                && empty($card['is_deleted']) && empty($card['is_archived'])
+                && self::userIsApprover($userId, $boardId),
             'edit_card'        => $canEditCard,
             'edit_description' => $canEditDescription,
             'edit_machines'    => $canEditMachines,
@@ -909,7 +913,7 @@ class PluginTrallaCard extends CommonDBTM
         if ($paused) {
             // Pausado: nada além de ver o card e pedir para despausar.
             foreach ($permissions as $name => $allowed) {
-                $permissions[$name] = in_array($name, ['view', 'request_resume', 'edit_pause_codes'], true) ? $allowed : false;
+                $permissions[$name] = in_array($name, ['view', 'request_resume', 'edit_pause_codes', 'change_priority'], true) ? $allowed : false;
             }
         }
 
@@ -1748,6 +1752,54 @@ class PluginTrallaCard extends CommonDBTM
         }
 
         return self::finalize($id, $userId, false)['card'];
+    }
+
+    /**
+     * Aprovador troca a prioridade de um card já liberado. O início do SLA não muda: o tempo
+     * já corrido continua valendo e só os prazos são recalculados pela nova prioridade.
+     */
+    public static function changePriority(int $id, string $priority, int $userId = 0): array
+    {
+        global $DB;
+
+        $userId = $userId > 0 ? $userId : (int) Session::getLoginUserID();
+        $priority = strtoupper(trim($priority));
+        if (!tralla_valid_priority($priority)) {
+            throw new RuntimeException('Escolha a prioridade (P1 a P4).');
+        }
+        $card = self::getCard($id);
+        if ($card === null) {
+            throw new RuntimeException('Card não encontrado.');
+        }
+        self::assertBoardAccess($card);
+        $boardType = self::getBoardType((int) $card['plugin_tralla_boards_id']);
+
+        $DB->beginTransaction();
+        try {
+            self::lockCardRow($id);
+            $card = self::getCard($id);
+            if ($card === null || empty(self::permissionsFor($card, $boardType, $userId, false)['change_priority'])) {
+                throw new RuntimeException('Somente aprovadores do quadro alteram a prioridade de cards já liberados.');
+            }
+            $previous = (string) $card['priority'];
+            if ($previous === $priority) {
+                throw new RuntimeException('O card já está com esta prioridade.');
+            }
+            // Os avisos de SLA recomeçam porque os prazos mudaram.
+            $DB->update('glpi_plugin_tralla_cards', [
+                'priority' => $priority, 'sla_alerts_sent' => '', 'date_mod' => tralla_now(),
+            ], ['id' => $id]);
+            $labels = tralla_priorities();
+            PluginTrallaHistory::log($id, $userId, 'priority_set', 'Prioridade alterada de '
+                . ($labels[$previous]['label'] ?? $previous) . ' para ' . ($labels[$priority]['label'] ?? $priority)
+                . '. O SLA continua contando desde o início.');
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
+        }
+
+        return self::getCardDetail($id, $userId);
     }
 
     /** Só vira rascunho o card sem pedido pendente, ou com a liberação ainda aguardando. */
