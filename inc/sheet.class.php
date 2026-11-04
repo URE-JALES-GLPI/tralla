@@ -183,6 +183,33 @@ class PluginTrallaSheetSync
             }
         }
 
+        // Card excluído: a linha que já existe passa a "Excluido". Se alguma parte da separação
+        // continua ativa, a linha segue o status dela; restaurar o card devolve o status real.
+        $deletedRoots = [];
+        foreach ($DB->request([
+            'FROM' => 'glpi_plugin_tralla_cards',
+            'WHERE' => [
+                'plugin_tralla_boards_id' => $boardId,
+                'stage' => 1,
+                'is_deleted' => 1,
+                'is_draft' => 0,
+            ],
+        ]) as $card) {
+            $cardId = (int) $card['id'];
+            $root = (int) ($card['code_root_cards_id'] ?? 0) ?: (int) ($card['family_cards_id'] ?? 0) ?: $cardId;
+            if (!isset($groups[$root])) {
+                $deletedRoots[$root] = $cardId === $root ? $card : ($deletedRoots[$root] ?? null);
+            }
+        }
+        foreach ($deletedRoots as $root => $rootCard) {
+            $code = (string) tralla_code_number($root, $rootCard);
+            $rowNumber = (int) ($byCode[$code] ?? 0);
+            if ($rowNumber > 0 && trim((string) ($rows[$rowNumber - 1][4] ?? '')) !== 'Excluido') {
+                $updates[] = ['range' => "'" . str_replace("'", "''", $tab) . "'!E{$rowNumber}",
+                    'values' => [['Excluido']]];
+            }
+        }
+
         // Linhas antigas de partes separadas ("30/1", "30/2") ou repetidas de um card que
         // agora tem a linha única: removidas de baixo para cima depois de gravar.
         $obsolete = [];
