@@ -9,6 +9,50 @@
     var root = document.getElementById('tralla-kanban');
     var boardModal = document.getElementById('tralla-board-create');
     var organizer = document.querySelector('[data-board-organizer]');
+    var categoryEditor = document.querySelector('[data-category-editor]');
+
+    // Configurações: edição das categorias; só vale depois de "Salvar categorias".
+    if (categoryEditor) {
+        var nextCategoryIndex = categoryEditor.querySelectorAll('[data-category-block]').length;
+        var categorySubRow = function (index) {
+            var row = document.createElement('div');
+            row.className = 'tralla-category-sub';
+            row.setAttribute('data-category-sub', '');
+            row.innerHTML = '<input type="text" name="categories[' + index + '][subs][]" maxlength="150" placeholder="Subcategoria" aria-label="Subcategoria">'
+                + '<button type="button" class="tralla-icon-btn" data-category-sub-remove title="Remover subcategoria" aria-label="Remover subcategoria"><i class="ti ti-x"></i></button>';
+            return row;
+        };
+        categoryEditor.addEventListener('click', function (event) {
+            var button = event.target.closest('button');
+            if (!button) {
+                return;
+            }
+            var block = button.closest('[data-category-block]');
+            if (button.hasAttribute('data-category-add')) {
+                var index = nextCategoryIndex++;
+                var created = document.createElement('div');
+                created.className = 'tralla-category-block';
+                created.setAttribute('data-category-block', '');
+                created.setAttribute('data-category-index', String(index));
+                created.innerHTML = '<div class="tralla-category-head">'
+                    + '<input type="text" name="categories[' + index + '][name]" maxlength="100" required placeholder="Nome da categoria" aria-label="Nome da categoria">'
+                    + '<button type="button" class="tralla-icon-btn" data-category-remove title="Remover categoria" aria-label="Remover categoria"><i class="ti ti-trash"></i></button>'
+                    + '</div><div class="tralla-category-subs" data-category-subs></div>'
+                    + '<button type="button" class="tralla-btn tralla-btn-ghost tralla-category-sub-add" data-category-sub-add><i class="ti ti-plus"></i> Adicionar subcategoria</button>';
+                created.querySelector('[data-category-subs]').appendChild(categorySubRow(index));
+                categoryEditor.querySelector('[data-category-list]').appendChild(created);
+                created.querySelector('input').focus();
+            } else if (button.hasAttribute('data-category-remove')) {
+                block.remove();
+            } else if (button.hasAttribute('data-category-sub-add')) {
+                var added = categorySubRow(block.getAttribute('data-category-index'));
+                block.querySelector('[data-category-subs]').appendChild(added);
+                added.querySelector('input').focus();
+            } else if (button.hasAttribute('data-category-sub-remove')) {
+                button.closest('[data-category-sub]').remove();
+            }
+        });
+    }
 
     // Quadro ocupa exatamente o espaço visível: sem barra de rolagem da página (só a do quadro).
     if (root) {

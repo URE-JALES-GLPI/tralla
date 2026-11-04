@@ -22,6 +22,62 @@ if (!function_exists('tralla_finalization_partition')) {
     }
 }
 
+if (!function_exists('tralla_normalize_call_categories')) {
+    /**
+     * Valida as categorias vindas da tela de configuração.
+     *
+     * @param array $rows lista de ['name' => string, 'subs' => string[]]
+     * @return array{categories: array<string, string[]>, error: string}
+     */
+    function tralla_normalize_call_categories(array $rows): array
+    {
+        $clean = static fn ($value): string => is_scalar($value)
+            ? trim((string) preg_replace('/\s+/u', ' ', strip_tags((string) $value))) : '';
+        $fail = static fn (string $error): array => ['categories' => [], 'error' => $error];
+        $categories = [];
+        $seen = [];
+        foreach ($rows as $row) {
+            $name = $clean(is_array($row) ? ($row['name'] ?? '') : '');
+            $subs = [];
+            $seenSubs = [];
+            foreach ((array) (is_array($row) ? ($row['subs'] ?? []) : []) as $sub) {
+                $sub = $clean($sub);
+                $subKey = mb_strtolower($sub);
+                if ($sub === '' || isset($seenSubs[$subKey])) {
+                    continue;
+                }
+                if (mb_strlen($sub) > 150) {
+                    return $fail('A subcategoria "' . mb_substr($sub, 0, 40) . '..." passa de 150 caracteres.');
+                }
+                $seenSubs[$subKey] = true;
+                $subs[] = $sub;
+            }
+            if ($name === '' && $subs === []) {
+                continue;
+            }
+            if ($name === '') {
+                return $fail('Informe o nome de todas as categorias.');
+            }
+            if (mb_strlen($name) > 100) {
+                return $fail('A categoria "' . mb_substr($name, 0, 40) . '..." passa de 100 caracteres.');
+            }
+            if (isset($seen[mb_strtolower($name)])) {
+                return $fail('A categoria "' . $name . '" está repetida.');
+            }
+            if ($subs === []) {
+                return $fail('A categoria "' . $name . '" precisa de ao menos uma subcategoria.');
+            }
+            $seen[mb_strtolower($name)] = true;
+            $categories[$name] = $subs;
+        }
+        if ($categories === []) {
+            return $fail('Mantenha ao menos uma categoria.');
+        }
+
+        return ['categories' => $categories, 'error' => ''];
+    }
+}
+
 if (!function_exists('tralla_person_name')) {
     /** Nome de exibição: primeiro nome e depois sobrenome; sem nenhum dos dois, o login. */
     function tralla_person_name(string $firstname, string $realname, string $login = ''): string

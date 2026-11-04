@@ -92,6 +92,18 @@ if (isset($_POST['ticket_sync_existing'])) {
     Html::back();
 }
 
+if (isset($_POST['categories_save'])) {
+    $result = tralla_normalize_call_categories(array_values((array) ($_POST['categories'] ?? [])));
+    if ($result['error'] !== '') {
+        Session::addMessageAfterRedirect($result['error'] . ' Nada foi salvo.', false, ERROR);
+    } else {
+        PluginTrallaConfig::set('call_categories', json_encode($result['categories'], JSON_UNESCAPED_UNICODE));
+        PluginTrallaConfig::clearCache();
+        Session::addMessageAfterRedirect('Categorias salvas.', true);
+    }
+    Html::back();
+}
+
 if (isset($_POST['sheet_sync_now'])) {
     require_once GLPI_ROOT . '/plugins/tralla/inc/sheet.class.php';
     try {
@@ -468,6 +480,42 @@ $holidays = array_filter($holidays, static fn (string $name, string $day): bool 
 </section>
 
 <?php $models = PluginTrallaMachineModel::getModels(true); ?>
+<section class="tralla-card tralla-config-card tralla-models-card" id="tralla-categories">
+    <header>
+        <h2><i class="ti ti-category"></i> Categorias dos chamados</h2>
+        <p>Categorias e subcategorias disponíveis ao criar cards do tipo Chamado. Cards já criados mantêm a categoria que têm hoje, mesmo que ela seja renomeada ou removida aqui.</p>
+    </header>
+
+    <form method="post" action="<?= tralla_h($pluginUrl) ?>/front/config.form.php" data-category-editor>
+        <?= Html::hidden('_glpi_csrf_token', ['value' => tralla_csrf_token()]) ?>
+        <div class="tralla-category-grid" data-category-list>
+            <?php $categoryIndex = 0; foreach (tralla_call_categories() as $categoryName => $subcategories): ?>
+                <div class="tralla-category-block" data-category-block data-category-index="<?= $categoryIndex ?>">
+                    <div class="tralla-category-head">
+                        <input type="text" name="categories[<?= $categoryIndex ?>][name]" maxlength="100" required
+                               value="<?= tralla_h((string) $categoryName) ?>" placeholder="Nome da categoria" aria-label="Nome da categoria">
+                        <button type="button" class="tralla-icon-btn" data-category-remove title="Remover categoria" aria-label="Remover categoria"><i class="ti ti-trash"></i></button>
+                    </div>
+                    <div class="tralla-category-subs" data-category-subs>
+                        <?php foreach ((array) $subcategories as $subcategory): ?>
+                            <div class="tralla-category-sub" data-category-sub>
+                                <input type="text" name="categories[<?= $categoryIndex ?>][subs][]" maxlength="150"
+                                       value="<?= tralla_h((string) $subcategory) ?>" placeholder="Subcategoria" aria-label="Subcategoria">
+                                <button type="button" class="tralla-icon-btn" data-category-sub-remove title="Remover subcategoria" aria-label="Remover subcategoria"><i class="ti ti-x"></i></button>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <button type="button" class="tralla-btn tralla-btn-ghost tralla-category-sub-add" data-category-sub-add><i class="ti ti-plus"></i> Adicionar subcategoria</button>
+                </div>
+            <?php $categoryIndex++; endforeach; ?>
+        </div>
+        <div class="tralla-category-actions">
+            <button type="button" class="tralla-btn tralla-btn-ghost" data-category-add><i class="ti ti-plus"></i> Adicionar categoria</button>
+            <button type="submit" name="categories_save" value="1" class="tralla-btn tralla-btn-primary"><i class="ti ti-device-floppy"></i> Salvar categorias</button>
+        </div>
+    </form>
+</section>
+
 <section class="tralla-card tralla-config-card tralla-models-card">
     <header>
         <h2><i class="ti ti-device-laptop"></i> Modelos de máquina</h2>

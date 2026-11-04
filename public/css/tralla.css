@@ -5478,3 +5478,60 @@ html.tralla-board-fit .tralla-list {
     margin: 12px 24px 0;
 }
 .tralla-finalize-pending-dialog .tralla-dialog-actions { margin-top: 20px; }
+
+/* Configurações: categorias e subcategorias dos chamados. */
+.tralla-category-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    margin-top: 16px;
+}
+.tralla-category-block {
+    align-self: start;
+    background: var(--tr-surface-2);
+    border: 1px solid var(--tr-border);
+    border-radius: 10px;
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+}
+.tralla-category-head,
+.tralla-category-sub {
+    align-items: center;
+    display: flex;
+    gap: 6px;
+}
+.tralla-category-head input,
+.tralla-category-sub input {
+    background: var(--tr-surface);
+    border: 1px solid var(--tr-border-strong);
+    border-radius: 6px;
+    color: var(--tr-text);
+    flex: 1;
+    font-size: 13px;
+    min-width: 0;
+    padding: 7px 10px;
+}
+.tralla-category-head input {
+    font-weight: 700;
+}
+.tralla-category-head input:focus,
+.tralla-category-sub input:focus {
+    border-color: var(--tr-primary);
+    box-shadow: 0 0 0 3px var(--tr-primary-soft);
+    outline: none;
+}
+.tralla-category-subs {
+    display: grid;
+    gap: 6px;
+}
+.tralla-category-sub-add {
+    justify-self: start;
+}
+.tralla-category-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 16px;
+}

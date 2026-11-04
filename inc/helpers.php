@@ -537,7 +537,11 @@ if (!function_exists('tralla_call_categories')) {
     {
         static $categories = null;
         if ($categories === null) {
-            $json = @file_get_contents(__DIR__ . '/../data/call_categories.json');
+            // A lista editada nas Configurações tem prioridade sobre a lista padrão do plugin.
+            $json = PluginTrallaConfig::get('call_categories');
+            if ($json === '') {
+                $json = @file_get_contents(__DIR__ . '/../data/call_categories.json');
+            }
             $decoded = is_string($json) ? json_decode($json, true) : null;
             $categories = is_array($decoded) ? $decoded : [];
         }

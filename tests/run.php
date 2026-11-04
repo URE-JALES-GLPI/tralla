@@ -134,5 +134,18 @@ check('deletion pending cannot request', !tralla_can_request_deletion(
     ['stage' => 1, 'is_deleted' => 0, 'status' => 'deletion_pending', 'is_locked' => 0], true, true, false
 ));
 
+$categories = tralla_normalize_call_categories([
+    ['name' => ' Rede  Interna ', 'subs' => ['Queda', ' queda ', '', '<b>Lenta</b>']],
+    ['name' => '', 'subs' => ['']],
+]);
+check('categories cleaned and deduped', $categories['error'] === ''
+    && $categories['categories'] === ['Rede Interna' => ['Queda', 'Lenta']]);
+check('category without sub rejected', tralla_normalize_call_categories([['name' => 'A', 'subs' => ['']]])['error'] !== '');
+check('sub without category rejected', tralla_normalize_call_categories([['name' => '', 'subs' => ['B']]])['error'] !== '');
+check('repeated category rejected', tralla_normalize_call_categories([
+    ['name' => 'A', 'subs' => ['x']], ['name' => 'a', 'subs' => ['y']],
+])['error'] !== '');
+check('empty list rejected', tralla_normalize_call_categories([])['error'] !== '');
+
 if ($failures > 0) { fwrite(STDERR, "{$failures} failure(s)\n"); exit(1); }
 echo "OK\n";
