@@ -4321,6 +4321,8 @@
             + '</div>' + modalCloseButton() + '</div>'
             + '<div class="tralla-modal-body">'
             + nameField
+            + '<div class="tralla-field"><label for="tralla-edit-description">Descrição</label>'
+            + '<textarea id="tralla-edit-description" rows="3" maxlength="2000">' + esc(card.description || '') + '</textarea></div>'
             + '<section class="tralla-detail-section">'
             + '<h3><i class="ti ti-device-desktop"></i> Máquinas</h3>'
             + '<div id="tralla-edit-machines">'
@@ -4354,6 +4356,9 @@
             }
             return;
         }
+
+        var descriptionEl = form.querySelector('#tralla-edit-description');
+        var description = descriptionEl ? descriptionEl.value : '';
 
         var machines = [];
         Array.prototype.forEach.call(form.querySelectorAll('[data-edit-machine]'), function (row) {
@@ -4410,6 +4415,7 @@
                 var edited = await api('tablet_edit', {
                     id: activeCard.id,
                     name: name,
+                    description: description,
                     machines: machines,
                     new_machines: newMachines
                 });
@@ -4435,6 +4441,7 @@
             var data = await api('edit_request', {
                 id: activeCard.id,
                 name: name,
+                description: description,
                 machines: machines,
                 new_machines: newMachines
             });

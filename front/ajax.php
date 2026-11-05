@@ -463,7 +463,7 @@ try {
                 'name'         => tralla_post_string('name'),
                 'machines'     => $machines,
                 'new_machines' => $newMachines,
-            ], $userId, $isAdmin);
+            ] + (isset($_POST['description']) ? ['description' => tralla_post_string('description')] : []), $userId, $isAdmin);
             tralla_json(['ok' => true, 'data' => [
                 'state'    => tralla_ajax_state((int) $result['card']['plugin_tralla_boards_id']),
                 'card'     => $result['card'],
@@ -481,7 +481,7 @@ try {
                 'name'         => tralla_post_string('name'),
                 'machines'     => $machines,
                 'new_machines' => $newMachines,
-            ], $userId);
+            ] + (isset($_POST['description']) ? ['description' => tralla_post_string('description')] : []), $userId);
             tralla_json(['ok' => true, 'data' => [
                 'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id']),
                 'card'  => $detail,

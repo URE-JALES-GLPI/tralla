@@ -3003,6 +3003,10 @@ class PluginTrallaCard extends CommonDBTM
                 }
 
                 self::applyEditPayload($parentId, $payload);
+                if (array_key_exists('description', $payload)) {
+                    PluginTrallaHistory::log($parentId, $userId, 'card_description_updated',
+                        tralla_history_change('Descrição', (string) $parent['description'], (string) $payload['description']));
+                }
                 $DB->update('glpi_plugin_tralla_cards', [
                     'approval_cards_id' => 0,
                     'is_locked'         => 0,
@@ -3620,7 +3624,7 @@ class PluginTrallaCard extends CommonDBTM
             throw new RuntimeException('Sem permissão para solicitar edição deste card.');
         }
 
-        [$proposedName, $machines, $newMachines, $newTotal] = self::normalizeEditInput($card, $data);
+        [$proposedName, $machines, $newMachines, $newTotal, $proposedDescription] = self::normalizeEditInput($card, $data);
 
         $approvalId = 0;
         $familyRoot = self::familyRoot($card);
@@ -3650,6 +3654,9 @@ class PluginTrallaCard extends CommonDBTM
                 'machines'     => $machines,
                 'new_machines' => $newMachines,
             ];
+            if ($proposedDescription !== null) {
+                $payload['description'] = $proposedDescription;
+            }
             $approvalSeq = self::nextCodeSequence($codeRoot);
             $now = tralla_now();
 
@@ -4762,7 +4769,7 @@ class PluginTrallaCard extends CommonDBTM
     /**
      * Valida nome e máquinas de uma edição de card.
      *
-     * @return array{0: string, 1: array, 2: array, 3: int}
+     * @return array{0: string, 1: array, 2: array, 3: int, 4: ?string} Descrição nula: não mudou.
      */
     private static function normalizeEditInput(array $card, array $data): array
     {
@@ -4854,14 +4861,28 @@ class PluginTrallaCard extends CommonDBTM
         if ($proposedName !== (string) $card['name']) {
             $hasChange = true;
         }
+        $proposedDescription = null;
+        if (array_key_exists('description', $data)) {
+            $description = trim(strip_tags((string) $data['description']));
+            if (mb_strlen($description) > 2000) {
+                throw new RuntimeException('A descrição deve ter no máximo 2000 caracteres.');
+            }
+            if ($description !== trim((string) $card['description'])) {
+                if ($description === '' && (string) ($card['workflow_type'] ?? '') === 'call') {
+                    throw new RuntimeException('Descreva a situação do chamado.');
+                }
+                $proposedDescription = $description;
+                $hasChange = true;
+            }
+        }
         if (!$hasChange) {
             throw new RuntimeException('Nenhuma alteração para salvar.');
         }
 
-        return [$proposedName, $machines, $newMachines, $newTotal];
+        return [$proposedName, $machines, $newMachines, $newTotal, $proposedDescription];
     }
 
-    /** Aplica nome e máquinas de uma edição validada ao card. */
+    /** Aplica nome, descrição e máquinas de uma edição validada ao card. */
     private static function applyEditPayload(int $parentId, array $payload): void
     {
         global $DB;
@@ -4944,6 +4965,15 @@ class PluginTrallaCard extends CommonDBTM
             'name'     => $proposedName,
             'date_mod' => tralla_now(),
         ], ['id' => $parentId]);
+        // Só vem no payload quando foi alterada: pedido antigo não sobrescreve a descrição atual.
+        if (array_key_exists('description', $payload)) {
+            foreach (array_merge([$parentId], self::whatsappWatchIds($parentId)) as $descriptionCardId) {
+                $DB->update('glpi_plugin_tralla_cards', [
+                    'description' => (string) $payload['description'],
+                    'date_mod'    => tralla_now(),
+                ], ['id' => $descriptionCardId]);
+            }
+        }
         PluginTrallaMachine::refreshCardTotal($parentId);
     }
 
@@ -4978,8 +5008,11 @@ class PluginTrallaCard extends CommonDBTM
                 throw new RuntimeException('Sem permissão para editar este card.');
             }
 
-            [$proposedName, $machines, $newMachines] = self::normalizeEditInput($fresh, $data);
+            [$proposedName, $machines, $newMachines, , $proposedDescription] = self::normalizeEditInput($fresh, $data);
             $payload = ['name' => $proposedName, 'machines' => $machines, 'new_machines' => $newMachines];
+            if ($proposedDescription !== null) {
+                $payload['description'] = $proposedDescription;
+            }
             $changes = self::buildEditChanges($fresh, $payload);
             self::applyEditPayload($id, $payload);
 
@@ -5011,6 +5044,14 @@ class PluginTrallaCard extends CommonDBTM
                 'label'  => 'Nome',
                 'before' => $currentName !== '' ? $currentName : '—',
                 'after'  => $proposedName,
+            ];
+        }
+        if (array_key_exists('description', $payload)) {
+            $changes[] = [
+                'type'   => 'description',
+                'label'  => 'Descrição',
+                'before' => trim((string) ($card['description'] ?? '')) ?: '—',
+                'after'  => trim((string) $payload['description']) ?: '—',
             ];
         }
 
