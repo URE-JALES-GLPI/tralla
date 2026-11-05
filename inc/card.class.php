@@ -880,6 +880,11 @@ class PluginTrallaCard extends CommonDBTM
                 && (string) ($card['priority'] ?? '') !== ''
                 && empty($card['is_deleted']) && empty($card['is_archived'])
                 && self::userIsApprover($userId, $boardId),
+            'revert_finalization' => $isCall && $boardType === 'maintenance' && $stage === 1 && $status === 'done'
+                && $canUpdate && (int) ($card['technician_id'] ?? 0) > 0
+                && (int) ($card['approval_cards_id'] ?? 0) === 0
+                && empty($card['is_deleted']) && empty($card['is_archived'])
+                && ($isAdmin || self::userIsApprover($userId, $boardId)),
             'edit_card'        => $canEditCard,
             'edit_description' => $canEditDescription,
             'edit_machines'    => $canEditMachines,
@@ -1793,6 +1798,55 @@ class PluginTrallaCard extends CommonDBTM
             PluginTrallaHistory::log($id, $userId, 'priority_set', 'Prioridade alterada de '
                 . ($labels[$previous]['label'] ?? $previous) . ' para ' . ($labels[$priority]['label'] ?? $priority)
                 . '. O SLA continua contando desde o início.');
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
+        }
+
+        return self::getCardDetail($id, $userId);
+    }
+
+    /**
+     * Devolve um Chamado concluído para Em andamento, com o mesmo técnico.
+     * O SLA continua contando desde o início e os prazos de resposta voltam a valer.
+     */
+    public static function revertCallFinalization(int $id, int $userId = 0, bool $isAdmin = false): array
+    {
+        global $DB;
+
+        $userId = $userId > 0 ? $userId : (int) Session::getLoginUserID();
+        $card = self::getCard($id);
+        if ($card === null) {
+            throw new RuntimeException('Card não encontrado.');
+        }
+        self::assertBoardAccess($card);
+        $boardId = (int) $card['plugin_tralla_boards_id'];
+        $boardType = self::getBoardType($boardId);
+        $list = PluginTrallaBoard::findListByCategory($boardId, 'maintenance_in_progress');
+        if ($list === null) {
+            throw new RuntimeException('O quadro não possui a lista "Manutenção Em Andamento".');
+        }
+
+        $DB->beginTransaction();
+        try {
+            self::lockCardRow($id);
+            $card = self::getCard($id);
+            if ($card === null || empty(self::permissionsFor($card, $boardType, $userId, $isAdmin)['revert_finalization'])) {
+                throw new RuntimeException('Somente aprovadores ou SuperAdmin revertem a finalização de um Chamado concluído.');
+            }
+            $now = tralla_now();
+            $DB->update('glpi_plugin_tralla_cards', [
+                'plugin_tralla_lists_id' => (int) $list['id'],
+                'rank'                   => self::nextRankForList((int) $list['id']),
+                'status'                 => 'in_progress',
+                'is_locked'              => 0,
+                'date_finalized'         => null,
+                'date_approved'          => null,
+                'date_mod'               => $now,
+            ], ['id' => $id]);
+            PluginTrallaHistory::log($id, $userId, 'finalization_reverted',
+                'Finalização revertida por ' . tralla_user_name($userId) . '; chamado voltou para Em andamento.');
             $DB->commit();
         } catch (Throwable $e) {
             $DB->rollBack();

@@ -2601,6 +2601,11 @@
                 + '<i class="ti ti-package-export"></i> Confirmar retirada</button>';
         }
 
+        if (permissions.revert_finalization) {
+            buttons += '<button type="button" class="tralla-btn tralla-btn-ghost" data-card-action="revert_finalization">'
+                + '<i class="ti ti-arrow-back-up"></i> Reverter finalização</button>';
+        }
+
         if (permissions.request_deletion) {
             buttons += '<button type="button" class="tralla-btn tralla-btn-danger" data-card-action="delete">'
                 + '<i class="ti ti-trash"></i> Excluir card</button>';
@@ -3830,6 +3835,23 @@
                 var draftResult = await api('card_draft', { id: cardId, draft: publishing ? 0 : 1 });
                 applyState(draftResult);
                 toast(publishing ? 'Rascunho publicado.' : 'Card transformado em rascunho.', 'success');
+                await openCard(cardId);
+                return;
+            }
+
+            if (action === 'revert_finalization') {
+                if (!await confirmDialog({
+                    title: 'Reverter finalização',
+                    message: 'O chamado volta para Em andamento com o mesmo técnico. O SLA continua contando desde o início, sem recomeçar.',
+                    confirmLabel: 'Reverter finalização',
+                    tone: 'primary'
+                })) {
+                    return;
+                }
+                setBusy(button, true);
+                var revertResult = await api('card_revert_finalization', { id: cardId });
+                applyState(revertResult);
+                toast('Finalização revertida. O chamado voltou para Em andamento.', 'success');
                 await openCard(cardId);
                 return;
             }

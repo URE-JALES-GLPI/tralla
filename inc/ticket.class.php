@@ -338,7 +338,7 @@ class PluginTrallaTicketSync
         global $DB;
         if (!in_array($action, ['card_created', 'card_finalized', 'machine_added', 'machine_deleted',
             'machine_updated', 'edit_approved', 'tablet_edit', 'pause_approved', 'resume_approved', 'transfer_approved', 'approval_approved', 'call_report_updated',
-            'priority_set', 'call_released', 'withdrawal_confirmed'], true)) {
+            'priority_set', 'call_released', 'withdrawal_confirmed', 'finalization_reverted'], true)) {
             return '';
         }
         $lines = ['Estado do card: ' . tralla_status_label((string) $card['status'])];

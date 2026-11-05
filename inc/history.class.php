@@ -545,6 +545,7 @@ class PluginTrallaHistory extends CommonDBTM
             'machine_updated'       => 'Máquina atualizada',
             'machine_deleted'       => 'Máquina removida',
             'card_finalized'        => 'Manutenção finalizada',
+            'finalization_reverted' => 'Finalização revertida',
             'approval_created'      => 'Card de aprovação criado',
             'approval_approved'     => 'Manutenção aprovada',
             'approval_rejected'     => 'Manutenção reprovada',
