@@ -96,6 +96,16 @@ if (!function_exists('tralla_pending_reminder_minutes')) {
     }
 }
 
+if (!function_exists('tralla_pending_reminder_allowed_at')) {
+    /** Lembretes de card no Pendente só saem das 8h até as 17h. */
+    function tralla_pending_reminder_allowed_at(int $timestamp): bool
+    {
+        $hour = (int) date('G', $timestamp);
+
+        return $hour >= 8 && $hour < 17;
+    }
+}
+
 if (!function_exists('tralla_whatsapp_number')) {
     /** Número no formato da EvolutionAPI (55 + DDD + número) ou '' se inválido. */
     function tralla_whatsapp_number(string $phone): string

@@ -149,6 +149,7 @@ class PluginTrallaCron extends CommonDBTM
     /**
      * Cards no Pendente, já liberados com prioridade: lembra os membros do quadro
      * a cada intervalo da prioridade, contando a partir da criação (ou liberação).
+     * O envio automático só acontece das 8h às 17h; "Forçar notificações" não tem horário.
      */
     private static function remindPendingByPriority(int $boardId = 0, bool $force = false): int
     {
@@ -156,6 +157,9 @@ class PluginTrallaCron extends CommonDBTM
 
         $count = 0;
         $now = time();
+        if (!$force && !tralla_pending_reminder_allowed_at($now)) {
+            return 0;
+        }
         foreach ($DB->request([
             'SELECT'     => ['c.*', 'b.name AS board_name', 'b.entities_id AS board_entities_id',
                 'b.notify_email AS board_notify_email', 'b.notify_whatsapp AS board_notify_whatsapp'],
