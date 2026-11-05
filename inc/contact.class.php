@@ -19,10 +19,10 @@ class PluginTrallaContact
 
         $rows = [];
         foreach ($DB->request([
-            'SELECT'     => ['c.*', 'e.completename AS entity_name'],
+            'SELECT'     => ['c.*', 'e.name AS entity_name'],
             'FROM'       => self::TABLE . ' AS c',
             'INNER JOIN' => ['glpi_entities AS e' => ['ON' => ['c' => 'entities_id', 'e' => 'id']]],
-            'ORDER'      => ['e.completename ASC', 'c.type ASC', 'c.value ASC'],
+            'ORDER'      => ['e.name ASC', 'c.type ASC', 'c.value ASC'],
         ]) as $row) {
             $rows[] = $row;
         }

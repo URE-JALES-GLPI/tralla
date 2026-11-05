@@ -189,9 +189,9 @@ tralla_json([
         'entity'          => [
             'id'   => (int) $card['entities_id'],
             'name' => (string) ($DB->request([
-                'SELECT' => ['completename'], 'FROM' => 'glpi_entities',
+                'SELECT' => ['name'], 'FROM' => 'glpi_entities',
                 'WHERE' => ['id' => (int) $card['entities_id']], 'LIMIT' => 1,
-            ])->current()['completename'] ?? ''),
+            ])->current()['name'] ?? ''),
         ],
         'contacts'        => ['email' => PluginTrallaContact::emailsForEntity((int) $card['entities_id'])],
         'machines'        => $machinePayload,

@@ -535,7 +535,7 @@ $contacts = PluginTrallaContact::all();
                 <select id="tralla-contact-entity" name="contact_entity" required>
                     <option value="">Selecione a entidade...</option>
                     <?php foreach (tralla_all_entity_options() as $contactEntity): ?>
-                        <option value="<?= (int) $contactEntity['id'] ?>"><?= tralla_h((string) $contactEntity['completename']) ?></option>
+                        <option value="<?= (int) $contactEntity['id'] ?>"><?= tralla_h((string) $contactEntity['name']) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
