@@ -491,6 +491,24 @@ function plugin_tralla_install(): bool
         ") or die($DB->error());
     }
 
+    // Cards derivados (separação, pendentes, aprovações) não copiavam a entidade e ficaram na raiz.
+    // O nome do card é o nome da escola: só corrige quando ele aponta para uma única entidade.
+    $entityByName = [];
+    foreach ($DB->request(['SELECT' => ['id', 'name'], 'FROM' => 'glpi_entities', 'WHERE' => ['id' => ['>', 0]]]) as $entityRow) {
+        $entityKey = mb_strtolower(trim((string) $entityRow['name']));
+        $entityByName[$entityKey] = isset($entityByName[$entityKey]) ? 0 : (int) $entityRow['id'];
+    }
+    foreach ($DB->request([
+        'SELECT' => ['id', 'name'],
+        'FROM'   => 'glpi_plugin_tralla_cards',
+        'WHERE'  => ['entities_id' => 0],
+    ]) as $cardRow) {
+        $entityId = $entityByName[mb_strtolower(trim((string) $cardRow['name']))] ?? 0;
+        if ($entityId > 0) {
+            $DB->update('glpi_plugin_tralla_cards', ['entities_id' => $entityId], ['id' => (int) $cardRow['id']]);
+        }
+    }
+
     if (!$DB->tableExists('glpi_plugin_tralla_calendar_days')) {
         $DB->doQuery("
             CREATE TABLE `glpi_plugin_tralla_calendar_days` (

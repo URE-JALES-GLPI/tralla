@@ -1894,6 +1894,7 @@ class PluginTrallaCard extends CommonDBTM
         $DB->insert('glpi_plugin_tralla_cards', [
             'plugin_tralla_boards_id' => $boardId,
             'plugin_tralla_lists_id' => (int) $list['id'],
+            'entities_id'            => (int) ($card['entities_id'] ?? 0),
             'name' => (string) $card['name'],
             'description' => (string) $card['description'],
             'call_category' => (string) ($card['call_category'] ?? ''),
@@ -2562,6 +2563,7 @@ class PluginTrallaCard extends CommonDBTM
                 $DB->insert('glpi_plugin_tralla_cards', [
                     'plugin_tralla_boards_id' => $boards_id,
                     'plugin_tralla_lists_id'  => (int) $pendingList['id'],
+                    'entities_id'             => (int) ($card['entities_id'] ?? 0),
                     'name'                    => (string) $card['name'],
                     'description'             => $card['description'],
                     'call_category'           => (string) ($card['call_category'] ?? ''),
@@ -3205,6 +3207,7 @@ class PluginTrallaCard extends CommonDBTM
             $DB->insert('glpi_plugin_tralla_cards', [
                 'plugin_tralla_boards_id' => $boards_id,
                 'plugin_tralla_lists_id'  => (int) $approvalList['id'],
+                'entities_id'             => (int) ($fresh['entities_id'] ?? 0),
                 'name'                    => (string) $fresh['name'],
                 'description'             => $fresh['description'],
                 'call_category'           => (string) ($fresh['call_category'] ?? ''),
@@ -3413,6 +3416,7 @@ class PluginTrallaCard extends CommonDBTM
             $DB->insert('glpi_plugin_tralla_cards', [
                 'plugin_tralla_boards_id' => $boards_id,
                 'plugin_tralla_lists_id'  => (int) $approvalList['id'],
+                'entities_id'             => (int) ($fresh['entities_id'] ?? 0),
                 'name'                    => (string) $fresh['name'],
                 'description'             => $fresh['description'],
                 'call_category'           => (string) ($fresh['call_category'] ?? ''),
@@ -3652,6 +3656,7 @@ class PluginTrallaCard extends CommonDBTM
             $DB->insert('glpi_plugin_tralla_cards', [
                 'plugin_tralla_boards_id' => $boards_id,
                 'plugin_tralla_lists_id'  => (int) $approvalList['id'],
+                'entities_id'             => (int) ($fresh['entities_id'] ?? 0),
                 'name'                    => $proposedName,
                 'description'             => $fresh['description'],
                 'call_category'           => (string) ($fresh['call_category'] ?? ''),
@@ -3800,6 +3805,7 @@ class PluginTrallaCard extends CommonDBTM
             $DB->insert('glpi_plugin_tralla_cards', [
                 'plugin_tralla_boards_id' => $boards_id,
                 'plugin_tralla_lists_id'  => (int) $list['id'],
+                'entities_id'             => (int) ($fresh['entities_id'] ?? 0),
                 'name'                    => (string) $fresh['name'],
                 'description'             => $fresh['description'],
                 'call_category'           => (string) ($fresh['call_category'] ?? ''),
@@ -3922,6 +3928,7 @@ class PluginTrallaCard extends CommonDBTM
                 $DB->insert('glpi_plugin_tralla_cards', [
                     'plugin_tralla_boards_id' => $boards_id,
                     'plugin_tralla_lists_id' => (int) $list['id'],
+                    'entities_id'            => (int) ($parent['entities_id'] ?? 0),
                     'name' => (string) $parent['name'],
                     'description' => $parent['description'],
                     'call_category' => (string) ($parent['call_category'] ?? ''),
@@ -4324,6 +4331,7 @@ class PluginTrallaCard extends CommonDBTM
                 $DB->insert('glpi_plugin_tralla_cards', [
                     'plugin_tralla_boards_id' => (int) $fresh['plugin_tralla_boards_id'],
                     'plugin_tralla_lists_id'  => (int) $approvalList['id'],
+                    'entities_id'             => (int) ($fresh['entities_id'] ?? 0),
                     'name'                    => $fresh['name'],
                     'description'             => $fresh['description'],
                     'call_category'           => (string) ($fresh['call_category'] ?? ''),
