@@ -36,7 +36,7 @@ check('contact whatsapp is formatted', tralla_format_contact('whatsapp', '551799
 check('contact email is shown as is', tralla_format_contact('email', 'a@b.gov.br') === 'a@b.gov.br');
 check('redact email', tralla_redact_personal('fale com a@b.gov.br') === 'fale com [e-mail]');
 check('redact cpf with mask', tralla_redact_personal('CPF 529.982.247-25.') === 'CPF [CPF].');
-check('redact cpf digits', tralla_redact_personal('doc 52998224725') === 'doc [CPF]');
+check('redact cpf digits', tralla_redact_personal('doc 52998224725') === 'doc [CPF ou telefone]');
 check('redact rg', tralla_redact_personal('RG 12.345.678-X') === 'RG [RG]');
 check('redact mobile', tralla_redact_personal('liga (17) 99123-4567') === 'liga [telefone]');
 check('redact landline', tralla_redact_personal('liga 17 3632-1234') === 'liga [telefone]');

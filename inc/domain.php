@@ -139,9 +139,9 @@ if (!function_exists('tralla_redact_personal')) {
             '/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/u'                      => '[e-mail]',
             '/\b\d{3}\.\d{3}\.\d{3}-?\d{2}\b/'                       => '[CPF]',
             '/\b\d{1,2}\.\d{3}\.\d{3}-?[\dxX]\b/'                    => '[RG]',
+            '/\b\d{11}\b/'                                         => '[CPF ou telefone]',
             '/(?:\+?55[\s-]?)?\(?\b\d{2}\)?[\s-]*9\d{4}[\s.-]?\d{4}\b/' => '[telefone]',
             '/(?:\+?55[\s-]?)?\(?\b\d{2}\)?[\s-]+\d{4}[\s.-]?\d{4}\b/' => '[telefone]',
-            '/\b\d{11}\b/'                                         => '[CPF]',
         ];
 
         return preg_replace(array_keys($patterns), array_values($patterns), $text) ?? '';
