@@ -11,6 +11,24 @@
     var organizer = document.querySelector('[data-board-organizer]');
     var categoryEditor = document.querySelector('[data-category-editor]');
 
+    // Contatos das entidades: exemplo do campo conforme o tipo e busca na lista.
+    var contactType = document.querySelector('[data-contact-type]');
+    if (contactType) {
+        var contactValue = document.querySelector('[data-contact-value]');
+        contactType.addEventListener('change', function () {
+            contactValue.placeholder = contactType.value === 'whatsapp' ? '(17) 99123-4567' : 'nome@exemplo.gov.br';
+        });
+    }
+    var contactFilter = document.querySelector('[data-contact-filter]');
+    if (contactFilter) {
+        contactFilter.addEventListener('input', function () {
+            var term = contactFilter.value.trim().toLowerCase();
+            document.querySelectorAll('[data-contact-row]').forEach(function (row) {
+                row.hidden = term !== '' && row.textContent.toLowerCase().indexOf(term) === -1;
+            });
+        });
+    }
+
     // Configurações em guias. O formulário principal continua inteiro: salvar grava todas as guias.
     var configTabs = document.querySelector('[data-config-tabs]');
     if (configTabs) {

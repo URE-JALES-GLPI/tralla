@@ -475,6 +475,22 @@ function plugin_tralla_install(): bool
     }
 
     // Calendário de envios: dias tirados do envio ou forçados (além dos feriados automáticos).
+    if (!$DB->tableExists('glpi_plugin_tralla_entity_contacts')) {
+        $DB->doQuery("
+            CREATE TABLE `glpi_plugin_tralla_entity_contacts` (
+                `id`            INT {$sign} NOT NULL AUTO_INCREMENT,
+                `entities_id`   INT {$sign} NOT NULL DEFAULT '0',
+                `type`          VARCHAR(10)  NOT NULL DEFAULT 'email' COMMENT 'email ou whatsapp',
+                `value`         VARCHAR(255) NOT NULL DEFAULT '',
+                `name`          VARCHAR(255) NOT NULL DEFAULT '',
+                `users_id`      INT {$sign} NOT NULL DEFAULT '0',
+                `date_creation` DATETIME     DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `entity_contact` (`entities_id`, `type`, `value`)
+            ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}
+        ") or die($DB->error());
+    }
+
     if (!$DB->tableExists('glpi_plugin_tralla_calendar_days')) {
         $DB->doQuery("
             CREATE TABLE `glpi_plugin_tralla_calendar_days` (
@@ -700,6 +716,7 @@ function plugin_tralla_uninstall(): bool
     }
 
     $tables = [
+        'glpi_plugin_tralla_entity_contacts',
         'glpi_plugin_tralla_calendar_days',
         'glpi_plugin_tralla_files',
         'glpi_plugin_tralla_update_items',

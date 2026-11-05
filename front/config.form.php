@@ -177,6 +177,28 @@ if (isset($_POST['calendar_add']) || isset($_POST['calendar_remove'])) {
     Html::redirect($pluginUrl . '/front/config.form.php#tralla-calendar');
 }
 
+if (isset($_POST['contact_add']) || isset($_POST['contact_remove'])) {
+    require_once GLPI_ROOT . '/plugins/tralla/inc/contact.class.php';
+    try {
+        if (isset($_POST['contact_remove'])) {
+            PluginTrallaContact::remove(tralla_post_int('contact_id'));
+            Session::addMessageAfterRedirect('Contato removido.', true);
+        } else {
+            PluginTrallaContact::add(
+                ctype_digit(tralla_post_string('contact_entity')) ? tralla_post_int('contact_entity') : -1,
+                tralla_post_string('contact_type'),
+                tralla_post_string('contact_value'),
+                tralla_post_string('contact_name'),
+                (int) Session::getLoginUserID()
+            );
+            Session::addMessageAfterRedirect('Contato adicionado.', true);
+        }
+    } catch (RuntimeException $e) {
+        Session::addMessageAfterRedirect($e->getMessage(), false, ERROR);
+    }
+    Html::redirect($pluginUrl . '/front/config.form.php#tralla-contacts');
+}
+
 if (isset($_POST['test_email'])) {
     $userId = (int) Session::getLoginUserID();
     $email = '';
@@ -257,6 +279,7 @@ echo "<script>document.title = 'Tralla';</script>";
             'chamados'      => ['ti-ticket', 'Chamados do GLPI'],
             'planilha'      => ['ti-table', 'Planilha SEINTEC'],
             'notificacoes'  => ['ti-mail', 'Notificações'],
+            'contatos'      => ['ti-address-book', 'Contatos'],
             'categorias'    => ['ti-category', 'Categorias'],
             'modelos'       => ['ti-device-laptop', 'Modelos de máquina'],
         ] as $tabKey => [$tabIcon, $tabLabel]): ?>
@@ -492,6 +515,91 @@ $holidays = array_filter($holidays, static fn (string $name, string $day): bool 
             <?php endforeach; ?>
         </ul>
     </details>
+</section>
+
+<?php
+require_once GLPI_ROOT . '/plugins/tralla/inc/contact.class.php';
+$contacts = PluginTrallaContact::all();
+?>
+<section class="tralla-card tralla-config-card tralla-models-card" id="tralla-contacts" data-config-tab="contatos">
+    <header>
+        <h2><i class="ti ti-address-book"></i> Contatos das entidades</h2>
+        <p>WhatsApp e e-mail de cada entidade do GLPI. O Assignat-ure oferece os e-mails daqui na assinatura por e-mail dos cards do Tralla.</p>
+    </header>
+
+    <form method="post" action="<?= tralla_h($pluginUrl) ?>/front/config.form.php" class="tralla-model-add-form" data-contact-form>
+        <?= Html::hidden('_glpi_csrf_token', ['value' => tralla_csrf_token()]) ?>
+        <div class="tralla-form-row">
+            <div class="tralla-field">
+                <label for="tralla-contact-entity">Entidade *</label>
+                <select id="tralla-contact-entity" name="contact_entity" required>
+                    <option value="">Selecione a entidade...</option>
+                    <?php foreach (tralla_all_entity_options() as $contactEntity): ?>
+                        <option value="<?= (int) $contactEntity['id'] ?>"><?= tralla_h((string) $contactEntity['completename']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="tralla-field">
+                <label for="tralla-contact-type">Tipo *</label>
+                <select id="tralla-contact-type" name="contact_type" data-contact-type>
+                    <?php foreach (tralla_contact_types() as $contactType => $contactTypeLabel): ?>
+                        <option value="<?= tralla_h($contactType) ?>"><?= tralla_h($contactTypeLabel) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+        </div>
+        <div class="tralla-form-row">
+            <div class="tralla-field">
+                <label for="tralla-contact-value">Contato *</label>
+                <input id="tralla-contact-value" type="text" name="contact_value" maxlength="255" required autocomplete="off"
+                       placeholder="nome@exemplo.gov.br" data-contact-value>
+            </div>
+            <div class="tralla-field">
+                <label for="tralla-contact-name">Nome ou setor</label>
+                <input id="tralla-contact-name" type="text" name="contact_name" maxlength="255" placeholder="Ex.: Secretaria">
+            </div>
+        </div>
+        <button type="submit" name="contact_add" value="1" class="tralla-btn tralla-btn-primary">
+            <i class="ti ti-plus"></i> Adicionar contato
+        </button>
+    </form>
+
+    <?php if ($contacts === []): ?>
+        <p class="tralla-empty-mini">Nenhum contato cadastrado.</p>
+    <?php else: ?>
+        <div class="tralla-field">
+            <label for="tralla-contact-filter">Buscar nos contatos</label>
+            <input id="tralla-contact-filter" type="search" placeholder="Entidade, contato ou nome" data-contact-filter>
+        </div>
+        <div class="tralla-table-scroll">
+            <table class="tralla-data-table">
+                <thead><tr><th>Entidade</th><th>Tipo</th><th>Contato</th><th>Nome ou setor</th><th></th></tr></thead>
+                <tbody>
+                <?php foreach ($contacts as $contact): ?>
+                    <tr data-contact-row>
+                        <td><?= tralla_h((string) $contact['entity_name']) ?></td>
+                        <td><?= tralla_h(tralla_contact_types()[(string) $contact['type']] ?? (string) $contact['type']) ?></td>
+                        <td><?= tralla_h(tralla_format_contact((string) $contact['type'], (string) $contact['value'])) ?></td>
+                        <td><?= tralla_h((string) $contact['name']) ?: '—' ?></td>
+                        <td>
+                            <form method="post" action="<?= tralla_h($pluginUrl) ?>/front/config.form.php">
+                                <?= Html::hidden('_glpi_csrf_token', ['value' => tralla_csrf_token()]) ?>
+                                <?= Html::hidden('contact_id', ['value' => (int) $contact['id']]) ?>
+                                <button type="submit" name="contact_remove" value="1" class="tralla-btn tralla-btn-ghost"
+                                        data-tralla-confirm="Remover este contato da entidade?"
+                                        data-tralla-confirm-title="Remover contato"
+                                        data-tralla-confirm-label="Remover"
+                                        data-tralla-confirm-icon="ti-trash">
+                                    <i class="ti ti-trash"></i> Remover
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    <?php endif; ?>
 </section>
 
 <?php $models = PluginTrallaMachineModel::getModels(true); ?>

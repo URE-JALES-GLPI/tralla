@@ -27,6 +27,13 @@ check('pending reminder not before 8h', tralla_pending_reminder_allowed_at(strto
 check('pending reminder from 8h', tralla_pending_reminder_allowed_at(strtotime('2026-11-03 08:00')) === true);
 check('pending reminder until 16:59', tralla_pending_reminder_allowed_at(strtotime('2026-11-03 16:59')) === true);
 check('pending reminder stops at 17h', tralla_pending_reminder_allowed_at(strtotime('2026-11-03 17:00')) === false);
+check('contact email is lowercased', tralla_normalize_contact('email', ' Escola@Exemplo.GOV.br ') === 'escola@exemplo.gov.br');
+check('contact email rejects invalid', tralla_normalize_contact('email', 'escola@') === '');
+check('contact whatsapp keeps digits', tralla_normalize_contact('whatsapp', '(17) 99123-4567') === '5517991234567');
+check('contact whatsapp rejects short', tralla_normalize_contact('whatsapp', '1234') === '');
+check('contact type must exist', tralla_normalize_contact('fax', '1733334444') === '');
+check('contact whatsapp is formatted', tralla_format_contact('whatsapp', '5517991234567') === '(17) 99123-4567');
+check('contact email is shown as is', tralla_format_contact('email', 'a@b.gov.br') === 'a@b.gov.br');
 check('whatsapp number gets country code', tralla_whatsapp_number('(17) 99123-4567') === '5517991234567');
 check('whatsapp number rejects short', tralla_whatsapp_number('1234') === '');
 check('person name is first then last', tralla_person_name('Leonardo', 'Poiatti Facao', 'leo') === 'Leonardo Poiatti Facao');

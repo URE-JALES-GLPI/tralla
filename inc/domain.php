@@ -96,6 +96,41 @@ if (!function_exists('tralla_pending_reminder_minutes')) {
     }
 }
 
+if (!function_exists('tralla_contact_types')) {
+    /** @return array<string, string> Tipos de contato de uma entidade. */
+    function tralla_contact_types(): array
+    {
+        return ['email' => 'E-mail', 'whatsapp' => 'WhatsApp'];
+    }
+}
+
+if (!function_exists('tralla_normalize_contact')) {
+    /** Contato no formato gravado (e-mail minúsculo; WhatsApp 55 + DDD + número) ou '' se inválido. */
+    function tralla_normalize_contact(string $type, string $value): string
+    {
+        $value = trim($value);
+        if ($type === 'email') {
+            $value = strtolower($value);
+
+            return strlen($value) <= 255 && filter_var($value, FILTER_VALIDATE_EMAIL) !== false ? $value : '';
+        }
+
+        return $type === 'whatsapp' ? tralla_whatsapp_number($value) : '';
+    }
+}
+
+if (!function_exists('tralla_format_contact')) {
+    /** Contato para exibir: WhatsApp como (17) 99123-4567; o restante como está. */
+    function tralla_format_contact(string $type, string $value): string
+    {
+        if ($type === 'whatsapp' && preg_match('/^55(\d{2})(\d{4,5})(\d{4})$/D', $value, $parts)) {
+            return '(' . $parts[1] . ') ' . $parts[2] . '-' . $parts[3];
+        }
+
+        return $value;
+    }
+}
+
 if (!function_exists('tralla_pending_reminder_allowed_at')) {
     /** Lembretes de card no Pendente só saem das 8h até as 17h. */
     function tralla_pending_reminder_allowed_at(int $timestamp): bool

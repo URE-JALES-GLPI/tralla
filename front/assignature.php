@@ -9,6 +9,7 @@ include('../../../inc/includes.php');
 
 require_once GLPI_ROOT . '/plugins/tralla/inc/compat.php';
 require_once GLPI_ROOT . '/plugins/tralla/inc/helpers.php';
+require_once GLPI_ROOT . '/plugins/tralla/inc/contact.class.php';
 
 global $DB;
 
@@ -185,6 +186,14 @@ tralla_json([
             'id'   => (int) $card['users_id_approver'],
             'name' => tralla_user_name((int) $card['users_id_approver']),
         ],
+        'entity'          => [
+            'id'   => (int) $card['entities_id'],
+            'name' => (string) ($DB->request([
+                'SELECT' => ['completename'], 'FROM' => 'glpi_entities',
+                'WHERE' => ['id' => (int) $card['entities_id']], 'LIMIT' => 1,
+            ])->current()['completename'] ?? ''),
+        ],
+        'contacts'        => ['email' => PluginTrallaContact::emailsForEntity((int) $card['entities_id'])],
         'machines'        => $machinePayload,
         'machines_filled' => tralla_all_machines_filled($machines),
         'progress'        => tralla_machines_progress($machines),
