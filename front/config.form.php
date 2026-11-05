@@ -531,9 +531,9 @@ $contacts = PluginTrallaContact::all();
         <?= Html::hidden('_glpi_csrf_token', ['value' => tralla_csrf_token()]) ?>
         <div class="tralla-form-row">
             <div class="tralla-field">
-                <label for="tralla-contact-entity">Entidade *</label>
+                <label for="tralla-contact-entity">Escola *</label>
                 <select id="tralla-contact-entity" name="contact_entity" required>
-                    <option value="">Selecione a entidade...</option>
+                    <option value="">Selecione a escola...</option>
                     <?php foreach (tralla_all_entity_options() as $contactEntity): ?>
                         <option value="<?= (int) $contactEntity['id'] ?>"><?= tralla_h((string) $contactEntity['name']) ?></option>
                     <?php endforeach; ?>
@@ -569,11 +569,11 @@ $contacts = PluginTrallaContact::all();
     <?php else: ?>
         <div class="tralla-field">
             <label for="tralla-contact-filter">Buscar nos contatos</label>
-            <input id="tralla-contact-filter" type="search" placeholder="Entidade, contato ou nome" data-contact-filter>
+            <input id="tralla-contact-filter" type="search" placeholder="Escola, contato ou nome" data-contact-filter>
         </div>
         <div class="tralla-table-scroll">
             <table class="tralla-data-table">
-                <thead><tr><th>Entidade</th><th>Tipo</th><th>Contato</th><th>Nome ou setor</th><th></th></tr></thead>
+                <thead><tr><th>Escola</th><th>Tipo</th><th>Contato</th><th>Nome ou setor</th><th></th></tr></thead>
                 <tbody>
                 <?php foreach ($contacts as $contact): ?>
                     <tr data-contact-row>
@@ -586,7 +586,7 @@ $contacts = PluginTrallaContact::all();
                                 <?= Html::hidden('_glpi_csrf_token', ['value' => tralla_csrf_token()]) ?>
                                 <?= Html::hidden('contact_id', ['value' => (int) $contact['id']]) ?>
                                 <button type="submit" name="contact_remove" value="1" class="tralla-btn tralla-btn-ghost"
-                                        data-tralla-confirm="Remover este contato da entidade?"
+                                        data-tralla-confirm="Remover este contato da escola?"
                                         data-tralla-confirm-title="Remover contato"
                                         data-tralla-confirm-label="Remover"
                                         data-tralla-confirm-icon="ti-trash">

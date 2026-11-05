@@ -36,7 +36,7 @@ class PluginTrallaContact
 
         $entity = new Entity();
         if ($entityId < 0 || !$entity->getFromDB($entityId)) {
-            throw new RuntimeException('Selecione uma entidade válida.');
+            throw new RuntimeException('Selecione uma escola válida.');
         }
         if (!isset(tralla_contact_types()[$type])) {
             throw new RuntimeException('Escolha WhatsApp ou E-mail.');
@@ -48,7 +48,7 @@ class PluginTrallaContact
                 : 'Informe o WhatsApp com DDD, por exemplo (17) 99123-4567.');
         }
         if (countElementsInTable(self::TABLE, ['entities_id' => $entityId, 'type' => $type, 'value' => $normalized]) > 0) {
-            throw new RuntimeException('Este contato já está cadastrado nesta entidade.');
+            throw new RuntimeException('Este contato já está cadastrado nesta escola.');
         }
         $DB->insert(self::TABLE, [
             'entities_id'   => $entityId,
