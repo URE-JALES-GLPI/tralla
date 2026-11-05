@@ -3336,7 +3336,7 @@
                 + '<small class="tralla-empty-mini">Atualizada sempre que o card é aberto.</small>'
                 + (permissions.summarize_report && !hasLegacyCallMachines
                     ? '<div class="tralla-detail-edit-actions"><button type="button" class="tralla-btn tralla-btn-ghost" data-summarize-call-report>'
-                        + '<i class="ti ti-sparkles"></i> Unificar</button></div>'
+                        + '<i class="ti ti-sparkles"></i> Formalizar</button></div>'
                     : '')
                 + '</section>';
         }
@@ -3551,7 +3551,7 @@
         var field = modalRoot.querySelector('#tralla-call-report');
         if (!field) { return; }
         if (field.value.trim() !== '' && !await confirmDialog({
-            title: 'Unificar conversa',
+            title: 'Formalizar conversa',
             message: 'O texto que está no relatório será substituído no campo. Ele só é gravado quando você clicar em Salvar relatório.',
             confirmLabel: 'Substituir',
             tone: 'primary'

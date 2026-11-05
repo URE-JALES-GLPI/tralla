@@ -454,7 +454,7 @@ echo "<script>document.title = 'Tralla';</script>";
         <section class="tralla-card tralla-config-card" data-config-tab="ia">
             <header>
                 <h2><i class="ti ti-sparkles"></i> Inteligência artificial</h2>
-                <p>O botão Unificar resume a conversa do WhatsApp no relatório do chamado usando o Groq. CPF, RG, telefone e e-mail são retirados antes do envio; os demais textos da conversa, como nomes, saem do servidor.</p>
+                <p>O botão Formalizar resume a conversa do WhatsApp no relatório do chamado usando o Groq. CPF, RG, telefone e e-mail são retirados antes do envio; os demais textos da conversa, como nomes, saem do servidor.</p>
             </header>
             <div class="tralla-field">
                 <label for="tralla-groq-key">Chave da API do Groq</label>
@@ -463,7 +463,7 @@ echo "<script>document.title = 'Tralla';</script>";
                 <small>Fica criptografada e não é exibida de novo.</small>
             </div>
             <?php if (($config['groq_api_key_encrypted'] ?? '') !== ''): ?>
-                <label class="tralla-check"><input type="checkbox" name="groq_key_remove" value="1"> Remover a chave e esconder o botão Unificar</label>
+                <label class="tralla-check"><input type="checkbox" name="groq_key_remove" value="1"> Remover a chave e esconder o botão Formalizar</label>
             <?php endif; ?>
             <div class="tralla-field">
                 <label for="tralla-groq-model">Modelo</label>

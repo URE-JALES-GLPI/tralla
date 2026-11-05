@@ -2163,12 +2163,12 @@ class PluginTrallaCard extends CommonDBTM
         }
         self::assertBoardAccess($card);
         if (empty(self::permissionsFor($card, 'maintenance', $userId, $isAdmin)['summarize_report'])) {
-            throw new RuntimeException('Somente quem pode editar o relatório do chamado usa o Unificar.');
+            throw new RuntimeException('Somente quem pode editar o relatório do chamado usa o Formalizar.');
         }
         $transcript = tralla_whatsapp_live_transcript(tralla_whatsapp_chat_ids($card))
             ?? (string) ($card['whatsapp_transcript'] ?? '');
         if (trim($transcript) === '') {
-            throw new RuntimeException('Este card não tem conversa do WhatsApp para unificar.');
+            throw new RuntimeException('Este card não tem conversa do WhatsApp para formalizar.');
         }
         require_once __DIR__ . '/reportai.class.php';
 
