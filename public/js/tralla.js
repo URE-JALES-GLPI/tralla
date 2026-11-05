@@ -3334,6 +3334,10 @@
                 + '</h3>'
                 + '<div class="tralla-detail-description tralla-whatsapp-transcript">' + esc(card.whatsapp_transcript) + '</div>'
                 + '<small class="tralla-empty-mini">Atualizada sempre que o card é aberto.</small>'
+                + (permissions.summarize_report && !hasLegacyCallMachines
+                    ? '<div class="tralla-detail-edit-actions"><button type="button" class="tralla-btn tralla-btn-ghost" data-summarize-call-report>'
+                        + '<i class="ti ti-sparkles"></i> Unificar</button></div>'
+                    : '')
                 + '</section>';
         }
 
@@ -3539,6 +3543,32 @@
             toast(error.message, 'error');
             setBusy(button, false);
         }
+    }
+
+    // Só preenche o campo: o técnico revisa e clica em Salvar relatório.
+    async function summarizeCallReport(button) {
+        if (!activeCard) { return; }
+        var field = modalRoot.querySelector('#tralla-call-report');
+        if (!field) { return; }
+        if (field.value.trim() !== '' && !await confirmDialog({
+            title: 'Unificar conversa',
+            message: 'O texto que está no relatório será substituído no campo. Ele só é gravado quando você clicar em Salvar relatório.',
+            confirmLabel: 'Substituir',
+            tone: 'primary'
+        })) {
+            return;
+        }
+        setBusy(button, true);
+        try {
+            var data = await api('call_report_summarize', { id: activeCard.id });
+            field.value = data.report;
+            field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            field.focus();
+            toast('Relatório preenchido. Revise e clique em Salvar relatório.', 'success');
+        } catch (error) {
+            toast(error.message, 'error');
+        }
+        setBusy(button, false);
     }
 
     async function saveCallReport(button) {
@@ -6161,6 +6191,11 @@
         var savePauseCodesButton = event.target.closest('[data-save-pause-codes]');
         if (savePauseCodesButton) {
             savePauseCodes(savePauseCodesButton);
+            return;
+        }
+        var summarizeButton = event.target.closest('[data-summarize-call-report]');
+        if (summarizeButton) {
+            summarizeCallReport(summarizeButton);
             return;
         }
         var saveCallButton = event.target.closest('[data-save-call-report]');

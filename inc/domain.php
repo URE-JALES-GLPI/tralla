@@ -131,6 +131,38 @@ if (!function_exists('tralla_format_contact')) {
     }
 }
 
+if (!function_exists('tralla_redact_personal')) {
+    /** Tira CPF, RG, e-mail e telefone do texto que vai para um serviço externo. */
+    function tralla_redact_personal(string $text): string
+    {
+        $patterns = [
+            '/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/u'                      => '[e-mail]',
+            '/\b\d{3}\.\d{3}\.\d{3}-?\d{2}\b/'                       => '[CPF]',
+            '/\b\d{1,2}\.\d{3}\.\d{3}-?[\dxX]\b/'                    => '[RG]',
+            '/(?:\+?55[\s-]?)?\(?\b\d{2}\)?[\s-]*9\d{4}[\s.-]?\d{4}\b/' => '[telefone]',
+            '/(?:\+?55[\s-]?)?\(?\b\d{2}\)?[\s-]+\d{4}[\s.-]?\d{4}\b/' => '[telefone]',
+            '/\b\d{11}\b/'                                         => '[CPF]',
+        ];
+
+        return preg_replace(array_keys($patterns), array_values($patterns), $text) ?? '';
+    }
+}
+
+if (!function_exists('tralla_transcript_for_summary')) {
+    /** Conversa sem dados pessoais e no tamanho do limite gratuito: mantém o início e o fim. */
+    function tralla_transcript_for_summary(string $transcript, int $maxLength = 16000): string
+    {
+        $text = tralla_redact_personal(trim($transcript));
+        if (mb_strlen($text) <= $maxLength) {
+            return $text;
+        }
+        $head = (int) ($maxLength / 4);
+
+        return mb_substr($text, 0, $head) . "\n[... parte da conversa omitida ...]\n"
+            . mb_substr($text, -($maxLength - $head));
+    }
+}
+
 if (!function_exists('tralla_pending_reminder_allowed_at')) {
     /** Lembretes de card no Pendente só saem das 8h até as 17h. */
     function tralla_pending_reminder_allowed_at(int $timestamp): bool

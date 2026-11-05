@@ -45,6 +45,18 @@ if (isset($_POST['save'])) {
     PluginTrallaConfig::set('sheet_tab', trim(tralla_post_string('sheet_tab', 'Página1')));
     PluginTrallaConfig::set('sheet_first_row', (string) max(2, tralla_post_int('sheet_first_row', 463)));
     PluginTrallaConfig::set('sheet_credentials_path', trim(tralla_post_string('sheet_credentials_path')));
+    require_once GLPI_ROOT . '/plugins/tralla/inc/reportai.class.php';
+    if (!empty($_POST['groq_key_remove'])) {
+        PluginTrallaReportAi::removeKey();
+    } elseif (trim(tralla_post_string('groq_key')) !== '') {
+        PluginTrallaReportAi::saveKey(tralla_post_string('groq_key'));
+    }
+    $groqModel = trim(tralla_post_string('groq_model'));
+    if ($groqModel === '' || preg_match('~^[A-Za-z0-9._:/-]{1,100}$~D', $groqModel) !== 1) {
+        Session::addMessageAfterRedirect('O modelo do Groq é inválido; o anterior foi mantido.', false, ERROR);
+    } else {
+        PluginTrallaConfig::set('groq_model', $groqModel);
+    }
     foreach (array_keys(tralla_priorities()) as $priority) {
         foreach (['tto' => SLM::TTO, 'ttr' => SLM::TTR] as $kind => $type) {
             $slaId = max(0, (int) ($_POST['ticket_sla_' . $kind . '_' . $priority] ?? 0));
@@ -59,6 +71,17 @@ if (isset($_POST['save'])) {
     PluginTrallaConfig::clearCache();
 
     Session::addMessageAfterRedirect('Configurações salvas.', true);
+    Html::back();
+}
+
+if (isset($_POST['groq_test'])) {
+    require_once GLPI_ROOT . '/plugins/tralla/inc/reportai.class.php';
+    try {
+        PluginTrallaReportAi::test();
+        Session::addMessageAfterRedirect('O Groq respondeu: a chave e o modelo estão funcionando.', true);
+    } catch (Throwable $e) {
+        Session::addMessageAfterRedirect($e->getMessage(), false, ERROR);
+    }
     Html::back();
 }
 
@@ -280,6 +303,7 @@ echo "<script>document.title = 'Tralla';</script>";
             'planilha'      => ['ti-table', 'Planilha SEINTEC'],
             'notificacoes'  => ['ti-mail', 'Notificações'],
             'contatos'      => ['ti-address-book', 'Contatos'],
+            'ia'            => ['ti-sparkles', 'Inteligência artificial'],
             'categorias'    => ['ti-category', 'Categorias'],
             'modelos'       => ['ti-device-laptop', 'Modelos de máquina'],
         ] as $tabKey => [$tabIcon, $tabLabel]): ?>
@@ -425,6 +449,32 @@ echo "<script>document.title = 'Tralla';</script>";
             <button type="submit" name="test_email" value="1" class="tralla-btn tralla-btn-ghost">
                 <i class="ti ti-send"></i> Enviar e-mail de teste para mim
             </button>
+        </section>
+
+        <section class="tralla-card tralla-config-card" data-config-tab="ia">
+            <header>
+                <h2><i class="ti ti-sparkles"></i> Inteligência artificial</h2>
+                <p>O botão Unificar resume a conversa do WhatsApp no relatório do chamado usando o Groq. CPF, RG, telefone e e-mail são retirados antes do envio; os demais textos da conversa, como nomes, saem do servidor.</p>
+            </header>
+            <div class="tralla-field">
+                <label for="tralla-groq-key">Chave da API do Groq</label>
+                <input id="tralla-groq-key" type="password" name="groq_key" maxlength="255" autocomplete="new-password"
+                       placeholder="<?= ($config['groq_api_key_encrypted'] ?? '') !== '' ? 'Chave cadastrada. Preencha só para trocar.' : 'Cole aqui a chave criada em console.groq.com' ?>">
+                <small>Fica criptografada e não é exibida de novo.</small>
+            </div>
+            <?php if (($config['groq_api_key_encrypted'] ?? '') !== ''): ?>
+                <label class="tralla-check"><input type="checkbox" name="groq_key_remove" value="1"> Remover a chave e esconder o botão Unificar</label>
+            <?php endif; ?>
+            <div class="tralla-field">
+                <label for="tralla-groq-model">Modelo</label>
+                <input id="tralla-groq-model" type="text" name="groq_model" maxlength="100" value="<?= tralla_h($config['groq_model'] ?? 'openai/gpt-oss-20b') ?>">
+                <small>Os modelos do Groq mudam com o tempo. Se o teste disser que este não existe mais, escolha outro em console.groq.com/docs/models.</small>
+            </div>
+            <?php if (($config['groq_api_key_encrypted'] ?? '') !== ''): ?>
+                <button type="submit" name="groq_test" value="1" class="tralla-btn tralla-btn-ghost">
+                    <i class="ti ti-plug-connected"></i> Testar chave e modelo
+                </button>
+            <?php endif; ?>
         </section>
 
         <footer class="tralla-config-actions">

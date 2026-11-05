@@ -380,6 +380,12 @@ try {
                 'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id']),
             ]]);
 
+        case 'call_report_summarize':
+            tralla_ajax_require(UPDATE);
+            tralla_json(['ok' => true, 'data' => [
+                'report' => PluginTrallaCard::summarizeCallReport(tralla_post_int('id'), $userId, $isAdmin),
+            ]]);
+
         case 'call_report_update':
             tralla_ajax_require(UPDATE);
             $detail = PluginTrallaCard::updateCallReport(tralla_post_int('id'), tralla_post_string('report'), $userId, $isAdmin);

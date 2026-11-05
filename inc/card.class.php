@@ -885,6 +885,8 @@ class PluginTrallaCard extends CommonDBTM
                 && (int) ($card['approval_cards_id'] ?? 0) === 0
                 && empty($card['is_deleted']) && empty($card['is_archived'])
                 && ($isAdmin || self::userIsApprover($userId, $boardId)),
+            'summarize_report' => $isCall && $stage === 1 && $canEditMachines
+                && PluginTrallaConfig::get('groq_api_key_encrypted') !== '',
             'edit_card'        => $canEditCard,
             'edit_description' => $canEditDescription,
             'edit_machines'    => $canEditMachines,
@@ -2149,6 +2151,28 @@ class PluginTrallaCard extends CommonDBTM
         }
 
         return self::getCardDetail($id, $userId);
+    }
+
+    /** Texto sugerido para o relatório, a partir da conversa do WhatsApp. Não grava nada. */
+    public static function summarizeCallReport(int $id, int $userId = 0, bool $isAdmin = false): string
+    {
+        $userId = $userId ?: (int) Session::getLoginUserID();
+        $card = self::getCard($id);
+        if ($card === null) {
+            throw new RuntimeException('Chamado não encontrado.');
+        }
+        self::assertBoardAccess($card);
+        if (empty(self::permissionsFor($card, 'maintenance', $userId, $isAdmin)['summarize_report'])) {
+            throw new RuntimeException('Somente quem pode editar o relatório do chamado usa o Unificar.');
+        }
+        $transcript = tralla_whatsapp_live_transcript(tralla_whatsapp_chat_ids($card))
+            ?? (string) ($card['whatsapp_transcript'] ?? '');
+        if (trim($transcript) === '') {
+            throw new RuntimeException('Este card não tem conversa do WhatsApp para unificar.');
+        }
+        require_once __DIR__ . '/reportai.class.php';
+
+        return PluginTrallaReportAi::summarize($transcript);
     }
 
     public static function updateCallReport(int $id, string $report, int $userId = 0, bool $isAdmin = false): array

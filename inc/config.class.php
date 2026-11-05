@@ -33,6 +33,8 @@ class PluginTrallaConfig
             'sheet_last_attempt' => '0',
             'sheet_last_success' => '0',
             'sheet_last_error' => '',
+            'groq_api_key_encrypted' => '',
+            'groq_model' => 'openai/gpt-oss-20b',
         ];
     }
 
