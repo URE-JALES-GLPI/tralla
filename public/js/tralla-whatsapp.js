@@ -2,12 +2,12 @@
  * [URE] Tralla — cards do contato abertos pelo WhatsAppSimples.
  *
  * Três telas no padrão do Kanban:
- * - Cards do contato: chamados ainda não concluídos, com Editar, Transferir e Finalizar, e "Criar card";
+ * - Cards do contato: chamados ainda não concluídos, com Editar e Transferir, e "Criar card"
+ *   (finalizar é só pelo Kanban do Tralla);
  * - Novo card: o modal do Kanban restrito a Chamado, com a prioridade escolhida por quem abre
  *   (o card nasce direto em Manutenção Em Andamento);
  * - Card: descrição e relatório do atendimento editáveis, SLA, detalhes e conversa do WhatsApp;
  * - Transferir: vincula o card a outra conversa (a anterior continua na conversa do card);
- * - Finalizar: o chamado vai direto para Concluído, sem aprovação.
  *
  * Os dados passam pelo WhatsAppSimples, que valida o atendimento e vincula a conversa.
  *
@@ -265,10 +265,6 @@
                     + (card.wa && card.wa.edit
                         ? '<button type="button" class="tralla-btn tralla-btn-ghost" data-wa-transfer="' + Number(card.id) + '">'
                             + '<i class="ti ti-arrows-exchange"></i> Transferir</button>'
-                        : '')
-                    + (card.wa && card.wa.finalize
-                        ? '<button type="button" class="tralla-btn tralla-btn-primary" data-wa-finalize="' + Number(card.id)
-                            + '" data-wa-code="' + esc(displayCode(card.code, card.id)) + '"><i class="ti ti-flag-check"></i> Finalizar</button>'
                         : '')
                     + '</div></section>';
             }).join('')
@@ -627,10 +623,6 @@
             + metaRow('Atualizado em', formatDate(card.date_mod))
             + '</div></div>'
             + '<div class="tralla-card"><h3>Ações</h3><div class="tralla-wa-side-actions">'
-            + (wa.finalize
-                ? '<button type="button" class="tralla-btn tralla-btn-primary" data-wa-finalize="' + Number(card.id)
-                    + '" data-wa-code="' + esc(displayCode(card.code, card.id)) + '"><i class="ti ti-flag-check"></i> Finalizar card</button>'
-                : '')
             + '<a class="tralla-btn tralla-btn-ghost" href="' + esc(card.url || '#') + '" target="_blank" rel="noopener noreferrer">'
             + '<i class="ti ti-external-link"></i> Abrir no Tralla</a>'
             + '<button type="button" class="tralla-btn tralla-btn-ghost" data-wa-back><i class="ti ti-arrow-left"></i> Voltar aos cards</button>'
@@ -752,37 +744,6 @@
         return true;
     }
 
-    async function finalizeCard(button) {
-        var cardId = Number(button.dataset.waFinalize);
-        var code = button.dataset.waCode || '';
-        var confirmed = await confirmDialog({
-            icon: 'ti-flag-check',
-            title: 'Finalizar o card ' + code + '?',
-            message: 'O chamado vai direto para Manutenção Concluído, sem aprovação. '
-                + 'O relatório do atendimento precisa estar preenchido.',
-            confirmLabel: 'Finalizar card'
-        });
-        if (!confirmed) {
-            return;
-        }
-        button.disabled = true;
-        try {
-            if (activeCard && Number(activeCard.id) === cardId && !(await saveCard(false))) {
-                return;
-            }
-            var result = await post('finalize', { card_id: cardId });
-            if (!result || !result.success) {
-                toast((result && result.error) || 'Não foi possível finalizar o card.', 'error');
-                return;
-            }
-            toast('Card ' + code + ' finalizado e concluído no Tralla.', 'success');
-            changed();
-            showList();
-        } finally {
-            button.disabled = false;
-        }
-    }
-
     /** Volta para a lista; na tela do card, avisa antes de descartar alterações não salvas. */
     async function goBack() {
         var description = root.querySelector('#tralla-wa-description');
@@ -838,11 +799,6 @@
         var transfer = target.closest('[data-wa-transfer-confirm]');
         if (transfer) {
             confirmTransfer(transfer);
-            return;
-        }
-        var finalize = target.closest('[data-wa-finalize]');
-        if (finalize) {
-            finalizeCard(finalize);
             return;
         }
         var save = target.closest('[data-wa-save]');
