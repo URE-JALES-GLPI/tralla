@@ -2629,7 +2629,7 @@
         }
         var aside = modalRoot.querySelector('.tralla-detail-side');
         if (aside) {
-            aside.innerHTML = renderSideMeta(activeCard) + renderSideActions(activeCard);
+            aside.innerHTML = renderSide(activeCard);
         }
     }
 
@@ -2991,6 +2991,34 @@
         return size + ' B';
     }
 
+    function renderSide(card) {
+        return renderSideMeta(card) + renderCallFiles(card) + renderSideActions(card);
+    }
+
+    function renderCallComments(card, permissions) {
+        if (!isMaintenance || card.workflow_type !== 'call') { return ''; }
+        var source = Number(card.stage) === 2 && card.parent ? card.parent : card;
+        var comments = String(source.call_comments || '');
+        var view = '<div class="tralla-detail-description">'
+            + (comments ? esc(comments) : '<span class="tralla-empty-mini">Sem comentários.</span>') + '</div>';
+        return '<section class="tralla-detail-section">'
+            + '<h3><i class="ti ti-message-circle"></i> Comentários</h3>'
+            + (permissions.edit_comments
+                ? '<div data-comments-view>' + view + '<div class="tralla-detail-edit-actions">'
+                    + '<button type="button" class="tralla-btn tralla-btn-ghost" data-edit-comments>'
+                    + '<i class="ti ti-pencil"></i> Editar comentários</button></div></div>'
+                    + '<div data-comments-editor hidden>'
+                    + '<div class="tralla-field"><label for="tralla-call-comments">Comentários do chamado</label>'
+                    + '<textarea id="tralla-call-comments" rows="4" maxlength="20000" placeholder="Escreva um comentário...">'
+                    + esc(comments) + '</textarea></div>'
+                    + '<div class="tralla-detail-edit-actions">'
+                    + '<button type="button" class="tralla-btn tralla-btn-ghost" data-cancel-comments>Cancelar</button>'
+                    + '<button type="button" class="tralla-btn tralla-btn-primary" data-save-comments>'
+                    + '<i class="ti ti-device-floppy"></i> Salvar comentários</button></div></div>'
+                : view)
+            + '</section>';
+    }
+
     function renderCallFiles(card) {
         if (!isMaintenance || card.workflow_type !== 'call') { return ''; }
         var files = Array.isArray(card.call_files) ? card.call_files : [];
@@ -3321,6 +3349,8 @@
             body += renderMachines(card);
         }
 
+        body += renderCallComments(card, permissions);
+
         if (card.whatsapp_transcript) {
             body += '<section class="tralla-detail-section">'
                 + '<h3><i class="ti ti-brand-whatsapp"></i> Conversa do WhatsApp'
@@ -3341,7 +3371,6 @@
                 + '</section>';
         }
 
-        body += renderCallFiles(card);
         body += renderAssignature(card);
         body += renderHistory(card);
 
@@ -3349,7 +3378,7 @@
         showModal(approvalNavigation + detailHeader(card)
             + '<div class="tralla-modal-body"><div class="tralla-detail-grid">'
             + '<div class="tralla-detail-main">' + body + '</div>'
-            + '<aside class="tralla-detail-side">' + renderSideMeta(card) + renderSideActions(card) + '</aside>'
+            + '<aside class="tralla-detail-side">' + renderSide(card) + '</aside>'
             + '</div></div>', true);
         if (approvalNavigation) {
             modalRoot.querySelector('.tralla-modal').classList.add('has-approval-navigation');
@@ -3497,6 +3526,23 @@
             });
             applyState(data);
             toast('Card atualizado.', 'success');
+            await openCard(activeCard.id);
+            shouldRefreshBoard = false;
+        } catch (error) {
+            toast(error.message, 'error');
+            setBusy(button, false);
+        }
+    }
+
+    async function saveComments(button) {
+        if (!activeCard) { return; }
+        var field = modalRoot.querySelector('#tralla-call-comments');
+        if (!field) { return; }
+        setBusy(button, true);
+        try {
+            var data = await api('card_comments_update', { id: activeCard.id, comments: field.value });
+            applyState(data);
+            toast('Comentários salvos.', 'success');
             await openCard(activeCard.id);
             shouldRefreshBoard = false;
         } catch (error) {
@@ -6170,6 +6216,23 @@
         var saveDescriptionButton = event.target.closest('[data-save-description]');
         if (saveDescriptionButton) {
             saveDescription(saveDescriptionButton);
+            return;
+        }
+        if (event.target.closest('[data-edit-comments]')) {
+            modalRoot.querySelector('[data-comments-view]').hidden = true;
+            modalRoot.querySelector('[data-comments-editor]').hidden = false;
+            modalRoot.querySelector('#tralla-call-comments').focus();
+            return;
+        }
+        if (event.target.closest('[data-cancel-comments]')) {
+            modalRoot.querySelector('#tralla-call-comments').value = activeCard.call_comments || '';
+            modalRoot.querySelector('[data-comments-editor]').hidden = true;
+            modalRoot.querySelector('[data-comments-view]').hidden = false;
+            return;
+        }
+        var saveCommentsButton = event.target.closest('[data-save-comments]');
+        if (saveCommentsButton) {
+            saveComments(saveCommentsButton);
             return;
         }
         var editPauseCodesButton = event.target.closest('[data-edit-pause-codes]');

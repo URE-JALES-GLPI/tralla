@@ -5585,3 +5585,9 @@ html.tralla-config-tabbed .tralla-config-grid {
     margin-top: 12px;
     max-width: 1120px;
 }
+
+/* Arquivos vinculados na lateral do Chamado: coluna estreita. */
+.tralla-detail-side .tralla-call-files { min-width: 0; }
+.tralla-detail-side .tralla-call-file-form input[type="file"] { font-size: 12px; width: 100%; }
+.tralla-detail-side .tralla-call-file-form .tralla-btn { justify-self: stretch; }
+[data-comments-view][hidden], [data-comments-editor][hidden] { display: none !important; }
