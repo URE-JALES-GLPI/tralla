@@ -107,6 +107,7 @@ class PluginTrallaCron extends CommonDBTM
             $count += self::warnSlaDeadlines();
         }
 
+        $count += PluginTrallaCard::mergeReadyFamilies();
         require_once __DIR__ . '/ticket.class.php';
         $count += PluginTrallaTicketSync::syncPending(200);
         require_once __DIR__ . '/sheet.class.php';

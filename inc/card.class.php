@@ -2780,7 +2780,7 @@ class PluginTrallaCard extends CommonDBTM
         }
 
         return [
-            'card'     => self::getCardDetail($familyReady ? $familyRoot : $id, $userId),
+            'card'     => self::getCardDetail($familyReady ? self::codeRoot($card) : $id, $userId),
             'approval' => $approvalId > 0 ? self::getCardDetail($approvalId, $userId) : null,
             'family_ready' => $familyReady,
             'pending_card' => $pendingCardId > 0 ? self::getCardDetail($pendingCardId, $userId) : null,
@@ -2944,7 +2944,7 @@ class PluginTrallaCard extends CommonDBTM
             throw $e;
         }
 
-        $detailId = $approve && $familyReady ? self::familyRoot($parent) : $parentId;
+        $detailId = $approve && $familyReady ? self::codeRoot($parent) : $parentId;
         $detail = self::getCardDetail($detailId, $userId);
         $detail['family_ready'] = $familyReady;
 
@@ -4765,13 +4765,51 @@ class PluginTrallaCard extends CommonDBTM
 
         $DB->doQuery(sprintf(
             'SELECT `id` FROM `glpi_plugin_tralla_cards`
-             WHERE `family_cards_id` = %d
+             WHERE (`family_cards_id` = %d OR `code_root_cards_id` = %d)
                AND `stage` = 1
                AND `is_archived` = 0
                AND `is_deleted` = 0
              FOR UPDATE',
+            $root,
             $root
         ));
+    }
+
+    /**
+     * Junta na Retirada os cards do mesmo número que já terminaram e ficaram separados
+     * (por exemplo, finalizados antes desta regra). Roda na tarefa automática.
+     */
+    public static function mergeReadyFamilies(): int
+    {
+        global $DB;
+
+        $groups = [];
+        $result = $DB->doQuery(
+            "SELECT `code_root_cards_id` AS `root`, `plugin_tralla_boards_id` AS `board`
+             FROM `glpi_plugin_tralla_cards`
+             WHERE `stage` = 1 AND `is_archived` = 0 AND `is_deleted` = 0 AND `code_root_cards_id` > 0
+             GROUP BY `code_root_cards_id`, `plugin_tralla_boards_id`
+             HAVING COUNT(*) > 1 AND SUM(`status` NOT IN ('approved', 'withdrawal')) = 0"
+        );
+        while ($row = $DB->fetchAssoc($result)) {
+            $groups[] = $row;
+        }
+        $merged = 0;
+        foreach ($groups as $group) {
+            if (self::getBoardType((int) $group['board']) !== 'maintenance') {
+                continue;
+            }
+            $DB->beginTransaction();
+            try {
+                $merged += self::syncFamilyWithdrawal((int) $group['board'], (int) $group['root'], 0) ? 1 : 0;
+                $DB->commit();
+            } catch (Throwable $e) {
+                $DB->rollBack();
+                error_log('[Tralla] Junção na Retirada #' . (int) $group['root'] . ': ' . $e->getMessage());
+            }
+        }
+
+        return $merged;
     }
 
     private static function syncFamilyWithdrawal(int $boards_id, int $root, int $userId): bool
@@ -4781,6 +4819,12 @@ class PluginTrallaCard extends CommonDBTM
         if ($boards_id <= 0 || $root <= 0) {
             return false;
         }
+        // Tudo que tem o mesmo número (28, 28/1, 28/3...) vira um card só na Retirada, inclusive
+        // os cards de máquinas pendentes criados antes de ganharem número próprio.
+        $rootRow = self::getCard($root);
+        if ($rootRow !== null && self::codeRoot($rootRow) > 0) {
+            $root = self::codeRoot($rootRow);
+        }
 
         self::lockFamilyRows($root);
 
@@ -4788,7 +4832,7 @@ class PluginTrallaCard extends CommonDBTM
         foreach ($DB->request([
             'FROM'  => 'glpi_plugin_tralla_cards',
             'WHERE' => [
-                'family_cards_id' => $root,
+                'OR'              => ['family_cards_id' => $root, 'code_root_cards_id' => $root],
                 'stage'           => 1,
                 'is_archived'     => 0,
                 'is_deleted'      => 0,
@@ -4854,6 +4898,7 @@ class PluginTrallaCard extends CommonDBTM
                 }
             }
             $DB->update('glpi_plugin_tralla_cards', [
+                'family_cards_id' => $root,
                 'is_archived' => 1,
                 'is_locked' => 1,
                 'machines_total' => 0,
