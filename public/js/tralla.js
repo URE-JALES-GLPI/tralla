@@ -2996,27 +2996,184 @@
     }
 
     function renderCallComments(card, permissions) {
-        if (!isMaintenance || card.workflow_type !== 'call') { return ''; }
-        var source = Number(card.stage) === 2 && card.parent ? card.parent : card;
-        var comments = String(source.call_comments || '');
-        var view = '<div class="tralla-detail-description">'
-            + (comments ? esc(comments) : '<span class="tralla-empty-mini">Sem comentários.</span>') + '</div>';
-        return '<section class="tralla-detail-section">'
-            + '<h3><i class="ti ti-message-circle"></i> Comentários</h3>'
-            + (permissions.edit_comments
-                ? '<div data-comments-view>' + view + '<div class="tralla-detail-edit-actions">'
-                    + '<button type="button" class="tralla-btn tralla-btn-ghost" data-edit-comments>'
-                    + '<i class="ti ti-pencil"></i> Editar comentários</button></div></div>'
-                    + '<div data-comments-editor hidden>'
-                    + '<div class="tralla-field"><label for="tralla-call-comments">Comentários do chamado</label>'
-                    + '<textarea id="tralla-call-comments" rows="4" maxlength="20000" placeholder="Escreva um comentário...">'
-                    + esc(comments) + '</textarea></div>'
-                    + '<div class="tralla-detail-edit-actions">'
-                    + '<button type="button" class="tralla-btn tralla-btn-ghost" data-cancel-comments>Cancelar</button>'
-                    + '<button type="button" class="tralla-btn tralla-btn-primary" data-save-comments>'
-                    + '<i class="ti ti-device-floppy"></i> Salvar comentários</button></div></div>'
-                : view)
+        if (!isMaintenance) { return ''; }
+        var comments = Array.isArray(card.comments) ? card.comments : [];
+        var last = comments.length ? comments[comments.length - 1] : null;
+        var preview = last
+            ? '<div class="tralla-comments-preview">'
+                + '<div class="tralla-comments-preview-meta"><strong>' + esc(last.user_name) + '</strong>'
+                + '<span>' + esc(formatDate(last.date_creation)) + '</span></div>'
+                + '<p>' + esc(last.content) + '</p></div>'
+            : '<div class="tralla-detail-description"><span class="tralla-empty-mini">Sem comentários.</span></div>';
+        return '<section class="tralla-detail-section" data-comments-section>'
+            + '<h3><i class="ti ti-message-circle"></i> Comentários'
+            + (comments.length ? ' <span class="tralla-comments-count">' + comments.length + '</span>' : '') + '</h3>'
+            + preview
+            + '<div class="tralla-detail-edit-actions">'
+            + '<button type="button" class="tralla-btn tralla-btn-ghost" data-open-comments>'
+            + '<i class="ti ti-messages"></i> '
+            + (permissions.edit_comments ? 'Abrir comentários' : (comments.length ? 'Ver comentários' : 'Abrir comentários'))
+            + '</button></div>'
             + '</section>';
+    }
+
+    function renderCommentMessages(comments) {
+        if (!comments.length) {
+            return '<div class="tralla-chat-empty"><i class="ti ti-message-circle"></i>'
+                + '<p>Nenhum comentário ainda.</p></div>';
+        }
+        var lastDay = '';
+        return comments.map(function (comment) {
+            var day = String(comment.date_creation || '').slice(0, 10);
+            var divider = '';
+            if (day && day !== lastDay) {
+                lastDay = day;
+                var parts = day.split('-');
+                divider = '<div class="tralla-chat-day"><span>' + esc(parts[2] + '/' + parts[1] + '/' + parts[0]) + '</span></div>';
+            }
+            var time = String(comment.date_creation || '').slice(11, 16);
+            var initials = String(comment.user_name || '?').split(/\s+/).filter(Boolean).slice(0, 2)
+                .map(function (part) { return part.charAt(0).toUpperCase(); }).join('');
+            var avatar = comment.picture_url
+                ? '<img class="tralla-chat-avatar" src="' + attr(comment.picture_url) + '" alt="">'
+                : '<span class="tralla-chat-avatar">' + esc(initials || '?') + '</span>';
+            return divider + '<div class="tralla-chat-msg' + (comment.mine ? ' is-mine' : '') + '">'
+                + (comment.mine ? '' : avatar)
+                + '<div class="tralla-chat-bubble">'
+                + (comment.mine ? '' : '<strong>' + esc(comment.user_name) + '</strong>')
+                + '<p>' + esc(comment.content) + '</p>'
+                + '<div class="tralla-chat-meta"><span title="' + attr(formatDate(comment.date_creation)) + '">' + esc(time) + '</span>'
+                + (comment.can_delete
+                    ? '<button type="button" class="tralla-chat-delete" data-chat-delete="' + Number(comment.id) + '" title="Apagar comentário" aria-label="Apagar comentário"><i class="ti ti-trash"></i></button>'
+                    : '')
+                + '</div></div></div>';
+        }).join('');
+    }
+
+    var commentsLayer = null;
+
+    function refreshCommentsSection() {
+        if (!activeCard) { return; }
+        var section = modalRoot.querySelector('[data-comments-section]');
+        if (section) {
+            section.outerHTML = renderCallComments(activeCard, activeCard.permissions || {});
+        }
+    }
+
+    function openCommentsChat() {
+        if (!activeCard || commentsLayer) { return; }
+        var card = activeCard;
+        var canWrite = !!(card.permissions && card.permissions.edit_comments);
+        var previousFocus = document.activeElement;
+        var layer = document.createElement('div');
+        layer.className = 'tralla-dialog-layer tralla-chat-layer';
+        layer.innerHTML = '<div class="tralla-dialog-backdrop" data-chat-backdrop></div>'
+            + '<div class="tralla-modal tralla-chat" role="dialog" aria-modal="true" aria-labelledby="tralla-chat-title">'
+            + '<header class="tralla-chat-head"><div><h2 id="tralla-chat-title"><i class="ti ti-messages"></i> Comentários</h2>'
+            + '<p>' + esc(displayCardCode(card.code, card.id)) + ' · ' + esc(card.name || '') + '</p></div>'
+            + '<button type="button" class="tralla-chat-close" data-chat-close aria-label="Fechar"><i class="ti ti-x"></i></button></header>'
+            + '<div class="tralla-chat-list" data-chat-list>' + renderCommentMessages(card.comments || []) + '</div>'
+            + (canWrite
+                ? '<form class="tralla-chat-form" data-chat-form>'
+                    + '<textarea rows="2" maxlength="5000" placeholder="Escreva um comentário..." aria-label="Novo comentário" data-chat-input></textarea>'
+                    + '<button type="submit" class="tralla-btn tralla-btn-primary" data-chat-send aria-label="Enviar"><i class="ti ti-send"></i><span>Enviar</span></button>'
+                    + '</form><p class="tralla-chat-hint">Enter envia · Shift+Enter quebra linha</p>'
+                : '<p class="tralla-chat-readonly">Somente leitura neste card.</p>')
+            + '</div>';
+        document.body.appendChild(layer);
+        document.body.classList.add('tralla-dialog-open');
+        commentsLayer = layer;
+
+        var list = layer.querySelector('[data-chat-list]');
+        var input = layer.querySelector('[data-chat-input]');
+        var form = layer.querySelector('[data-chat-form]');
+        var sending = false;
+
+        function scrollBottom() { list.scrollTop = list.scrollHeight; }
+
+        function render() {
+            list.innerHTML = renderCommentMessages(activeCard.comments || []);
+            scrollBottom();
+        }
+
+        function close() {
+            document.removeEventListener('keydown', onKeydown, true);
+            layer.remove();
+            commentsLayer = null;
+            if (!document.querySelector('.tralla-dialog-layer')) {
+                document.body.classList.remove('tralla-dialog-open');
+            }
+            if (previousFocus && typeof previousFocus.focus === 'function' && document.contains(previousFocus)) {
+                previousFocus.focus();
+            }
+        }
+
+        async function run(action, payload) {
+            var data = await api(action, payload);
+            applyState(data);
+            if (activeCard && data.card && Number(activeCard.id) === Number(data.card.id)) {
+                activeCard.comments = data.card.comments || [];
+            }
+            render();
+            refreshCommentsSection();
+            shouldRefreshBoard = false;
+        }
+
+        async function send() {
+            if (!input || sending) { return; }
+            var text = input.value.trim();
+            if (!text) { input.focus(); return; }
+            var button = layer.querySelector('[data-chat-send]');
+            sending = true;
+            setBusy(button, true);
+            try {
+                await run('card_comment_add', { id: card.id, content: text });
+                input.value = '';
+            } catch (error) {
+                toast(error.message, 'error');
+            } finally {
+                sending = false;
+                setBusy(button, false);
+                input.focus();
+            }
+        }
+
+        function onKeydown(event) {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopPropagation();
+                close();
+            }
+        }
+
+        bindBackdropDismiss(layer.querySelector('[data-chat-backdrop]'), close);
+        layer.querySelector('[data-chat-close]').addEventListener('click', close);
+        if (form) {
+            form.addEventListener('submit', function (event) { event.preventDefault(); send(); });
+            input.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+                    event.preventDefault();
+                    send();
+                }
+            });
+        }
+        list.addEventListener('click', async function (event) {
+            var button = event.target.closest('[data-chat-delete]');
+            if (!button) { return; }
+            var ok = await openPluginDialog({
+                title: 'Apagar comentário?', message: 'O comentário sai da conversa. O histórico do card registra que ele foi apagado.',
+                tone: 'danger', confirmLabel: 'Apagar', cancelLabel: 'Cancelar'
+            });
+            if (!ok || !commentsLayer) { return; }
+            try {
+                await run('card_comment_delete', { comment_id: button.getAttribute('data-chat-delete') });
+            } catch (error) {
+                toast(error.message, 'error');
+            }
+        });
+        document.addEventListener('keydown', onKeydown, true);
+        scrollBottom();
+        window.setTimeout(function () { (input || layer.querySelector('[data-chat-close]')).focus(); }, 30);
     }
 
     function renderCallFiles(card) {
@@ -3526,23 +3683,6 @@
             });
             applyState(data);
             toast('Card atualizado.', 'success');
-            await openCard(activeCard.id);
-            shouldRefreshBoard = false;
-        } catch (error) {
-            toast(error.message, 'error');
-            setBusy(button, false);
-        }
-    }
-
-    async function saveComments(button) {
-        if (!activeCard) { return; }
-        var field = modalRoot.querySelector('#tralla-call-comments');
-        if (!field) { return; }
-        setBusy(button, true);
-        try {
-            var data = await api('card_comments_update', { id: activeCard.id, comments: field.value });
-            applyState(data);
-            toast('Comentários salvos.', 'success');
             await openCard(activeCard.id);
             shouldRefreshBoard = false;
         } catch (error) {
@@ -6218,21 +6358,8 @@
             saveDescription(saveDescriptionButton);
             return;
         }
-        if (event.target.closest('[data-edit-comments]')) {
-            modalRoot.querySelector('[data-comments-view]').hidden = true;
-            modalRoot.querySelector('[data-comments-editor]').hidden = false;
-            modalRoot.querySelector('#tralla-call-comments').focus();
-            return;
-        }
-        if (event.target.closest('[data-cancel-comments]')) {
-            modalRoot.querySelector('#tralla-call-comments').value = activeCard.call_comments || '';
-            modalRoot.querySelector('[data-comments-editor]').hidden = true;
-            modalRoot.querySelector('[data-comments-view]').hidden = false;
-            return;
-        }
-        var saveCommentsButton = event.target.closest('[data-save-comments]');
-        if (saveCommentsButton) {
-            saveComments(saveCommentsButton);
+        if (event.target.closest('[data-open-comments]')) {
+            openCommentsChat();
             return;
         }
         var editPauseCodesButton = event.target.closest('[data-edit-pause-codes]');

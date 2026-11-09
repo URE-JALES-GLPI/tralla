@@ -5591,3 +5591,53 @@ html.tralla-config-tabbed .tralla-config-grid {
 .tralla-detail-side .tralla-call-file-form input[type="file"] { font-size: 12px; width: 100%; }
 .tralla-detail-side .tralla-call-file-form .tralla-btn { justify-self: stretch; }
 [data-comments-view][hidden], [data-comments-editor][hidden] { display: none !important; }
+
+/* ---------------------------------------------------------- comentários (chat) */
+.tralla-comments-count { background: #e9f2ff; border-radius: 999px; color: #0c66e4; font-size: 11px; font-weight: 700; margin-left: 4px; padding: 1px 8px; }
+.tralla-comments-preview { background: #f7f8f9; border-left: 3px solid #0c66e4; border-radius: 6px; padding: 8px 12px; }
+.tralla-comments-preview-meta { color: #626f86; display: flex; flex-wrap: wrap; font-size: 12px; gap: 8px; }
+.tralla-comments-preview-meta strong { color: #172b4d; }
+.tralla-comments-preview p { -webkit-box-orient: vertical; -webkit-line-clamp: 3; display: -webkit-box; margin: 4px 0 0; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tralla-chat { display: flex; flex-direction: column; height: min(720px, calc(100vh - 48px)); margin: 0; max-width: 640px; position: relative; width: 100%; z-index: 1; }
+.tralla-chat-head { align-items: flex-start; border-bottom: 1px solid #dcdfe4; display: flex; gap: 12px; justify-content: space-between; padding: 16px 20px; }
+.tralla-chat-head h2 { align-items: center; display: flex; font-size: 18px; gap: 8px; margin: 0; }
+.tralla-chat-head p { color: #626f86; font-size: 13px; margin: 2px 0 0; }
+.tralla-chat-close { background: transparent; border: 0; border-radius: 6px; color: #44546f; cursor: pointer; font-size: 20px; height: 36px; width: 36px; }
+.tralla-chat-close:hover { background: #f1f2f4; }
+.tralla-chat-list { background: #f4f5f7; display: flex; flex: 1; flex-direction: column; gap: 8px; overflow-y: auto; padding: 16px 20px; }
+.tralla-chat-empty { align-items: center; color: #8590a2; display: flex; flex: 1; flex-direction: column; justify-content: center; }
+.tralla-chat-empty i { font-size: 36px; }
+.tralla-chat-day { display: flex; justify-content: center; margin: 6px 0; }
+.tralla-chat-day span { background: #dcdfe4; border-radius: 999px; color: #44546f; font-size: 11px; font-weight: 600; padding: 2px 10px; }
+.tralla-chat-msg { align-items: flex-end; display: flex; gap: 8px; max-width: 85%; }
+.tralla-chat-msg.is-mine { align-self: flex-end; flex-direction: row-reverse; }
+.tralla-chat-avatar { align-items: center; background: #0c66e4; border-radius: 50%; color: #fff; display: inline-flex; flex: 0 0 30px; font-size: 11px; font-weight: 700; height: 30px; justify-content: center; object-fit: cover; width: 30px; }
+.tralla-chat-bubble { background: #fff; border-radius: 12px 12px 12px 4px; box-shadow: 0 1px 1px rgba(9, 30, 66, .13); min-width: 90px; padding: 8px 12px 6px; }
+.tralla-chat-msg.is-mine .tralla-chat-bubble { background: #dcfce7; border-radius: 12px 12px 4px 12px; }
+.tralla-chat-bubble strong { color: #0c66e4; display: block; font-size: 12px; margin-bottom: 2px; }
+.tralla-chat-bubble p { color: #172b4d; font-size: 14px; line-height: 1.45; margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.tralla-chat-meta { align-items: center; color: #626f86; display: flex; font-size: 11px; gap: 6px; justify-content: flex-end; margin-top: 2px; }
+.tralla-chat-delete { background: transparent; border: 0; color: #8590a2; cursor: pointer; font-size: 13px; padding: 0 2px; }
+.tralla-chat-delete:hover { color: #c9372c; }
+.tralla-chat-form { align-items: flex-end; border-top: 1px solid #dcdfe4; display: flex; gap: 8px; padding: 12px 16px 4px; }
+.tralla-chat-form textarea { border: 1px solid #b7bfcc; border-radius: 8px; flex: 1; font: inherit; max-height: 140px; min-height: 42px; padding: 9px 12px; resize: vertical; }
+.tralla-chat-form textarea:focus { border-color: #0c66e4; outline: 2px solid rgba(12, 102, 228, .2); }
+.tralla-chat-form .tralla-btn { min-height: 42px; }
+.tralla-chat-hint { color: #8590a2; font-size: 11px; margin: 0; padding: 0 16px 10px; }
+.tralla-chat-readonly { border-top: 1px solid #dcdfe4; color: #626f86; font-size: 13px; margin: 0; padding: 12px 16px; text-align: center; }
+@media (max-width: 700px) {
+    .tralla-chat { border-radius: 12px 12px 0 0; height: 92vh; max-width: none; }
+    .tralla-chat-form .tralla-btn span { display: none; }
+}
+html[data-theme="dark"] .tralla-chat-list, body[data-theme="dark"] .tralla-chat-list { background: #161a1d; }
+html[data-theme="dark"] .tralla-chat-bubble, body[data-theme="dark"] .tralla-chat-bubble { background: #282e33; box-shadow: none; }
+html[data-theme="dark"] .tralla-chat-msg.is-mine .tralla-chat-bubble, body[data-theme="dark"] .tralla-chat-msg.is-mine .tralla-chat-bubble { background: #164b35; }
+html[data-theme="dark"] .tralla-chat-bubble p, body[data-theme="dark"] .tralla-chat-bubble p,
+html[data-theme="dark"] .tralla-comments-preview-meta strong, body[data-theme="dark"] .tralla-comments-preview-meta strong { color: #dee4ea; }
+html[data-theme="dark"] .tralla-chat-bubble strong, body[data-theme="dark"] .tralla-chat-bubble strong { color: #85b8ff; }
+html[data-theme="dark"] .tralla-comments-preview, body[data-theme="dark"] .tralla-comments-preview { background: #22272b; }
+html[data-theme="dark"] .tralla-chat-day span, body[data-theme="dark"] .tralla-chat-day span { background: #2c333a; color: #b6c2cf; }
+html[data-theme="dark"] .tralla-chat-form textarea, body[data-theme="dark"] .tralla-chat-form textarea { background: #22272b; border-color: #454f59; color: #dee4ea; }
+html[data-theme="dark"] .tralla-chat-head, body[data-theme="dark"] .tralla-chat-head,
+html[data-theme="dark"] .tralla-chat-form, body[data-theme="dark"] .tralla-chat-form,
+html[data-theme="dark"] .tralla-chat-readonly, body[data-theme="dark"] .tralla-chat-readonly { border-color: #38414a; }

@@ -344,7 +344,6 @@ class PluginTrallaCard extends CommonDBTM
                     'code'     => tralla_display_code($parentCard, $boardType),
                     'name'     => $parentCard['name'],
                     'status'   => $parentCard['status'],
-                    'call_comments' => (string) ($parentCard['call_comments'] ?? ''),
                     'machines' => PluginTrallaMachine::getMachinesForCard((int) $parentCard['id']),
                 ];
             }
@@ -549,6 +548,14 @@ class PluginTrallaCard extends CommonDBTM
             $card['update_items'] = PluginTrallaUpdate::items($id);
             $card['update_files'] = empty($card['is_deleted']) ? PluginTrallaFile::listForCard($id, $userId) : [];
             $card['permissions']['upload_update_file'] = PluginTrallaFile::canUpload($card, $userId);
+        }
+        $card['comments'] = [];
+        if ($boardType === 'maintenance') {
+            $commentCard = (int) $card['stage'] === 2 ? $parentCard : $card;
+            if (is_array($commentCard)) {
+                $card['comments'] = self::listComments((int) $commentCard['id'], $userId,
+                    (int) $card['stage'] === 1 && !empty($card['permissions']['edit_comments']));
+            }
         }
         $card['call_files'] = [];
         $card['permissions']['upload_call_file'] = false;
@@ -890,7 +897,7 @@ class PluginTrallaCard extends CommonDBTM
                 && PluginTrallaConfig::get('groq_api_key_encrypted') !== '',
             'edit_card'        => $canEditCard,
             'edit_description' => $canEditDescription,
-            'edit_comments'    => $isMember && $isCall && $boardType === 'maintenance' && $stage === 1
+            'edit_comments'    => $isMember && $boardType === 'maintenance' && $stage === 1
                 && empty($card['is_deleted']) && empty($card['is_archived']),
             'edit_machines'    => $canEditMachines,
             'add_machine'      => $canEditMachines && !$isCall,
@@ -2066,8 +2073,44 @@ class PluginTrallaCard extends CommonDBTM
         return self::getCardDetail($id, $userId);
     }
 
-    /** Comentários do Chamado: qualquer membro do quadro edita, em qualquer etapa. */
-    public static function updateComments(int $id, string $comments, int $userId = 0): array
+    /** Conversa de comentários do card, da mais antiga para a mais nova. */
+    private static function listComments(int $cardId, int $userId, bool $canEdit): array
+    {
+        global $DB;
+
+        $rows = [];
+        foreach ($DB->request([
+            'FROM'  => 'glpi_plugin_tralla_comments',
+            'WHERE' => ['plugin_tralla_cards_id' => $cardId],
+            'ORDER' => ['date_creation ASC', 'id ASC'],
+        ]) as $row) {
+            $authorId = (int) $row['users_id'];
+            $profile = $authorId > 0 ? tralla_user_profile($authorId) : ['name' => '', 'picture_url' => ''];
+            $rows[] = [
+                'id'            => (int) $row['id'],
+                'users_id'      => $authorId,
+                'user_name'     => $profile['name'] !== '' ? $profile['name'] : 'Comentário anterior',
+                'picture_url'   => (string) ($profile['picture_url'] ?? ''),
+                'content'       => (string) $row['content'],
+                'date_creation' => (string) $row['date_creation'],
+                'mine'          => $authorId > 0 && $authorId === $userId,
+                'can_delete'    => $canEdit && $authorId > 0 && $authorId === $userId,
+            ];
+        }
+
+        return $rows;
+    }
+
+    private static function assertCanComment(array $card, int $userId): void
+    {
+        self::assertBoardAccess($card);
+        if (empty(self::permissionsFor($card, self::getBoardType((int) $card['plugin_tralla_boards_id']), $userId, false)['edit_comments'])) {
+            throw new RuntimeException('Não é possível comentar neste card.');
+        }
+    }
+
+    /** Nova mensagem na conversa do card: qualquer membro do quadro de manutenção comenta. */
+    public static function addComment(int $id, string $content, int $userId = 0): array
     {
         global $DB;
 
@@ -2076,26 +2119,63 @@ class PluginTrallaCard extends CommonDBTM
         if ($card === null) {
             throw new RuntimeException('Card não encontrado.');
         }
-        self::assertBoardAccess($card);
-        if (empty(self::permissionsFor($card, self::getBoardType((int) $card['plugin_tralla_boards_id']), $userId, false)['edit_comments'])) {
-            throw new RuntimeException('Os comentários deste card não podem ser editados.');
+        self::assertCanComment($card, $userId);
+        $content = trim(strip_tags($content));
+        if ($content === '') {
+            throw new RuntimeException('Escreva o comentário.');
         }
-        $comments = trim(strip_tags($comments));
-        if (mb_strlen($comments) > 20000) {
-            throw new RuntimeException('Os comentários devem ter no máximo 20000 caracteres.');
+        if (mb_strlen($content) > 5000) {
+            throw new RuntimeException('O comentário deve ter no máximo 5000 caracteres.');
         }
-        $previous = trim((string) ($card['call_comments'] ?? ''));
-        if ($comments !== $previous) {
-            $DB->beginTransaction();
-            try {
-                $DB->update('glpi_plugin_tralla_cards', ['call_comments' => $comments, 'date_mod' => tralla_now()], ['id' => $id]);
-                PluginTrallaHistory::log($id, $userId, 'call_comments_updated',
-                    tralla_history_change('Comentários', $previous, $comments));
-                $DB->commit();
-            } catch (Throwable $e) {
-                $DB->rollBack();
-                throw $e;
-            }
+        $now = tralla_now();
+        $DB->beginTransaction();
+        try {
+            $DB->insert('glpi_plugin_tralla_comments', [
+                'plugin_tralla_cards_id' => $id,
+                'users_id'               => $userId,
+                'content'                => $content,
+                'date_creation'          => $now,
+            ]);
+            $DB->update('glpi_plugin_tralla_cards', ['date_mod' => $now], ['id' => $id]);
+            PluginTrallaHistory::log($id, $userId, 'comment_added', mb_strimwidth($content, 0, 300, '...'));
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
+        }
+
+        return self::getCardDetail($id, $userId);
+    }
+
+    /** O autor pode apagar o próprio comentário enquanto o card aceita comentários. */
+    public static function deleteComment(int $commentId, int $userId = 0): array
+    {
+        global $DB;
+
+        $userId = $userId ?: (int) Session::getLoginUserID();
+        $comment = $DB->request(['FROM' => 'glpi_plugin_tralla_comments', 'WHERE' => ['id' => $commentId]])->current();
+        if (!$comment) {
+            throw new RuntimeException('Comentário não encontrado.');
+        }
+        $id = (int) $comment['plugin_tralla_cards_id'];
+        $card = self::getCard($id);
+        if ($card === null) {
+            throw new RuntimeException('Card não encontrado.');
+        }
+        self::assertCanComment($card, $userId);
+        if ((int) $comment['users_id'] !== $userId) {
+            throw new RuntimeException('Só quem escreveu pode apagar o comentário.');
+        }
+        $DB->beginTransaction();
+        try {
+            $DB->delete('glpi_plugin_tralla_comments', ['id' => $commentId]);
+            $DB->update('glpi_plugin_tralla_cards', ['date_mod' => tralla_now()], ['id' => $id]);
+            PluginTrallaHistory::log($id, $userId, 'comment_deleted',
+                mb_strimwidth((string) $comment['content'], 0, 300, '...'));
+            $DB->commit();
+        } catch (Throwable $e) {
+            $DB->rollBack();
+            throw $e;
         }
 
         return self::getCardDetail($id, $userId);

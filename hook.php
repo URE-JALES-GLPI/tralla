@@ -571,6 +571,35 @@ function plugin_tralla_install(): bool
         ") or die($DB->error());
     }
 
+    if (!$DB->tableExists('glpi_plugin_tralla_comments')) {
+        $DB->doQuery("
+            CREATE TABLE `glpi_plugin_tralla_comments` (
+                `id`                     INT {$sign} NOT NULL AUTO_INCREMENT,
+                `plugin_tralla_cards_id` INT {$sign} NOT NULL DEFAULT '0',
+                `users_id`               INT {$sign} NOT NULL DEFAULT '0',
+                `content`                TEXT DEFAULT NULL,
+                `date_creation`          DATETIME DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                KEY `plugin_tralla_cards_id` (`plugin_tralla_cards_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}
+        ") or die($DB->error());
+        // O antigo campo único de comentários vira a primeira mensagem da conversa,
+        // com o autor e a data da última edição registrada no histórico.
+        $DB->doQuery("
+            INSERT INTO `glpi_plugin_tralla_comments` (`plugin_tralla_cards_id`, `users_id`, `content`, `date_creation`)
+            SELECT c.`id`,
+                   COALESCE((SELECT h.`users_id` FROM `glpi_plugin_tralla_history` AS h
+                             WHERE h.`plugin_tralla_cards_id` = c.`id` AND h.`action` = 'call_comments_updated'
+                             ORDER BY h.`id` DESC LIMIT 1), 0),
+                   TRIM(c.`call_comments`),
+                   COALESCE((SELECT h.`date_creation` FROM `glpi_plugin_tralla_history` AS h
+                             WHERE h.`plugin_tralla_cards_id` = c.`id` AND h.`action` = 'call_comments_updated'
+                             ORDER BY h.`id` DESC LIMIT 1), c.`date_mod`)
+            FROM `glpi_plugin_tralla_cards` AS c
+            WHERE c.`call_comments` IS NOT NULL AND TRIM(c.`call_comments`) <> ''
+        ") or die($DB->error());
+    }
+
     // Garante que o criador de cada quadro existente seja SuperAdmin.
     require_once __DIR__ . '/inc/boarduser.class.php';
     foreach ($DB->request([
@@ -739,6 +768,7 @@ function plugin_tralla_uninstall(): bool
         'glpi_plugin_tralla_entity_contacts',
         'glpi_plugin_tralla_calendar_days',
         'glpi_plugin_tralla_files',
+        'glpi_plugin_tralla_comments',
         'glpi_plugin_tralla_update_items',
         'glpi_plugin_tralla_notifications',
         'glpi_plugin_tralla_history',

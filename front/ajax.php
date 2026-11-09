@@ -372,10 +372,17 @@ try {
                 'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id']),
             ]]);
 
-        case 'card_comments_update':
-            $detail = PluginTrallaCard::updateComments(
-                tralla_post_int('id'), tralla_post_string('comments'), $userId
+        case 'card_comment_add':
+            $detail = PluginTrallaCard::addComment(
+                tralla_post_int('id'), tralla_post_string('content'), $userId
             );
+            tralla_json(['ok' => true, 'data' => [
+                'card' => $detail,
+                'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id']),
+            ]]);
+
+        case 'card_comment_delete':
+            $detail = PluginTrallaCard::deleteComment(tralla_post_int('comment_id'), $userId);
             tralla_json(['ok' => true, 'data' => [
                 'card' => $detail,
                 'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id']),
