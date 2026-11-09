@@ -545,16 +545,45 @@ class PluginTrallaBoard extends CommonDBTM
         $stats['pending'] = countElementsInTable('glpi_plugin_tralla_cards', $base + [
             'status' => 'pending', 'is_archived' => 0, 'technician_id' => 0, 'users_id' => $usersId,
         ]);
+        // Card pausado não está mais "em andamento" para o técnico: a pausa já conta como concluído.
         foreach (['in_progress', 'withdrawal'] as $status) {
             $stats[$status] = countElementsInTable('glpi_plugin_tralla_cards', $base + [
-                'status' => $status, 'is_archived' => 0, 'technician_id' => $usersId,
+                'status' => $status, 'is_archived' => 0, 'is_paused' => 0, 'technician_id' => $usersId,
             ]);
         }
         $stats['done'] = countElementsInTable('glpi_plugin_tralla_cards', $base + [
             'status' => 'done', 'technician_id' => $usersId,
-        ]);
+        ]) + self::countPauseCredits($usersId, $boardIds);
 
         return $stats;
+    }
+
+    /**
+     * Cada pausa aprovada vale um "concluído" para o técnico que estava no card naquele momento
+     * (gravado no próprio pedido de pausa). Ao despausar o card volta a Pendente e quem pegar
+     * de novo ganha a própria contagem; a do técnico anterior continua valendo.
+     *
+     * @param int[] $boardIds
+     */
+    private static function countPauseCredits(int $usersId, array $boardIds): int
+    {
+        global $DB;
+
+        $ids = implode(',', array_map('intval', $boardIds));
+        if ($usersId <= 0 || $ids === '') {
+            return 0;
+        }
+        $row = $DB->doQuery(
+            "SELECT COUNT(*) AS `total`
+             FROM `glpi_plugin_tralla_cards` AS a
+             INNER JOIN `glpi_plugin_tralla_cards` AS p ON p.`id` = a.`parent_cards_id`
+             WHERE a.`stage` = 2 AND a.`approval_kind` = 'pause' AND a.`status` = 'approved'
+               AND a.`technician_id` = " . (int) $usersId . "
+               AND a.`plugin_tralla_boards_id` IN ({$ids})
+               AND p.`is_deleted` = 0"
+        )->fetch_assoc();
+
+        return (int) ($row['total'] ?? 0);
     }
 
     /**
