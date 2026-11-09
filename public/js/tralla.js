@@ -2761,13 +2761,13 @@
                         + '<i class="ti ti-database-export" aria-hidden="true"></i> Backup extraído</button>'
                     : '<span class="tralla-backup-step"><i class="ti ti-clock" aria-hidden="true"></i> Backup ainda não extraído</span>');
             var done = machine.backup_done_at
-                ? '<span class="tralla-backup-step is-done"><i class="ti ti-circle-check" aria-hidden="true"></i> Backup realizado <small>'
+                ? '<span class="tralla-backup-step is-done"><i class="ti ti-circle-check" aria-hidden="true"></i> Backup restaurado <small>'
                     + stepInfo(machine.backup_done_at, machine.backup_done_by_name) + '</small></span>'
                 : (machine.backup_extracted_at
                     ? (permissions.backup_steps
                         ? '<button type="button" class="tralla-backup-step-btn" data-backup-step="done" data-machine="' + id + '">'
-                            + '<i class="ti ti-database-import" aria-hidden="true"></i> Backup realizado</button>'
-                        : '<span class="tralla-backup-step"><i class="ti ti-clock" aria-hidden="true"></i> Backup ainda não realizado</span>')
+                            + '<i class="ti ti-database-import" aria-hidden="true"></i> Backup restaurado</button>'
+                        : '<span class="tralla-backup-step"><i class="ti ti-clock" aria-hidden="true"></i> Backup ainda não restaurado</span>')
                     : '');
             backupSteps = '<div class="tralla-backup-steps">' + extracted + done + '</div>';
         }
@@ -6508,9 +6508,9 @@
         if (backupStep && activeCard) {
             var stepName = backupStep.getAttribute('data-backup-step');
             confirmDialog({
-                title: stepName === 'done' ? 'Backup realizado' : 'Backup extraído',
+                title: stepName === 'done' ? 'Backup restaurado' : 'Backup extraído',
                 message: stepName === 'done'
-                    ? 'Confirmar que o backup desta máquina foi devolvido/realizado? Fica registrado com seu nome e a hora.'
+                    ? 'Confirmar que o backup desta máquina foi restaurado? Fica registrado com seu nome e a hora.'
                     : 'Confirmar que o backup desta máquina foi extraído? Fica registrado com seu nome e a hora.',
                 confirmLabel: 'Confirmar',
                 icon: stepName === 'done' ? 'ti-database-import' : 'ti-database-export'

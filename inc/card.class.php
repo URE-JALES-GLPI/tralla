@@ -2134,7 +2134,7 @@ class PluginTrallaCard extends CommonDBTM
         return $card;
     }
 
-    /** Em andamento: registra "Backup extraído" e depois "Backup realizado" na máquina marcada. */
+    /** Em andamento: registra "Backup extraído" e depois "Backup restaurado" na máquina marcada. */
     public static function setMachineBackupStep(int $cardId, int $machineId, string $step, int $userId = 0): array
     {
         global $DB;
@@ -2166,13 +2166,13 @@ class PluginTrallaCard extends CommonDBTM
             $what = 'Backup extraído';
         } elseif ($step === 'done') {
             if (empty($machine['backup_extracted_at'])) {
-                throw new RuntimeException('Marque "Backup extraído" antes de "Backup realizado".');
+                throw new RuntimeException('Marque "Backup extraído" antes de "Backup restaurado".');
             }
             if (!empty($machine['backup_done_at'])) {
                 return self::getCardDetail($cardId, $userId);
             }
             $fields = ['backup_done_at' => $now, 'backup_done_by' => $userId];
-            $what = 'Backup realizado';
+            $what = 'Backup restaurado';
         } else {
             throw new RuntimeException('Etapa de backup inválida.');
         }
