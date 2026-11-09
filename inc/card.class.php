@@ -256,6 +256,11 @@ class PluginTrallaCard extends CommonDBTM
                 ? PluginTrallaConfig::assignatureCardUrl((int) $card['id'])
                 : '';
             $card['machine_count'] = count($machines) ?: (int) $card['machines_total'];
+            $card['backup_count'] = count(array_filter($machines, static fn (array $m): bool => !empty($m['needs_backup'])));
+            $card['backup_done_count'] = count(array_filter($machines, static fn (array $m): bool => !empty($m['needs_backup']) && !empty($m['backup_done_at'])));
+            $card['backup_pending'] = (int) $card['stage'] === 2
+                ? (string) ($card['approval_kind'] ?? '') === 'call_release'
+                : ((string) $card['status'] === 'pending' && !empty($card['is_locked']));
             $card['machine_summary'] = PluginTrallaMachine::summarizeModels($machines, $modelNames);
             $card['progress'] = tralla_machines_progress($machines);
             $card['is_filled'] = tralla_all_machines_filled($machines);
@@ -557,6 +562,13 @@ class PluginTrallaCard extends CommonDBTM
                     (int) $card['stage'] === 1 && !empty($card['permissions']['edit_comments']));
             }
         }
+        $releaseParent = $boardType === 'maintenance' ? self::awaitingReleaseParent($card) : null;
+        $card['awaiting_release'] = $releaseParent !== null;
+        $card['permissions']['mark_backup'] = $boardType === 'maintenance' && self::backupEditableParent($card) !== null
+            && PluginTrallaBoard::canOperateBoard((int) $card['plugin_tralla_boards_id'], $userId)
+            && Session::haveRight('plugin_tralla', UPDATE);
+        $card['permissions']['backup_steps'] = $boardType === 'maintenance' && (int) $card['stage'] === 1
+            && (string) $card['status'] === 'in_progress' && !empty($card['permissions']['edit_machines']);
         $card['call_files'] = [];
         $card['permissions']['upload_call_file'] = false;
         if ($boardType === 'maintenance' && (string) ($card['workflow_type'] ?? '') === 'call') {
@@ -2073,6 +2085,141 @@ class PluginTrallaCard extends CommonDBTM
         return self::getCardDetail($id, $userId);
     }
 
+    /**
+     * Card de origem quando o card (ou o pedido dele) está aguardando liberação; senão null.
+     */
+    private static function awaitingReleaseParent(array $card): ?array
+    {
+        if ((int) $card['stage'] === 2) {
+            if ((string) ($card['approval_kind'] ?? '') !== 'call_release'
+                || (string) $card['status'] !== 'waiting_approval' || !empty($card['is_archived'])) {
+                return null;
+            }
+            $approval = $card;
+            $parent = self::getCard((int) $card['parent_cards_id']);
+        } else {
+            $parent = $card;
+            $approvalId = (int) ($card['approval_cards_id'] ?? 0);
+            $approval = $approvalId > 0 ? self::getCard($approvalId) : null;
+        }
+        if ($parent === null || $approval === null
+            || (string) ($approval['approval_kind'] ?? '') !== 'call_release'
+            || (string) $approval['status'] !== 'waiting_approval' || !empty($approval['is_archived'])
+            || (int) $parent['stage'] !== 1 || (string) $parent['status'] !== 'pending'
+            || empty($parent['is_locked']) || !empty($parent['is_deleted'])
+            || (int) ($parent['approval_cards_id'] ?? 0) !== (int) $approval['id']) {
+            return null;
+        }
+
+        return $parent;
+    }
+
+    /**
+     * "Precisa de backup" se marca direto enquanto o card está em Pendente (ou aguardando liberação);
+     * de Em andamento em diante só por pedido de edição.
+     */
+    private static function backupEditableParent(array $card): ?array
+    {
+        if ((int) $card['stage'] === 2) {
+            return self::awaitingReleaseParent($card);
+        }
+        if ((string) $card['status'] !== 'pending' || !empty($card['is_archived']) || !empty($card['is_deleted'])
+            || !empty($card['is_paused']) || !empty($card['is_draft'])) {
+            return null;
+        }
+        if (!empty($card['is_locked']) && self::awaitingReleaseParent($card) === null) {
+            return null;
+        }
+
+        return $card;
+    }
+
+    /** Em andamento: registra "Backup extraído" e depois "Backup realizado" na máquina marcada. */
+    public static function setMachineBackupStep(int $cardId, int $machineId, string $step, int $userId = 0): array
+    {
+        global $DB;
+
+        $userId = $userId ?: (int) Session::getLoginUserID();
+        $card = self::getCard($cardId);
+        if ($card === null) {
+            throw new RuntimeException('Card não encontrado.');
+        }
+        self::assertBoardAccess($card);
+        $boardType = self::getBoardType((int) $card['plugin_tralla_boards_id']);
+        if ($boardType !== 'maintenance' || (int) $card['stage'] !== 1 || (string) $card['status'] !== 'in_progress'
+            || empty(self::permissionsFor($card, $boardType, $userId, false)['edit_machines'])) {
+            throw new RuntimeException('O backup só é registrado com o card Em andamento, por quem está com ele.');
+        }
+        $machine = $DB->request(['FROM' => 'glpi_plugin_tralla_machines', 'WHERE' => ['id' => $machineId]])->current();
+        if (!$machine || (int) $machine['plugin_tralla_cards_id'] !== $cardId) {
+            throw new RuntimeException('Máquina não encontrada neste card.');
+        }
+        if (empty($machine['needs_backup'])) {
+            throw new RuntimeException('Esta máquina não está marcada como "precisa de backup".');
+        }
+        $now = tralla_now();
+        if ($step === 'extracted') {
+            if (!empty($machine['backup_extracted_at'])) {
+                return self::getCardDetail($cardId, $userId);
+            }
+            $fields = ['backup_extracted_at' => $now, 'backup_extracted_by' => $userId];
+            $what = 'Backup extraído';
+        } elseif ($step === 'done') {
+            if (empty($machine['backup_extracted_at'])) {
+                throw new RuntimeException('Marque "Backup extraído" antes de "Backup realizado".');
+            }
+            if (!empty($machine['backup_done_at'])) {
+                return self::getCardDetail($cardId, $userId);
+            }
+            $fields = ['backup_done_at' => $now, 'backup_done_by' => $userId];
+            $what = 'Backup realizado';
+        } else {
+            throw new RuntimeException('Etapa de backup inválida.');
+        }
+        $DB->update('glpi_plugin_tralla_machines', $fields + ['date_mod' => $now], ['id' => $machineId]);
+        $DB->update('glpi_plugin_tralla_cards', ['date_mod' => $now], ['id' => $cardId]);
+        $number = (int) ($machine['machine_number'] ?? 0);
+        PluginTrallaHistory::log($cardId, $userId, 'machine_backup_' . $step,
+            $what . ': máquina ' . ($number > 0 ? '#' . $number . ' ' : '') . trim((string) $machine['label']) . '.');
+
+        return self::getCardDetail($cardId, $userId);
+    }
+
+    /** Marca ou desmarca "precisa de backup" numa máquina enquanto o card está em Pendente. */
+    public static function setMachineBackup(int $viewId, int $machineId, bool $on, int $userId = 0): array
+    {
+        global $DB;
+
+        $userId = $userId ?: (int) Session::getLoginUserID();
+        $view = self::getCard($viewId);
+        if ($view === null) {
+            throw new RuntimeException('Card não encontrado.');
+        }
+        self::assertBoardAccess($view);
+        $parent = self::backupEditableParent($view);
+        if ($parent === null) {
+            throw new RuntimeException('Com o card em andamento, peça uma edição para mudar o backup.');
+        }
+        if (!PluginTrallaBoard::canOperateBoard((int) $parent['plugin_tralla_boards_id'], $userId)) {
+            throw new RuntimeException('Sem permissão para marcar backup neste quadro.');
+        }
+        $machine = $DB->request(['FROM' => 'glpi_plugin_tralla_machines', 'WHERE' => ['id' => $machineId]])->current();
+        if (!$machine || (int) $machine['plugin_tralla_cards_id'] !== (int) $parent['id']) {
+            throw new RuntimeException('Máquina não encontrada neste card.');
+        }
+        if ((int) $machine['needs_backup'] !== ($on ? 1 : 0)) {
+            $now = tralla_now();
+            $DB->update('glpi_plugin_tralla_machines', ['needs_backup' => $on ? 1 : 0, 'date_mod' => $now], ['id' => $machineId]);
+            $DB->update('glpi_plugin_tralla_cards', ['date_mod' => $now], ['id' => (int) $parent['id']]);
+            $number = (int) ($machine['machine_number'] ?? 0);
+            PluginTrallaHistory::log((int) $parent['id'], $userId, 'machine_backup',
+                'Máquina ' . ($number > 0 ? '#' . $number . ' ' : '') . trim((string) $machine['label'])
+                . ($on ? ' marcada como "precisa de backup".' : ' desmarcada de "precisa de backup".'));
+        }
+
+        return self::getCardDetail($viewId, $userId);
+    }
+
     /** Conversa de comentários do card, da mais antiga para a mais nova. */
     private static function listComments(int $cardId, int $userId, bool $canEdit): array
     {
@@ -2867,7 +3014,7 @@ class PluginTrallaCard extends CommonDBTM
         ];
     }
 
-    public static function decide(int $approvalId, bool $approve, string $reason = '', int $userId = 0, bool $isAdmin = false, string $priority = '', string $code = '', bool $seintec = false): array
+    public static function decide(int $approvalId, bool $approve, string $reason = '', int $userId = 0, bool $isAdmin = false, string $priority = '', string $code = '', bool $seintec = false, ?array $backupIds = null): array
     {
         global $DB;
 
@@ -2890,7 +3037,7 @@ class PluginTrallaCard extends CommonDBTM
             return self::decideSplit($approvalId, $approve, $reason, $userId, $isAdmin);
         }
         if ($kind === 'call_release') {
-            return self::decideCallRelease($approvalId, $approve, $reason, $userId, $priority, $code, $seintec);
+            return self::decideCallRelease($approvalId, $approve, $reason, $userId, $priority, $code, $seintec, $backupIds);
         }
         if ($kind === 'transfer' || $kind === 'takeover') {
             return self::decideTransfer($approvalId, $approve, $reason, $userId, $code);
@@ -3032,7 +3179,7 @@ class PluginTrallaCard extends CommonDBTM
     }
 
     /** $seintec: liberação feita pela Seintec/estagiário, sem CRM obrigatório (só SuperAdmin do quadro). */
-    private static function decideCallRelease(int $approvalId, bool $approve, string $reason, int $userId, string $priority = '', string $crm = '', bool $seintec = false): array
+    private static function decideCallRelease(int $approvalId, bool $approve, string $reason, int $userId, string $priority = '', string $crm = '', bool $seintec = false, ?array $backupIds = null): array
     {
         global $DB;
         $priority = strtoupper(trim($priority));
@@ -3114,11 +3261,33 @@ class PluginTrallaCard extends CommonDBTM
                 'rejection_reason' => !$approve && $reason !== '' ? $reason : null,
                 'date_mod' => $now,
             ], ['id' => $approvalId]);
+            $backupNote = '';
+            if ($approve && $backupIds !== null) {
+                // Na liberação o aprovador confirma quais máquinas precisam de backup.
+                $wanted = array_fill_keys(array_map('intval', $backupIds), true);
+                $marked = [];
+                foreach ($DB->request(['FROM' => 'glpi_plugin_tralla_machines', 'WHERE' => ['plugin_tralla_cards_id' => $parentId]]) as $machine) {
+                    $flag = isset($wanted[(int) $machine['id']]) ? 1 : 0;
+                    if ($flag !== (int) $machine['needs_backup']) {
+                        $DB->update('glpi_plugin_tralla_machines', ['needs_backup' => $flag, 'date_mod' => $now], ['id' => (int) $machine['id']]);
+                    }
+                    if ($flag === 1) {
+                        $number = (int) ($machine['machine_number'] ?? 0);
+                        $marked[] = ($number > 0 ? '#' . $number . ' ' : '') . trim((string) $machine['label']);
+                    }
+                }
+                if ($marked !== []) {
+                    $backupNote = ' Precisam de backup: ' . implode(', ', $marked) . '.';
+                }
+            } elseif ($approve) {
+                $count = countElementsInTable('glpi_plugin_tralla_machines', ['plugin_tralla_cards_id' => $parentId, 'needs_backup' => 1]);
+                $backupNote = $count > 0 ? ' ' . $count . ' máquina(s) precisam de backup.' : '';
+            }
             $what = (string) ($parent['workflow_type'] ?? '') === 'call' ? 'Chamado' : 'Card';
             $message = $approve
                 ? $what . ' liberado com prioridade ' . (tralla_priorities()[$priority]['label'] ?? $priority)
                     . ($seintec ? '. Seintec/Estagiário' . ($crm !== '' ? ', CRM: ' . $crm : ' (sem CRM)') : '. CRM: ' . $crm)
-                    . '; já pode ser assumido por um técnico.'
+                    . '; já pode ser assumido por um técnico.' . $backupNote
                 : 'Liberação recusada.' . ($reason !== '' ? ' Motivo: ' . $reason : '');
             PluginTrallaHistory::log($parentId, $userId, $approve ? 'call_released' : 'call_release_rejected', $message);
             PluginTrallaHistory::log($approvalId, $userId, $approve ? 'approval_approved' : 'approval_rejected', $message);
@@ -5052,11 +5221,14 @@ class PluginTrallaCard extends CommonDBTM
             $serviceDone = !empty($entry['service_done']) ? 1 : 0;
             $needsInventory = !empty($entry['needs_inventory']) ? 1 : 0;
             $current = $currentById[$machineId];
+            $needsBackup = array_key_exists('needs_backup', $entry)
+                ? (!empty($entry['needs_backup']) ? 1 : 0) : (int) ($current['needs_backup'] ?? 0);
 
             if ($status !== (string) $current['status']
                 || $report !== trim((string) $current['report'])
                 || $serviceDone !== (int) $current['service_done']
-                || $needsInventory !== (int) $current['needs_inventory']) {
+                || $needsInventory !== (int) $current['needs_inventory']
+                || $needsBackup !== (int) ($current['needs_backup'] ?? 0)) {
                 $hasChange = true;
             }
 
@@ -5066,6 +5238,7 @@ class PluginTrallaCard extends CommonDBTM
                 'report'          => $report,
                 'service_done'    => $serviceDone,
                 'needs_inventory' => $needsInventory,
+                'needs_backup'    => $needsBackup,
             ];
         }
 
@@ -5166,7 +5339,7 @@ class PluginTrallaCard extends CommonDBTM
                 'report'          => tralla_normalize_report($entry['report'] ?? ''),
                 'service_done'    => !empty($entry['service_done']) ? 1 : 0,
                 'needs_inventory' => !empty($entry['needs_inventory']) ? 1 : 0,
-            ]);
+            ] + (array_key_exists('needs_backup', $entry) ? ['needs_backup' => !empty($entry['needs_backup']) ? 1 : 0] : []));
         }
 
         foreach (array_keys($currentById) as $machineId) {
@@ -5364,6 +5537,17 @@ class PluginTrallaCard extends CommonDBTM
                     'label'      => $label . ': serviço realizado',
                     'before'     => !empty($current['service_done']) ? 'Sim' : 'Não',
                     'after'      => $service ? 'Sim' : 'Não',
+                    'machine_id' => $machineId,
+                ];
+            }
+
+            if (array_key_exists('needs_backup', $entry)
+                && (!empty($entry['needs_backup']) ? 1 : 0) !== (int) ($current['needs_backup'] ?? 0)) {
+                $changes[] = [
+                    'type'       => 'machine_backup',
+                    'label'      => $label . ': precisa de backup',
+                    'before'     => !empty($current['needs_backup']) ? 'Sim' : 'Não',
+                    'after'      => !empty($entry['needs_backup']) ? 'Sim' : 'Não',
                     'machine_id' => $machineId,
                 ];
             }

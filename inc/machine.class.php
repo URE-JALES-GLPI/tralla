@@ -53,6 +53,8 @@ class PluginTrallaMachine extends CommonDBTM
                 $row['status'] = 'in_progress';
             }
             $row['status_label'] = tralla_machine_status_label((string) $row['status']);
+            $row['backup_extracted_by_name'] = (int) ($row['backup_extracted_by'] ?? 0) > 0 ? tralla_user_name((int) $row['backup_extracted_by']) : '';
+            $row['backup_done_by_name'] = (int) ($row['backup_done_by'] ?? 0) > 0 ? tralla_user_name((int) $row['backup_done_by']) : '';
             $row['is_filled'] = tralla_machine_is_filled($row);
             $machines[] = $row;
         }
@@ -160,6 +162,9 @@ class PluginTrallaMachine extends CommonDBTM
         }
         if (array_key_exists('needs_inventory', $data)) {
             $allowed['needs_inventory'] = !empty($data['needs_inventory']) ? 1 : 0;
+        }
+        if (array_key_exists('needs_backup', $data)) {
+            $allowed['needs_backup'] = !empty($data['needs_backup']) ? 1 : 0;
         }
         if (array_key_exists('label', $data)) {
             $allowed['label'] = tralla_normalize_label($data['label']);

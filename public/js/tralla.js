@@ -1661,6 +1661,14 @@
         if (showProgress) {
             badges += progressMarkup(progress, Number(progress.total || machineCount), Number(progress.filled || 0));
         }
+        var backupCount = Number(card.backup_count || 0);
+        if (isMaintenance && backupCount > 0) {
+            badges += '<span class="tralla-card-badge tralla-card-backup' + (card.backup_pending ? ' is-pending' : '') + '" title="'
+                + backupCount + ' máquina(s) precisam de backup' + (card.backup_pending ? ' (aguardando liberação)' : '') + '">'
+                + '<i class="ti ti-database-export" aria-hidden="true"></i> Backup'
+                + (card.backup_pending ? (backupCount > 1 ? ' ×' + backupCount : '')
+                    : ' ' + Number(card.backup_done_count || 0) + '/' + backupCount) + '</span>';
+        }
         badges += machineBadge + lock + slaBadges(card);
 
         var takeButton = !departing && card.permissions && card.permissions.update_take
@@ -2186,6 +2194,19 @@
         });
     }
 
+    function backupChecklist(card) {
+        if (!card) { return ''; }
+        var machines = Number(card.stage) === 2 && card.parent ? (card.parent.machines || []) : (card.machines || []);
+        if (!machines.length) { return ''; }
+        return '<div class="tralla-release-backup"><strong><i class="ti ti-database-export" aria-hidden="true"></i> Precisam de backup?</strong>'
+            + '<small>Marque as máquinas que precisam de backup. Elas ficam roxas no card depois de liberar.</small>'
+            + '<div class="tralla-release-backup-list">' + machines.map(function (machine, index) {
+                return '<label class="tralla-check"><input type="checkbox" data-release-backup value="' + Number(machine.id) + '"'
+                    + (Number(machine.needs_backup) === 1 ? ' checked' : '') + '> ' + esc(machineDisplayTitle(machine, index + 1))
+                    + (machine.model_name ? ' <small>' + esc(machine.model_name) + '</small>' : '') + '</label>';
+            }).join('') + '</div></div>';
+    }
+
     function priorityDialog(card) {
         var list = Array.isArray(labels.priorities) ? labels.priorities : [];
         return new Promise(function (resolve) {
@@ -2221,6 +2242,7 @@
                         + '<span class="tralla-priority-seintec-text"><strong>Seintec/Estagiário</strong>'
                         + '<small>Marque para liberar sem informar o CRM</small></span></label>'
                     : '')
+                + backupChecklist(card)
                 + '<label class="tralla-field" style="display:block;margin:16px 0 0" data-approval-code-field>'
                 + '<span>CRM <strong aria-hidden="true" data-approval-code-required>*</strong></span>'
                 + '<input type="text" data-approval-code maxlength="255" required placeholder="Informe o CRM para liberar"></label>'
@@ -2268,7 +2290,15 @@
                 radio.addEventListener('change', ready);
             });
             crmEl.addEventListener('input', ready);
-            confirmEl.addEventListener('click', function () { if (!confirmEl.disabled) { finish({ priority: selected(), code: crmEl.value.trim(), seintec: crmOptional() }); } });
+            confirmEl.addEventListener('click', function () {
+                if (confirmEl.disabled) { return; }
+                var backupBoxes = layer.querySelectorAll('[data-release-backup]');
+                finish({
+                    priority: selected(), code: crmEl.value.trim(), seintec: crmOptional(),
+                    backup_ids: backupBoxes.length ? Array.prototype.filter.call(backupBoxes, function (box) { return box.checked; })
+                        .map(function (box) { return Number(box.value); }) : null
+                });
+            });
             layer.querySelector('[data-dialog-backdrop]').addEventListener('click', function () { finish(null); });
             layer.querySelector('[data-dialog-cancel]').addEventListener('click', function () { finish(null); });
             document.addEventListener('keydown', onKeydown, true);
@@ -2707,12 +2737,42 @@
         };
     }
 
-    function renderMachine(machine, canEdit, permissions, sequence, canBulkSelect) {
+    function renderMachine(machine, canEdit, permissions, sequence, canBulkSelect, awaitingRelease) {
         var id = Number(machine.id);
         var title = machineDisplayTitle(machine, sequence);
         var disabled = canEdit ? '' : ' disabled';
+        var backup = Number(machine.needs_backup) === 1;
+        var backupClass = backup ? (awaitingRelease ? ' is-backup-pending' : ' is-backup') : '';
+        var backupControl = permissions.mark_backup
+            ? '<button type="button" class="tralla-backup-toggle' + (backup ? ' is-on' : '') + '" data-machine-backup="' + id
+                + '" aria-pressed="' + (backup ? 'true' : 'false') + '" title="' + (backup ? 'Desmarcar backup' : 'Marcar que precisa de backup') + '">'
+                + '<i class="ti ti-database-export" aria-hidden="true"></i> ' + (backup ? 'Precisa de backup' : 'Backup?') + '</button>'
+            : (backup ? '<span class="tralla-backup-badge"><i class="ti ti-database-export" aria-hidden="true"></i> Precisa de backup</span>' : '');
+        var backupSteps = '';
+        if (backup && !awaitingRelease && !permissions.mark_backup) {
+            var stepInfo = function (at, by) {
+                return esc(formatDate(at)) + (by ? ' · ' + esc(by) : '');
+            };
+            var extracted = machine.backup_extracted_at
+                ? '<span class="tralla-backup-step is-done"><i class="ti ti-circle-check" aria-hidden="true"></i> Backup extraído <small>'
+                    + stepInfo(machine.backup_extracted_at, machine.backup_extracted_by_name) + '</small></span>'
+                : (permissions.backup_steps
+                    ? '<button type="button" class="tralla-backup-step-btn" data-backup-step="extracted" data-machine="' + id + '">'
+                        + '<i class="ti ti-database-export" aria-hidden="true"></i> Backup extraído</button>'
+                    : '<span class="tralla-backup-step"><i class="ti ti-clock" aria-hidden="true"></i> Backup ainda não extraído</span>');
+            var done = machine.backup_done_at
+                ? '<span class="tralla-backup-step is-done"><i class="ti ti-circle-check" aria-hidden="true"></i> Backup realizado <small>'
+                    + stepInfo(machine.backup_done_at, machine.backup_done_by_name) + '</small></span>'
+                : (machine.backup_extracted_at
+                    ? (permissions.backup_steps
+                        ? '<button type="button" class="tralla-backup-step-btn" data-backup-step="done" data-machine="' + id + '">'
+                            + '<i class="ti ti-database-import" aria-hidden="true"></i> Backup realizado</button>'
+                        : '<span class="tralla-backup-step"><i class="ti ti-clock" aria-hidden="true"></i> Backup ainda não realizado</span>')
+                    : '');
+            backupSteps = '<div class="tralla-backup-steps">' + extracted + done + '</div>';
+        }
 
-        return '<div class="tralla-machine" data-machine-id="' + id + '">'
+        return '<div class="tralla-machine' + backupClass + '" data-machine-id="' + id + '">'
             + '<div class="tralla-machine-head">'
             + '<div class="tralla-machine-title">'
             + '<span data-machine-title-text>' + esc(title) + '</span>'
@@ -2725,9 +2785,11 @@
                     + ' durante a separação"><i class="ti ti-user"></i> ' + esc(machine.worked_by_name || 'Sem técnico')
                     + ' · ' + esc(displayCardCode(machine.worked_card_code, machine.worked_card_id)) + '</span>'
                 : '')
+            + backupControl
             + '<span class="tralla-pill ' + (machine.is_filled ? 'done' : 'pending') + '">'
             + (machine.is_filled ? 'Preenchida' : 'Pendente') + '</span>'
             + '</div>'
+            + backupSteps
             + '<div class="tralla-machine-grid is-single">'
             + '<div class="tralla-field"><label>Status</label>'
             + '<select data-machine-field="status"' + disabled + '>' + machineStatusOptions(machine.status || '') + '</select></div>'
@@ -2789,7 +2851,7 @@
             + bulkTools
             + (machines.length
                 ? machines.map(function (machine, index) {
-                    return renderMachine(machine, canEdit, permissions, index + 1, !!bulkTools);
+                    return renderMachine(machine, canEdit, permissions, index + 1, !!bulkTools, !!card.awaiting_release);
                 }).join('')
                 : '<p class="tralla-empty-mini">Nenhuma máquina cadastrada.</p>')
             + '</section>';
@@ -4026,6 +4088,7 @@
         var chosenPriority = '';
         var chosenCode = '';
         var chosenSeintec = 0;
+        var chosenBackup = null;
         var departingCard = Object.assign({}, activeCard);
 
         if (action === 'split') {
@@ -4383,6 +4446,7 @@
                     chosenPriority = releaseChoice.priority;
                     chosenCode = releaseChoice.code;
                     chosenSeintec = releaseChoice.seintec ? 1 : 0;
+                    chosenBackup = releaseChoice.backup_ids;
                 } else if (kind === 'pause' || kind === 'resume' || kind === 'transfer' || kind === 'takeover') {
                     var approvalCodeLabel = kind === 'pause' ? 'Chamado Externo' : 'Código CRM';
                     chosenCode = await promptDialog({
@@ -4441,7 +4505,8 @@
                 var approvalPosition = isCallReleaseApproval
                     ? approvalCardsInBoard().findIndex(function (item) { return Number(item.id) === Number(cardId); })
                     : -1;
-                data = await api('approve_card', { id: cardId, priority: chosenPriority, code: chosenCode, seintec: chosenSeintec });
+                data = await api('approve_card', { id: cardId, priority: chosenPriority, code: chosenCode, seintec: chosenSeintec,
+                    backup_ids: chosenBackup ? JSON.stringify(chosenBackup) : undefined });
                 applyState(data);
                 scheduleDepartingCard(departingCard, 'approved');
                 if (isDeletionApproval) {
@@ -4568,6 +4633,8 @@
             + serviceDoneCheck('data-edit-field', machine, '')
             + '<label class="tralla-check"><input type="checkbox" data-edit-field="needs_inventory" value="1"'
             + (Number(machine.needs_inventory) ? ' checked' : '') + '> Necessita inventariar</label>'
+            + (isMaintenance ? '<label class="tralla-check tralla-check-backup"><input type="checkbox" data-edit-field="needs_backup" value="1"'
+                + (Number(machine.needs_backup) ? ' checked' : '') + '> Precisa de backup</label>' : '')
             + '</div></div>';
     }
 
@@ -4664,13 +4731,16 @@
             var report = row.querySelector('[data-edit-field="report"]');
             var service = row.querySelector('[data-edit-field="service_done"]');
             var inventory = row.querySelector('[data-edit-field="needs_inventory"]');
-            machines.push({
+            var backupField = row.querySelector('[data-edit-field="needs_backup"]');
+            var entry = {
                 id: id,
                 status: status ? status.value : '',
                 report: report ? report.value : '',
                 service_done: service && service.checked ? 1 : 0,
                 needs_inventory: inventory && inventory.checked ? 1 : 0
-            });
+            };
+            if (backupField) { entry.needs_backup = backupField.checked ? 1 : 0; }
+            machines.push(entry);
         });
 
         var newMachines = [];
@@ -6417,6 +6487,46 @@
         var saveDescriptionButton = event.target.closest('[data-save-description]');
         if (saveDescriptionButton) {
             saveDescription(saveDescriptionButton);
+            return;
+        }
+        var backupToggle = event.target.closest('[data-machine-backup]');
+        if (backupToggle && activeCard) {
+            setBusy(backupToggle, true);
+            api('machine_backup', {
+                id: activeCard.id, machine_id: backupToggle.getAttribute('data-machine-backup'),
+                on: backupToggle.getAttribute('aria-pressed') === 'true' ? 0 : 1
+            }).then(function (data) {
+                applyState(data);
+                return openCard(activeCard.id);
+            }).catch(function (error) {
+                toast(error.message, 'error');
+                setBusy(backupToggle, false);
+            });
+            return;
+        }
+        var backupStep = event.target.closest('[data-backup-step]');
+        if (backupStep && activeCard) {
+            var stepName = backupStep.getAttribute('data-backup-step');
+            confirmDialog({
+                title: stepName === 'done' ? 'Backup realizado' : 'Backup extraído',
+                message: stepName === 'done'
+                    ? 'Confirmar que o backup desta máquina foi devolvido/realizado? Fica registrado com seu nome e a hora.'
+                    : 'Confirmar que o backup desta máquina foi extraído? Fica registrado com seu nome e a hora.',
+                confirmLabel: 'Confirmar',
+                icon: stepName === 'done' ? 'ti-database-import' : 'ti-database-export'
+            }).then(function (ok) {
+                if (!ok) { return null; }
+                setBusy(backupStep, true);
+                return api('machine_backup_step', {
+                    id: activeCard.id, machine_id: backupStep.getAttribute('data-machine'), step: stepName
+                }).then(function (data) {
+                    applyState(data);
+                    return openCard(activeCard.id);
+                });
+            }).catch(function (error) {
+                toast(error.message, 'error');
+                setBusy(backupStep, false);
+            });
             return;
         }
         if (event.target.closest('[data-open-comments]')) {

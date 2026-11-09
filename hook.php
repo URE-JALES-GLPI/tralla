@@ -399,6 +399,11 @@ function plugin_tralla_install(): bool
                 `status`                        VARCHAR(30)  NOT NULL DEFAULT '' COMMENT 'pending,in_progress,done,not_repairable',
                 `service_done`                  TINYINT(1)   NOT NULL DEFAULT '0',
                 `needs_inventory`               TINYINT(1)   NOT NULL DEFAULT '0',
+                `needs_backup`                  TINYINT(1)   NOT NULL DEFAULT '0',
+                `backup_extracted_at`           DATETIME     DEFAULT NULL,
+                `backup_extracted_by`           INT {$sign} NOT NULL DEFAULT '0',
+                `backup_done_at`                DATETIME     DEFAULT NULL,
+                `backup_done_by`                INT {$sign} NOT NULL DEFAULT '0',
                 `inventory_items_id`            INT {$sign} NOT NULL DEFAULT '0',
                 `rank`                          DOUBLE       NOT NULL DEFAULT '0',
                 `report_saved_at`               DATETIME     DEFAULT NULL,
@@ -648,6 +653,24 @@ function plugin_tralla_install(): bool
     if ($DB->tableExists('glpi_plugin_tralla_machines')) {
         $DB->update('glpi_plugin_tralla_machines', ['status' => 'in_progress'], ['status' => '']);
         $DB->update('glpi_plugin_tralla_machines', ['service_done' => 0], ['status' => 'in_progress', 'service_done' => 1]);
+    }
+
+    // 1.7.16: máquina marcada como "precisa de backup" na liberação.
+    if ($DB->tableExists('glpi_plugin_tralla_machines')
+        && !$DB->fieldExists('glpi_plugin_tralla_machines', 'needs_backup')) {
+        $DB->doQuery("ALTER TABLE `glpi_plugin_tralla_machines` ADD COLUMN `needs_backup` TINYINT(1) NOT NULL DEFAULT '0' AFTER `needs_inventory`") or die($DB->error());
+    }
+    if ($DB->tableExists('glpi_plugin_tralla_machines')) {
+        foreach ([
+            'backup_extracted_at' => 'DATETIME DEFAULT NULL',
+            'backup_extracted_by' => "INT {$sign} NOT NULL DEFAULT '0'",
+            'backup_done_at'      => 'DATETIME DEFAULT NULL',
+            'backup_done_by'      => "INT {$sign} NOT NULL DEFAULT '0'",
+        ] as $field => $definition) {
+            if (!$DB->fieldExists('glpi_plugin_tralla_machines', $field)) {
+                $DB->doQuery("ALTER TABLE `glpi_plugin_tralla_machines` ADD COLUMN `{$field}` {$definition}") or die($DB->error());
+            }
+        }
     }
 
     // 1.7.11: número fixo da máquina (Tablet Positivo #5 continua #5 depois de separar o card).

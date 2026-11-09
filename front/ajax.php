@@ -690,8 +690,26 @@ try {
         case 'approve_card':
             tralla_ajax_require(READ);
             $cardId = tralla_post_int('id');
+            $backupRaw = tralla_post_string('backup_ids');
+            $backupIds = null;
+            if ($backupRaw !== '') {
+                $decoded = json_decode($backupRaw, true);
+                $backupIds = is_array($decoded) ? array_values(array_filter(array_map('intval', $decoded))) : null;
+            }
             $detail = PluginTrallaCard::decide($cardId, true, '', $userId, $isAdmin, tralla_post_string('priority'), tralla_post_string('code'),
-                tralla_post_int('seintec') === 1);
+                tralla_post_int('seintec') === 1, $backupIds);
+            tralla_json(['ok' => true, 'data' => ['card' => $detail, 'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id'])]]);
+
+        case 'machine_backup':
+            tralla_ajax_require(UPDATE);
+            $detail = PluginTrallaCard::setMachineBackup(tralla_post_int('id'), tralla_post_int('machine_id'),
+                tralla_post_int('on') === 1, $userId);
+            tralla_json(['ok' => true, 'data' => ['card' => $detail, 'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id'])]]);
+
+        case 'machine_backup_step':
+            tralla_ajax_require(UPDATE);
+            $detail = PluginTrallaCard::setMachineBackupStep(tralla_post_int('id'), tralla_post_int('machine_id'),
+                tralla_post_string('step'), $userId);
             tralla_json(['ok' => true, 'data' => ['card' => $detail, 'state' => tralla_ajax_state((int) $detail['plugin_tralla_boards_id'])]]);
 
         case 'whatsapp_watch_ack':
