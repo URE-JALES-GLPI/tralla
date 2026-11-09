@@ -428,6 +428,75 @@ class PluginTrallaBoard extends CommonDBTM
         return $pausedList;
     }
 
+    /** E-mails dos técnicos exibidos no painel de contagem (na ordem). */
+    public const DASHBOARD_EMAILS = [
+        'marco.masson@apoiofde.sp.gov.br',
+        'aryan.ferrari@apoiofde.sp.gov.br',
+        'gabriel.nsiqueira@apoiofde.sp.gov.br',
+    ];
+
+    /** Painel de técnicos (Pendente / Em andamento / Retirada / Concluído) nos quadros de manutenção visíveis. */
+    public static function getTechnicianDashboard(): array
+    {
+        $maintenanceBoardIds = [];
+        foreach (self::getVisibleBoards(true) as $visibleBoard) {
+            if ((string) $visibleBoard['type'] === 'maintenance') {
+                $maintenanceBoardIds[] = (int) $visibleBoard['id'];
+            }
+        }
+
+        return self::getUserMaintenanceSummary(self::DASHBOARD_EMAILS, $maintenanceBoardIds);
+    }
+
+    /**
+     * HTML do painel de técnicos. Sem $ajaxUrl o perfil usa a configuração do quadro aberto.
+     */
+    public static function renderUserDashboard(array $dashboard, string $ajaxUrl = '', string $csrf = ''): string
+    {
+        if ($dashboard === []) {
+            return '';
+        }
+        ob_start();
+        ?>
+    <section class="tralla-user-dash" aria-label="Manutenções por usuário"<?php if ($ajaxUrl !== ''): ?>
+             data-user-profile-ajax="<?= tralla_h($ajaxUrl) ?>"
+             data-user-profile-csrf="<?= tralla_h($csrf) ?>"<?php endif; ?>>
+        <?php foreach ($dashboard as $person): ?>
+            <article class="tralla-user-dash-card">
+                <header>
+                    <?php $personPicture = (int) $person['users_id'] > 0 ? tralla_user_picture_url((int) $person['users_id']) : ''; ?>
+                    <button type="button" class="tralla-user-dash-person" data-user-profile="<?= (int) $person['users_id'] ?>"
+                            aria-label="Ver informações de <?= tralla_h($person['name']) ?>" <?= (int) $person['users_id'] === 0 ? 'disabled' : '' ?>>
+                        <?php if ($personPicture !== ''): ?>
+                            <img class="tralla-user-dash-avatar" src="<?= tralla_h($personPicture) ?>" alt="" loading="lazy">
+                        <?php else: ?>
+                            <i class="ti ti-user-circle" aria-hidden="true"></i>
+                        <?php endif; ?>
+                        <span><strong><?= tralla_h($person['name']) ?></strong><small><?= tralla_h($person['email']) ?></small></span>
+                    </button>
+                    <?php if ((int) $person['users_id'] > 0): ?>
+                        <span class="tralla-user-dash-total" title="Pendente + Em andamento + Retirada + Concluído">
+                            Total <b><?= (int) $person['pending'] + (int) $person['in_progress'] + (int) $person['withdrawal'] + (int) $person['done'] ?></b>
+                        </span>
+                    <?php endif; ?>
+                </header>
+                <?php if ((int) $person['users_id'] === 0): ?>
+                    <p class="tralla-user-dash-missing">Usuário não encontrado no GLPI.</p>
+                <?php else: ?>
+                    <dl>
+                        <div class="is-pending"><dt><button type="button" data-user-profile="<?= (int) $person['users_id'] ?>" data-user-stage="pending">Pendente <b><?= (int) $person['pending'] ?></b></button></dt></div>
+                        <div class="is-progress"><dt><button type="button" data-user-profile="<?= (int) $person['users_id'] ?>" data-user-stage="in_progress">Em andamento <b><?= (int) $person['in_progress'] ?></b></button></dt></div>
+                        <div class="is-withdrawal"><dt><button type="button" data-user-profile="<?= (int) $person['users_id'] ?>" data-user-stage="withdrawal">Retirada <b><?= (int) $person['withdrawal'] ?></b></button></dt></div>
+                        <div class="is-done"><dt><button type="button" data-user-profile="<?= (int) $person['users_id'] ?>" data-user-stage="done">Concluído <b><?= (int) $person['done'] ?></b></button></dt></div>
+                    </dl>
+                <?php endif; ?>
+            </article>
+        <?php endforeach; ?>
+    </section>
+        <?php
+        return (string) ob_get_clean();
+    }
+
     public static function getStats(int $boards_id): array
     {
         global $DB;

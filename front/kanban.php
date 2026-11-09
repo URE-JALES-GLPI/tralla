@@ -154,6 +154,11 @@ echo "<script>document.title = 'Tralla';</script>";
             </button>
         </div>
         <div class="tralla-head-actions">
+            <?php if ($isMaintenance && $canApprove): ?>
+                <button type="button" class="tralla-btn tralla-kanban-action" data-technician-dashboard>
+                    <i class="ti ti-users-group" aria-hidden="true"></i> Técnicos
+                </button>
+            <?php endif; ?>
             <button type="button" class="tralla-btn tralla-kanban-action" data-board-history>
                 <i class="ti ti-history" aria-hidden="true"></i> Histórico
             </button>

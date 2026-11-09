@@ -3542,6 +3542,62 @@
         }
     }
 
+    /* Painel dos técnicos dentro do quadro (só aprovadores). */
+    async function openTechnicianDashboard(button) {
+        if (document.querySelector('.tralla-tech-layer')) { return; }
+        setBusy(button, true);
+        var html = '';
+        try {
+            var formData = new FormData();
+            formData.set('action', 'technician_dashboard');
+            formData.set('boards_id', String(state.board ? state.board.id : 0));
+            formData.set('_glpi_csrf_token', state.csrf || '');
+            var response = await fetch(state.urls.ajax, {
+                method: 'POST', body: formData, credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            var result = await response.json();
+            if (!response.ok || !result.ok) {
+                throw new Error(result.error || result.message || 'Não foi possível abrir o painel.');
+            }
+            html = String(result.html || '');
+        } catch (error) {
+            toast(error.message, 'error');
+            return;
+        } finally {
+            setBusy(button, false);
+        }
+        var layer = document.createElement('div');
+        layer.className = 'tralla-dialog-layer tralla-tech-layer';
+        layer.innerHTML = '<div class="tralla-dialog-backdrop" data-tech-backdrop></div>'
+            + '<div class="tralla-modal tralla-tech-modal" role="dialog" aria-modal="true" aria-labelledby="tralla-tech-title">'
+            + '<header class="tralla-chat-head"><div><h2 id="tralla-tech-title"><i class="ti ti-users-group"></i> Técnicos</h2>'
+            + '<p>Cards de manutenção por técnico, em todos os quadros de manutenção</p></div>'
+            + '<button type="button" class="tralla-chat-close" data-tech-close aria-label="Fechar"><i class="ti ti-x"></i></button></header>'
+            + '<div class="tralla-tech-body">' + (html || '<p class="tralla-empty-mini">Nenhum técnico configurado.</p>') + '</div></div>';
+        document.body.appendChild(layer);
+        document.body.classList.add('tralla-dialog-open');
+        function close() {
+            document.removeEventListener('keydown', onKeydown, true);
+            layer.remove();
+            if (!document.querySelector('.tralla-dialog-layer')) {
+                document.body.classList.remove('tralla-dialog-open');
+            }
+            button.focus();
+        }
+        function onKeydown(event) {
+            if (event.key === 'Escape' && !document.querySelector('.tralla-user-profile-layer')) {
+                event.preventDefault();
+                event.stopPropagation();
+                close();
+            }
+        }
+        bindBackdropDismiss(layer.querySelector('[data-tech-backdrop]'), close);
+        layer.querySelector('[data-tech-close]').addEventListener('click', close);
+        document.addEventListener('keydown', onKeydown, true);
+        layer.querySelector('[data-tech-close]').focus();
+    }
+
     async function openCard(id, splitView) {
         var requestId = ++openCardRequest;
         try {
@@ -6016,6 +6072,11 @@
     /* ------------------------------------------------------------ events */
 
     root.addEventListener('click', function (event) {
+        var technicianButton = event.target.closest('[data-technician-dashboard]');
+        if (technicianButton) {
+            openTechnicianDashboard(technicianButton);
+            return;
+        }
         var historyButton = event.target.closest('[data-board-history]');
         if (historyButton) {
             event.preventDefault();
@@ -6756,3 +6817,4 @@
         openCard(linkedCardId);
     }
 })();
+

@@ -24,19 +24,7 @@ $boardGroups = array_merge(
     $organization['groups']
 );
 
-// Usuários exibidos no painel do topo (cards de manutenção por situação).
-$dashboardEmails = [
-    'marco.masson@apoiofde.sp.gov.br',
-    'aryan.ferrari@apoiofde.sp.gov.br',
-    'gabriel.nsiqueira@apoiofde.sp.gov.br',
-];
-$maintenanceBoardIds = [];
-foreach (PluginTrallaBoard::getVisibleBoards(true) as $visibleBoard) {
-    if ((string) $visibleBoard['type'] === 'maintenance') {
-        $maintenanceBoardIds[] = (int) $visibleBoard['id'];
-    }
-}
-$dashboard = PluginTrallaBoard::getUserMaintenanceSummary($dashboardEmails, $maintenanceBoardIds);
+$dashboard = PluginTrallaBoard::getTechnicianDashboard();
 
 Html::header('Tralla', $_SERVER['PHP_SELF'], 'tools', 'PluginTrallaBoard');
 echo "<script>document.title = 'Tralla';</script>";
@@ -45,43 +33,7 @@ $root = (string) $CFG_GLPI['root_doc'];
 $pluginUrl = $root . '/plugins/tralla';
 ?>
 <div class="tralla-page tralla-boards-page">
-    <?php if ($dashboard !== []): ?>
-    <section class="tralla-user-dash" aria-label="Manutenções por usuário"
-             data-user-profile-ajax="<?= tralla_h($pluginUrl) ?>/front/ajax.php"
-             data-user-profile-csrf="<?= tralla_h(tralla_csrf_token()) ?>">
-        <?php foreach ($dashboard as $person): ?>
-            <article class="tralla-user-dash-card">
-                <header>
-                    <?php $personPicture = (int) $person['users_id'] > 0 ? tralla_user_picture_url((int) $person['users_id']) : ''; ?>
-                    <button type="button" class="tralla-user-dash-person" data-user-profile="<?= (int) $person['users_id'] ?>"
-                            aria-label="Ver informações de <?= tralla_h($person['name']) ?>" <?= (int) $person['users_id'] === 0 ? 'disabled' : '' ?>>
-                        <?php if ($personPicture !== ''): ?>
-                            <img class="tralla-user-dash-avatar" src="<?= tralla_h($personPicture) ?>" alt="" loading="lazy">
-                        <?php else: ?>
-                            <i class="ti ti-user-circle" aria-hidden="true"></i>
-                        <?php endif; ?>
-                        <span><strong><?= tralla_h($person['name']) ?></strong><small><?= tralla_h($person['email']) ?></small></span>
-                    </button>
-                    <?php if ((int) $person['users_id'] > 0): ?>
-                        <span class="tralla-user-dash-total" title="Pendente + Em andamento + Retirada + Concluído">
-                            Total <b><?= (int) $person['pending'] + (int) $person['in_progress'] + (int) $person['withdrawal'] + (int) $person['done'] ?></b>
-                        </span>
-                    <?php endif; ?>
-                </header>
-                <?php if ((int) $person['users_id'] === 0): ?>
-                    <p class="tralla-user-dash-missing">Usuário não encontrado no GLPI.</p>
-                <?php else: ?>
-                    <dl>
-                        <div class="is-pending"><dt><button type="button" data-user-profile="<?= (int) $person['users_id'] ?>" data-user-stage="pending">Pendente <b><?= (int) $person['pending'] ?></b></button></dt></div>
-                        <div class="is-progress"><dt><button type="button" data-user-profile="<?= (int) $person['users_id'] ?>" data-user-stage="in_progress">Em andamento <b><?= (int) $person['in_progress'] ?></b></button></dt></div>
-                        <div class="is-withdrawal"><dt><button type="button" data-user-profile="<?= (int) $person['users_id'] ?>" data-user-stage="withdrawal">Retirada <b><?= (int) $person['withdrawal'] ?></b></button></dt></div>
-                        <div class="is-done"><dt><button type="button" data-user-profile="<?= (int) $person['users_id'] ?>" data-user-stage="done">Concluído <b><?= (int) $person['done'] ?></b></button></dt></div>
-                    </dl>
-                <?php endif; ?>
-            </article>
-        <?php endforeach; ?>
-    </section>
-    <?php endif; ?>
+    <?= PluginTrallaBoard::renderUserDashboard($dashboard, $pluginUrl . '/front/ajax.php', tralla_csrf_token()) ?>
 
     <header class="tralla-page-head">
         <div class="tralla-brand">

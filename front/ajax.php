@@ -110,6 +110,16 @@ try {
                 'stats' => PluginTrallaBoard::getUserMaintenanceStats($profileUserId, $maintenanceBoardIds),
             ]]);
 
+        case 'technician_dashboard':
+            $dashboardBoard = tralla_post_int('boards_id');
+            if (!PluginTrallaBoard::canViewBoard($dashboardBoard)
+                || !PluginTrallaCard::userIsApprover($userId, $dashboardBoard)) {
+                throw new RuntimeException('Só aprovadores veem o painel dos técnicos.');
+            }
+            tralla_json(['ok' => true, 'html' => PluginTrallaBoard::renderUserDashboard(
+                PluginTrallaBoard::getTechnicianDashboard()
+            )]);
+
         case 'board_group_create':
         case 'board_group_rename':
         case 'board_group_delete':
