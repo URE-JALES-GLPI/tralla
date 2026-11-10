@@ -4498,7 +4498,7 @@
                 applyState(data);
                 toast(departingCard.workflow_type === 'call'
                     ? (data.approval ? 'Chamado finalizado e enviado para aprovação.' : 'Chamado finalizado e concluído.')
-                    : (data.family_ready ? 'Manutenção finalizada e enviada para Retirada.' : 'Manutenção finalizada; aguardando os demais cards da família.')
+                    : (data.family_ready ? (data.card && data.card.status === 'done' ? 'Manutenção finalizada e concluída (URE, sem retirada).' : 'Manutenção finalizada e enviada para Retirada.') : 'Manutenção finalizada; aguardando os demais cards da família.')
                         + (data.pending_card ? ' Máquinas pendentes no card ' + displayCardCode(data.pending_card.code, data.pending_card.id) + '.' : ''), 'success');
                 await openCard(data.approval ? data.approval.id : data.card.id);
             } else if (action === 'approve') {
@@ -4535,7 +4535,7 @@
                 } else {
                     toast(departingCard.workflow_type === 'call'
                         ? 'Chamado aprovado e concluído.' : data.card.family_ready
-                        ? 'Manutenção aprovada. Família reunida para retirada.'
+                        ? (data.card.status === 'done' ? 'Manutenção aprovada e concluída (URE, sem retirada).' : 'Manutenção aprovada. Família reunida para retirada.')
                         : 'Manutenção aprovada. Aguardando os demais cards da família.', 'success');
                     await openCard(data.card.id);
                 }

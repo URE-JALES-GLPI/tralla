@@ -2996,7 +2996,7 @@ class PluginTrallaCard extends CommonDBTM
             } else {
                 $familyReady = self::syncFamilyWithdrawal($boards_id, $familyRoot, $userId);
                 PluginTrallaHistory::log($id, $userId, 'card_finalized', $familyReady
-                    ? 'Manutenção finalizada; card liberado para retirada.'
+                    ? (self::skipsWithdrawal($card) ? 'Manutenção finalizada e concluída (URE, sem retirada).' : 'Manutenção finalizada; card liberado para retirada.')
                     : 'Manutenção finalizada; aguardando os demais cards da família.');
             }
 
@@ -3127,7 +3127,7 @@ class PluginTrallaCard extends CommonDBTM
                     $userId,
                     'approval_approved',
                     $isCall ? 'Chamado aprovado e concluído.' : ($familyReady
-                        ? 'Manutenção aprovada; família liberada para retirada.'
+                        ? (self::skipsWithdrawal($parent) ? 'Manutenção aprovada e concluída (URE, sem retirada).' : 'Manutenção aprovada; família liberada para retirada.')
                         : 'Manutenção aprovada; aguardando os demais cards da família.')
                 );
                 PluginTrallaHistory::log($approvalId, $userId, 'approval_approved', 'Aprovação concluída.');
@@ -5061,6 +5061,27 @@ class PluginTrallaCard extends CommonDBTM
         return $merged;
     }
 
+    /** Entidade da própria URE: manutenção não passa por Retirada. */
+    public const NO_WITHDRAWAL_ENTITY = 'unidade regional de ensino de jales';
+
+    public static function skipsWithdrawal(array $card): bool
+    {
+        global $DB;
+
+        $entityId = (int) ($card['entities_id'] ?? 0);
+        if ($entityId <= 0 || (string) ($card['workflow_type'] ?? 'maintenance') === 'call') {
+            return false;
+        }
+        $row = $DB->request(['SELECT' => ['name'], 'FROM' => 'glpi_entities', 'WHERE' => ['id' => $entityId], 'LIMIT' => 1])->current();
+        if (!is_array($row)) {
+            return false;
+        }
+        $name = mb_strtolower(trim((string) $row['name']));
+        $name = strtr($name, ['á' => 'a', 'à' => 'a', 'â' => 'a', 'ã' => 'a', 'é' => 'e', 'ê' => 'e', 'í' => 'i', 'ó' => 'o', 'ô' => 'o', 'õ' => 'o', 'ú' => 'u', 'ç' => 'c']);
+
+        return preg_replace('/\s+/', ' ', $name) === self::NO_WITHDRAWAL_ENTITY;
+    }
+
     private static function syncFamilyWithdrawal(int $boards_id, int $root, int $userId): bool
     {
         global $DB;
@@ -5106,7 +5127,9 @@ class PluginTrallaCard extends CommonDBTM
             return false;
         }
 
-        $list = PluginTrallaBoard::findListByCategory($boards_id, 'maintenance_withdrawal');
+        // Manutenção da própria URE não tem retirada: vai direto para Concluído.
+        $skipWithdrawal = self::skipsWithdrawal($rootCard);
+        $list = PluginTrallaBoard::findListByCategory($boards_id, $skipWithdrawal ? 'maintenance_done' : 'maintenance_withdrawal');
         if ($list === null) {
             return false;
         }
@@ -5159,7 +5182,13 @@ class PluginTrallaCard extends CommonDBTM
         }
         PluginTrallaMachine::refreshCardTotal($root);
         if ((string) $rootCard['status'] === 'approved') {
-            $DB->update('glpi_plugin_tralla_cards', [
+            $DB->update('glpi_plugin_tralla_cards', $skipWithdrawal ? [
+                'plugin_tralla_lists_id' => (int) $list['id'],
+                'status' => 'done',
+                'date_withdrawn' => $now,
+                'date_mod' => $now,
+                'rank' => self::nextRankForList((int) $list['id']),
+            ] : [
                 'plugin_tralla_lists_id' => (int) $list['id'],
                 'status' => 'withdrawal',
                 'withdrawal_notice_marked' => 0,
@@ -5168,10 +5197,16 @@ class PluginTrallaCard extends CommonDBTM
                 'rank' => self::nextRankForList((int) $list['id']),
             ], ['id' => $root]);
         }
-        PluginTrallaHistory::log($root, $userId, 'family_withdrawal_ready',
-            count($members) > 1
-                ? 'Todos os cards finalizados; máquinas reunidas e prontas para retirada. ' . implode('; ', $summary) . '.'
-                : 'Manutenção concluída; aguardando retirada.');
+        if ($skipWithdrawal) {
+            PluginTrallaHistory::log($root, $userId, 'family_done_no_withdrawal',
+                (count($members) > 1 ? 'Todos os cards finalizados; máquinas reunidas. ' . implode('; ', $summary) . '. ' : '')
+                . 'Manutenção da URE concluída direto, sem etapa de retirada.');
+        } else {
+            PluginTrallaHistory::log($root, $userId, 'family_withdrawal_ready',
+                count($members) > 1
+                    ? 'Todos os cards finalizados; máquinas reunidas e prontas para retirada. ' . implode('; ', $summary) . '.'
+                    : 'Manutenção concluída; aguardando retirada.');
+        }
 
         return true;
     }
