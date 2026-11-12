@@ -83,7 +83,12 @@ $pluginUrl = $root . '/plugins/tralla';
           <p class="tralla-board-organizer-hint">Arraste os quadros entre os grupos. Esta organização é pessoal.</p>
           <div class="tralla-board-groups">
             <?php foreach ($boardGroups as $groupIndex => $group): ?>
-              <section class="tralla-board-group" data-group-id="<?= tralla_h($group['id']) ?>">
+              <?php
+                // "Sem grupo" só aparece quando tem quadro (ou durante um arrastar, para poder soltar nele).
+                $emptyUngrouped = $group['id'] === ''
+                    && count(array_filter($group['board_ids'], static fn ($id) => isset($boardsById[$id]))) === 0;
+              ?>
+              <section class="tralla-board-group<?= $emptyUngrouped ? ' is-empty-ungrouped' : '' ?>" data-group-id="<?= tralla_h($group['id']) ?>">
                 <header class="tralla-board-group-head">
                     <div><h2><?= tralla_h($group['name']) ?></h2><span><?= count($group['board_ids']) ?> quadro(s)</span></div>
                     <?php if ($group['id'] !== ''): ?>

@@ -222,6 +222,8 @@
             event.dataTransfer.setData('text/plain', tile.dataset.boardId);
             event.dataTransfer.setDragImage(tile, 24, 24);
             requestAnimationFrame(function () { tile.classList.add('is-dragging'); });
+            var ungrouped = organizer.querySelector('.is-empty-ungrouped');
+            if (ungrouped) { ungrouped.classList.add('is-peek'); }
         });
 
         organizer.addEventListener('dragover', function (event) {
@@ -267,6 +269,9 @@
             organizer.querySelectorAll('.is-drop-target').forEach(function (group) { group.classList.remove('is-drop-target'); });
             if (draggedBoard) { draggedBoard.classList.remove('is-dragging'); }
             draggedBoard = null;
+            organizer.querySelectorAll('.is-empty-ungrouped.is-peek').forEach(function (group) {
+                if (!group.querySelector('[data-board-id]')) { group.classList.remove('is-peek'); }
+            });
         });
     }
     var themeSelect = document.querySelector('[data-tralla-theme-select]');
