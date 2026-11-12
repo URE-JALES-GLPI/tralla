@@ -41,6 +41,8 @@ class PluginTrallaConfig
             'preventiva_last_sync' => '0',
             'preventiva_last_error' => '',
             'preventiva_exclude' => '9, 25',
+            'preventiva_last_import' => '0',
+            'preventiva_last_import_attempt' => '0',
         ];
     }
 

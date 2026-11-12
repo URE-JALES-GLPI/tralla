@@ -778,7 +778,7 @@ class PluginTrallaCard extends CommonDBTM
                     && (!$isCall || tralla_finalization_partition($card['machines'] ?? [])['pending'] === [])));
 
         $canEditCard = $isMember
-            && $boardType === 'normal'
+            && in_array($boardType, ['normal', 'preventiva'], true)
             && $canUpdate;
         $canEditDescription = $isAdmin
             && $boardType === 'maintenance'
@@ -928,7 +928,7 @@ class PluginTrallaCard extends CommonDBTM
                 && $stage === 1 && $status === 'withdrawal'
                 && empty($card['is_archived']) && empty($card['is_deleted']),
             'request_deletion' => $canRequestDeletion,
-            'move'             => $isMember && $boardType === 'normal' && $canUpdate,
+            'move'             => $isMember && in_array($boardType, ['normal', 'preventiva'], true) && $canUpdate,
         ];
 
         if ($isDraft) {
@@ -2478,7 +2478,7 @@ class PluginTrallaCard extends CommonDBTM
         self::assertBoardAccess($card);
         $boards_id = (int) $card['plugin_tralla_boards_id'];
         $boardType = self::getBoardType($boards_id);
-        if ($boardType !== 'normal') {
+        if (!in_array($boardType, ['normal', 'preventiva'], true)) {
             throw new RuntimeException('Quadro de manutenção usa o fluxo controlado; arrastar está bloqueado.');
         }
         if (!Session::haveRight(self::$rightname, UPDATE)) {
@@ -4689,7 +4689,7 @@ class PluginTrallaCard extends CommonDBTM
                 throw new RuntimeException('Sem permissão para excluir este card.');
             }
 
-            if ($freshBoardType !== 'normal') {
+            if (!in_array($freshBoardType, ['normal', 'preventiva'], true)) {
                 $approvalList = PluginTrallaBoard::findListByCategory(
                     (int) $fresh['plugin_tralla_boards_id'],
                     'maintenance_approval'

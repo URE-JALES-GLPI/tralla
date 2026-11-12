@@ -110,8 +110,8 @@ $pluginUrl = $root . '/plugins/tralla';
                     <a class="tralla-board-tile tr-bg-<?= tralla_h($background) ?>"
                        href="<?= tralla_h($pluginUrl) ?>/front/kanban.php?boards_id=<?= $boardId ?>">
                         <span class="tralla-board-type <?= $isMaintenance ? 'is-maintenance' : '' ?>">
-                            <i class="ti <?= $isMaintenance ? 'ti-tool' : ($type === 'updates' ? 'ti-refresh' : 'ti-layout-kanban') ?>"></i>
-                            <?= $isMaintenance ? 'Manutenção' : ($type === 'updates' ? 'Atualizações' : 'Normal') ?>
+                            <i class="ti <?= $isMaintenance ? 'ti-tool' : ($type === 'updates' ? 'ti-refresh' : ($type === 'preventiva' ? 'ti-clipboard-check' : 'ti-layout-kanban')) ?>"></i>
+                            <?= $isMaintenance ? 'Manutenção' : ($type === 'updates' ? 'Atualizações' : ($type === 'preventiva' ? 'Preventiva' : 'Normal')) ?>
                         </span>
                         <h2><?= tralla_h($board['name']) ?></h2>
                         <?php if (trim((string) $board['comment']) !== ''): ?>
@@ -170,6 +170,11 @@ $typeMeta = [
         'title'       => 'Atualizações',
         'description' => 'Tarefas com descrição ou checklist, responsáveis e arquivos.',
         'icon'        => 'ti-refresh',
+    ],
+    'preventiva' => [
+        'title'       => 'Preventiva',
+        'description' => 'Cada resposta do formulário das escolas vira um card automaticamente.',
+        'icon'        => 'ti-clipboard-check',
     ],
 ];
 $backgrounds = tralla_backgrounds();

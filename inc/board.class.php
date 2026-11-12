@@ -75,6 +75,7 @@ class PluginTrallaBoard extends CommonDBTM
             'normal'      => 'Normal (listas e cards livres)',
             'maintenance' => 'Manutenção (fluxo controlado)',
             'updates'     => 'Atualizações (tarefas e checklist)',
+            'preventiva'  => 'Preventiva (respostas do formulário das escolas)',
         ];
     }
 
@@ -88,6 +89,17 @@ class PluginTrallaBoard extends CommonDBTM
                 ['name' => 'Manutenção Retirada', 'category' => 'maintenance_withdrawal', 'color' => tralla_category_color('maintenance_withdrawal')],
                 ['name' => 'Manutenção Concluído', 'category' => 'maintenance_done', 'color' => tralla_category_color('maintenance_done')],
                 ['name' => 'Manutenção Pausados', 'category' => 'maintenance_paused', 'color' => tralla_category_color('maintenance_paused')],
+            ];
+        }
+
+        if ($type === 'preventiva') {
+            // A 1ª lista recebe as respostas com problemas; "Sem problemas relatados" recebe as demais.
+            return [
+                ['name' => 'Respostas recebidas', 'category' => '', 'color' => '#6e5dc6'],
+                ['name' => 'Em análise', 'category' => '', 'color' => '#0079bf'],
+                ['name' => 'Visita agendada', 'category' => '', 'color' => '#f2a000'],
+                ['name' => 'Concluído', 'category' => '', 'color' => '#61bd4f'],
+                ['name' => 'Sem problemas relatados', 'category' => '', 'color' => '#97a0af'],
             ];
         }
 

@@ -114,6 +114,7 @@ class PluginTrallaCron extends CommonDBTM
         $count += PluginTrallaSheetSync::syncIfDue();
         require_once __DIR__ . '/preventiva.class.php';
         $count += PluginTrallaPreventiva::syncIfDue();
+        $count += PluginTrallaPreventiva::importIfDue();
 
         if (method_exists($task, 'addVolume')) {
             $task->addVolume($count);

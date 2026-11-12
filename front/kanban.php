@@ -42,7 +42,8 @@ $bootstrap = [
         'id'             => (int) $boards_id,
         'name'           => (string) $board->fields['name'],
         'type'           => (string) $board->fields['type'],
-        'type_label'     => $isMaintenance ? 'Manutenção' : ($isUpdates ? 'Atualizações' : 'Normal'),
+        'type_label'     => $isMaintenance ? 'Manutenção' : ($isUpdates ? 'Atualizações'
+            : (($board->fields['type'] ?? '') === 'preventiva' ? 'Preventiva' : 'Normal')),
         'background'     => (string) $board->fields['background'],
         'color'          => (string) $board->fields['color'],
         'comment'        => (string) $board->fields['comment'],

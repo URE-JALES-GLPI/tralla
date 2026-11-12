@@ -124,6 +124,138 @@ class PluginTrallaPreventiva
         }
     }
 
+    /** Quadro que recebe as respostas: o primeiro quadro Preventiva não arquivado. */
+    public static function targetBoard(): ?array
+    {
+        global $DB;
+        $row = $DB->request([
+            'FROM'  => 'glpi_plugin_tralla_boards',
+            'WHERE' => ['type' => 'preventiva', 'is_archived' => 0],
+            'ORDER' => 'id ASC',
+            'LIMIT' => 1,
+        ])->current();
+        return is_array($row) ? $row : null;
+    }
+
+    /** Busca as respostas novas no formulário e cria um card para cada uma. */
+    public static function importResponses(): int
+    {
+        global $DB;
+
+        if (!self::isConfigured()) {
+            throw new RuntimeException('Informe a URL e o segredo do formulário de Preventiva.');
+        }
+        $board = self::targetBoard();
+        if ($board === null) {
+            throw new RuntimeException('Crie um quadro do tipo Preventiva para receber as respostas.');
+        }
+        $boardId = (int) $board['id'];
+        $lists = PluginTrallaList::getListsForBoard($boardId);
+        if ($lists === []) {
+            throw new RuntimeException('O quadro Preventiva não tem listas.');
+        }
+        $inbox = $lists[0];
+        $noIssue = $inbox;
+        foreach ($lists as $list) {
+            if (mb_strtolower(trim((string) $list['name'])) === 'sem problemas relatados') {
+                $noIssue = $list;
+            }
+        }
+
+        $result = self::call('respostas', ['limit' => 50]);
+        $created = 0;
+        $ack = [];
+        foreach ((array) ($result['respostas'] ?? []) as $answer) {
+            $responseId = preg_replace('/[^a-f0-9-]/i', '', (string) ($answer['id'] ?? ''));
+            if ($responseId === '') {
+                continue;
+            }
+            $marker = 'Resposta do formulário ' . $responseId;
+            // Já importada (a confirmação anterior pode ter falhado): só confirma de novo.
+            if (countElementsInTable('glpi_plugin_tralla_history', [
+                'action' => 'preventiva_import', 'details' => ['LIKE', '%' . $responseId . '%'],
+            ]) > 0) {
+                $ack[] = $responseId;
+                continue;
+            }
+
+            $entityId = (int) ($answer['escola_id'] ?? 0);
+            $entity = $entityId > 0
+                ? $DB->request(['SELECT' => ['id', 'name'], 'FROM' => 'glpi_entities', 'WHERE' => ['id' => $entityId], 'LIMIT' => 1])->current()
+                : null;
+            $school = trim((string) ($answer['escola'] ?? '')) ?: (is_array($entity) ? (string) $entity['name'] : 'Escola');
+            $hasProblems = !empty($answer['tem_problemas']);
+            $received = strtotime((string) ($answer['recebido_em'] ?? '')) ?: time();
+            $improvements = trim((string) ($answer['melhorias'] ?? ''));
+
+            $description = 'Resposta do formulário de Preventiva em ' . date('d/m/Y H:i', $received) . ".\n\n"
+                . 'Problemas de T.I.: ' . ($hasProblems ? 'Sim' : 'Não') . "\n";
+            if ($hasProblems) {
+                $description .= trim((string) ($answer['descricao'] ?? '')) . "\n";
+            }
+            $description .= "\nComo a equipe SEINTEC pode atender melhor:\n"
+                . ($improvements !== '' ? $improvements : '(não respondeu)');
+
+            $list = $hasProblems ? $inbox : $noIssue;
+            $now = tralla_now();
+            $DB->beginTransaction();
+            try {
+                $DB->insert('glpi_plugin_tralla_cards', [
+                    'plugin_tralla_boards_id' => $boardId,
+                    'plugin_tralla_lists_id'  => (int) $list['id'],
+                    'entities_id'             => is_array($entity) ? (int) $entity['id'] : 0,
+                    'name'                    => tralla_normalize_label($school),
+                    'description'             => mb_substr($description, 0, 60000),
+                    'rank'                    => PluginTrallaCard::nextRankForList((int) $list['id']),
+                    'users_id'                => 0,
+                    'technician_id'           => 0,
+                    'stage'                   => 1,
+                    'parent_cards_id'         => 0,
+                    'approval_cards_id'       => 0,
+                    'status'                  => 'normal',
+                    'is_locked'               => 0,
+                    'is_archived'             => 0,
+                    'source'                  => 'manual',
+                    'machines_total'          => 0,
+                    'date_creation'           => $now,
+                    'date_mod'                => $now,
+                ]);
+                $cardId = (int) $DB->insertId();
+                PluginTrallaHistory::log($cardId, 0, 'preventiva_import', $marker . '.');
+                $DB->commit();
+            } catch (Throwable $e) {
+                $DB->rollBack();
+                throw $e;
+            }
+            $ack[] = $responseId;
+            $created++;
+        }
+        if ($ack !== []) {
+            self::call('ack', ['ids' => $ack]);
+        }
+        PluginTrallaConfig::set('preventiva_last_import', (string) time());
+        PluginTrallaConfig::set('preventiva_last_error', '');
+
+        return $created;
+    }
+
+    /** Cron: busca respostas a cada 5 minutos. */
+    public static function importIfDue(): int
+    {
+        if (!self::isConfigured() || self::targetBoard() === null
+            || PluginTrallaConfig::getInt('preventiva_last_import_attempt') > time() - 300) {
+            return 0;
+        }
+        PluginTrallaConfig::set('preventiva_last_import_attempt', (string) time());
+        try {
+            return self::importResponses();
+        } catch (Throwable $e) {
+            PluginTrallaConfig::set('preventiva_last_error', mb_substr($e->getMessage(), 0, 500));
+            error_log('[Tralla] Preventiva (respostas): ' . $e->getMessage());
+            return 0;
+        }
+    }
+
     private static function call(string $action, array $payload): array
     {
         if (!function_exists('curl_init')) {

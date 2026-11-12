@@ -107,6 +107,18 @@ if (isset($_POST['preventiva_sync_now'])) {
     Html::back();
 }
 
+if (isset($_POST['preventiva_import_now'])) {
+    require_once GLPI_ROOT . '/plugins/tralla/inc/preventiva.class.php';
+    try {
+        $created = PluginTrallaPreventiva::importResponses();
+        Session::addMessageAfterRedirect($created . ' card(s) criado(s) com as respostas do formulário de Preventiva.', true);
+    } catch (Throwable $e) {
+        PluginTrallaConfig::set('preventiva_last_error', mb_substr($e->getMessage(), 0, 500));
+        Session::addMessageAfterRedirect($e->getMessage(), false, ERROR);
+    }
+    Html::back();
+}
+
 if (isset($_POST['groq_test'])) {
     require_once GLPI_ROOT . '/plugins/tralla/inc/reportai.class.php';
     try {
@@ -545,9 +557,19 @@ echo "<script>document.title = 'Tralla';</script>";
                 <?= $prevLast > 0 ? 'Último envio: ' . tralla_h(date('d/m/Y H:i', $prevLast)) . '.' : 'Ainda não enviado.' ?>
                 <?php if ($prevError !== ''): ?><br><strong>Último erro:</strong> <?= tralla_h($prevError) ?><?php endif; ?>
             </p>
-            <button type="submit" name="preventiva_sync_now" value="1" class="tralla-btn tralla-btn-ghost">
-                <i class="ti ti-send"></i> Salvar e enviar escolas agora
-            </button>
+            <?php $prevImport = (int) ($config['preventiva_last_import'] ?? 0); ?>
+            <p class="tralla-config-hint">
+                As respostas viram cards no primeiro quadro do tipo <strong>Preventiva</strong> (busca a cada 5 minutos).
+                <?= $prevImport > 0 ? 'Última busca: ' . tralla_h(date('d/m/Y H:i', $prevImport)) . '.' : '' ?>
+            </p>
+            <div class="tralla-input-group">
+                <button type="submit" name="preventiva_sync_now" value="1" class="tralla-btn tralla-btn-ghost">
+                    <i class="ti ti-send"></i> Salvar e enviar escolas agora
+                </button>
+                <button type="submit" name="preventiva_import_now" value="1" class="tralla-btn tralla-btn-ghost">
+                    <i class="ti ti-download"></i> Buscar respostas agora
+                </button>
+            </div>
         </section>
 
         <footer class="tralla-config-actions">
