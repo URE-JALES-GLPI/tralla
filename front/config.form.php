@@ -52,7 +52,9 @@ if (isset($_POST['save'])) {
             tralla_post_string('preventiva_secret'),
             !empty($_POST['preventiva_secret_remove'])
         );
-        PluginTrallaPreventiva::saveExcluded(tralla_post_string('preventiva_exclude'));
+        if (isset($_POST['preventiva_exclude'])) {
+            PluginTrallaPreventiva::saveExcluded(tralla_post_string('preventiva_exclude'));
+        }
     } catch (Throwable $e) {
         Session::addMessageAfterRedirect($e->getMessage() . ' (Preventiva não foi salva.)', false, ERROR);
     }
@@ -93,7 +95,9 @@ if (isset($_POST['preventiva_sync_now'])) {
             tralla_post_string('preventiva_secret'),
             !empty($_POST['preventiva_secret_remove'])
         );
-        PluginTrallaPreventiva::saveExcluded(tralla_post_string('preventiva_exclude'));
+        if (isset($_POST['preventiva_exclude'])) {
+            PluginTrallaPreventiva::saveExcluded(tralla_post_string('preventiva_exclude'));
+        }
         $total = PluginTrallaPreventiva::sendSchools();
         Session::addMessageAfterRedirect($total . ' escola(s) enviada(s) para o formulário de Preventiva.', true);
     } catch (Throwable $e) {
