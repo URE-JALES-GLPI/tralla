@@ -3509,13 +3509,30 @@
         if (isUpdates) { renderUpdateModal(card); return; }
         var permissions = card.permissions || {};
         var body = '';
+        var isPreventiva = !!card.preventiva;
+
+        if (card.preventiva) {
+            var pv = card.preventiva;
+            body += '<section class="tralla-detail-section tralla-prev-answer">'
+                + '<h3><i class="ti ti-clipboard-check"></i> Resposta do formulário</h3>'
+                + '<dl class="tralla-prev-fields">'
+                + '<div><dt>Escola</dt><dd>' + esc(card.name) + '</dd></div>'
+                + '<div><dt>Respondido em</dt><dd>' + esc(formatDate(pv.answered_at)) + '</dd></div>'
+                + '<div><dt>Existem problemas de T.I.?</dt><dd><span class="tralla-prev-badge '
+                + (pv.has_problems ? 'is-yes' : 'is-no') + '">' + (pv.has_problems ? 'Sim' : 'Não') + '</span></dd></div>'
+                + (pv.has_problems ? '<div class="is-wide"><dt>Descrição dos problemas</dt><dd class="tralla-prev-text">'
+                    + (pv.problems ? esc(pv.problems) : '<span class="tralla-empty-mini">Sem descrição.</span>') + '</dd></div>' : '')
+                + '<div class="is-wide"><dt>Como a equipe SEINTEC pode atender melhor</dt><dd class="tralla-prev-text">'
+                + (pv.improvements ? esc(pv.improvements) : '<span class="tralla-empty-mini">Não respondeu.</span>') + '</dd></div>'
+                + '</dl></section>';
+        }
 
         if (permissions.edit_card) {
             body += '<section class="tralla-detail-section">'
-                + '<h3><i class="ti ti-pencil"></i> Conteúdo do card</h3>'
+                + '<h3><i class="ti ti-pencil"></i> ' + (isPreventiva ? 'Anotações da equipe' : 'Conteúdo do card') + '</h3>'
                 + '<div class="tralla-field"><label for="tralla-detail-name">Nome</label>'
                 + '<input id="tralla-detail-name" type="text" maxlength="255" value="' + attr(card.name) + '"></div>'
-                + '<div class="tralla-field" style="margin-top:9px"><label for="tralla-detail-description">Descrição</label>'
+                + '<div class="tralla-field" style="margin-top:9px"><label for="tralla-detail-description">' + (isPreventiva ? 'Anotações' : 'Descrição') + '</label>'
                 + '<textarea id="tralla-detail-description" rows="4" maxlength="2000">' + esc(card.description || '') + '</textarea></div>'
                 + '<div class="tralla-detail-edit-actions">'
                 + '<button type="button" class="tralla-btn tralla-btn-primary" data-save-card>'

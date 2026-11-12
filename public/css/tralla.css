@@ -5673,3 +5673,15 @@ html[data-theme="dark"] .tralla-machine.is-backup, body[data-theme="dark"] .tral
 html[data-theme="dark"] .tralla-release-backup, body[data-theme="dark"] .tralla-release-backup,
 html[data-theme="dark"] .tralla-backup-toggle, body[data-theme="dark"] .tralla-backup-toggle,
 html[data-theme="dark"] .tralla-backup-step, body[data-theme="dark"] .tralla-backup-step { background: #2b2449; border-color: #5e4db2; color: #d6cffa; }
+
+/* Preventiva: resposta do formulário em campos separados */
+.tralla-prev-fields { display: grid; gap: 14px 18px; grid-template-columns: 1fr 1fr; margin: 0; }
+.tralla-prev-fields > div { min-width: 0; }
+.tralla-prev-fields > .is-wide { grid-column: 1 / -1; }
+.tralla-prev-fields dt { color: var(--tralla-muted, #6b778c); font-size: 11px; font-weight: 800; letter-spacing: .04em; margin-bottom: 4px; text-transform: uppercase; }
+.tralla-prev-fields dd { margin: 0; overflow-wrap: anywhere; }
+.tralla-prev-text { background: rgba(110, 93, 198, .07); border-left: 3px solid #6e5dc6; border-radius: 6px; padding: 9px 12px; white-space: pre-wrap; }
+.tralla-prev-badge { border-radius: 999px; display: inline-block; font-size: 12px; font-weight: 800; padding: 2px 12px; }
+.tralla-prev-badge.is-yes { background: #fdecea; color: #c62828; }
+.tralla-prev-badge.is-no { background: #e8f5e9; color: #2e7d32; }
+@media (max-width: 560px) { .tralla-prev-fields { grid-template-columns: 1fr; } }

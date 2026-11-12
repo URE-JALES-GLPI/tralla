@@ -554,6 +554,11 @@ class PluginTrallaCard extends CommonDBTM
             $card['update_files'] = empty($card['is_deleted']) ? PluginTrallaFile::listForCard($id, $userId) : [];
             $card['permissions']['upload_update_file'] = PluginTrallaFile::canUpload($card, $userId);
         }
+        $card['preventiva'] = null;
+        if ($boardType === 'preventiva') {
+            require_once __DIR__ . '/preventiva.class.php';
+            $card['preventiva'] = PluginTrallaPreventiva::answerFor($id);
+        }
         $card['comments'] = [];
         if ($boardType === 'maintenance') {
             $commentCard = (int) $card['stage'] === 2 ? $parentCard : $card;

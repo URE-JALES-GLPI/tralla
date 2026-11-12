@@ -137,6 +137,27 @@ class PluginTrallaPreventiva
         return is_array($row) ? $row : null;
     }
 
+    /** Resposta do formulário ligada ao card (campos separados) ou null. */
+    public static function answerFor(int $cardId): ?array
+    {
+        global $DB;
+        if (!$DB->tableExists('glpi_plugin_tralla_preventiva_answers')) {
+            return null;
+        }
+        $row = $DB->request([
+            'FROM' => 'glpi_plugin_tralla_preventiva_answers', 'WHERE' => ['plugin_tralla_cards_id' => $cardId], 'LIMIT' => 1,
+        ])->current();
+        if (!is_array($row)) {
+            return null;
+        }
+        return [
+            'answered_at'  => (string) $row['answered_at'],
+            'has_problems' => (int) $row['has_problems'] === 1,
+            'problems'     => (string) $row['problems_text'],
+            'improvements' => (string) $row['improvements_text'],
+        ];
+    }
+
     /** Busca as respostas novas no formulário e cria um card para cada uma. */
     public static function importResponses(): int
     {
@@ -172,9 +193,10 @@ class PluginTrallaPreventiva
             }
             $marker = 'Resposta do formulário ' . $responseId;
             // Já importada (a confirmação anterior pode ter falhado): só confirma de novo.
-            if (countElementsInTable('glpi_plugin_tralla_history', [
-                'action' => 'preventiva_import', 'details' => ['LIKE', '%' . $responseId . '%'],
-            ]) > 0) {
+            if (countElementsInTable('glpi_plugin_tralla_preventiva_answers', ['response_id' => $responseId]) > 0
+                || countElementsInTable('glpi_plugin_tralla_history', [
+                    'action' => 'preventiva_import', 'details' => ['LIKE', '%' . $responseId . '%'],
+                ]) > 0) {
                 $ack[] = $responseId;
                 continue;
             }
@@ -188,13 +210,7 @@ class PluginTrallaPreventiva
             $received = strtotime((string) ($answer['recebido_em'] ?? '')) ?: time();
             $improvements = trim((string) ($answer['melhorias'] ?? ''));
 
-            $description = 'Resposta do formulário de Preventiva em ' . date('d/m/Y H:i', $received) . ".\n\n"
-                . 'Problemas de T.I.: ' . ($hasProblems ? 'Sim' : 'Não') . "\n";
-            if ($hasProblems) {
-                $description .= trim((string) ($answer['descricao'] ?? '')) . "\n";
-            }
-            $description .= "\nComo a equipe SEINTEC pode atender melhor:\n"
-                . ($improvements !== '' ? $improvements : '(não respondeu)');
+            $problems = $hasProblems ? trim((string) ($answer['descricao'] ?? '')) : '';
 
             $list = $hasProblems ? $inbox : $noIssue;
             $now = tralla_now();
@@ -205,7 +221,7 @@ class PluginTrallaPreventiva
                     'plugin_tralla_lists_id'  => (int) $list['id'],
                     'entities_id'             => is_array($entity) ? (int) $entity['id'] : 0,
                     'name'                    => tralla_normalize_label($school),
-                    'description'             => mb_substr($description, 0, 60000),
+                    'description'             => '',
                     'rank'                    => PluginTrallaCard::nextRankForList((int) $list['id']),
                     'users_id'                => 0,
                     'technician_id'           => 0,
@@ -221,6 +237,15 @@ class PluginTrallaPreventiva
                     'date_mod'                => $now,
                 ]);
                 $cardId = (int) $DB->insertId();
+                $DB->insert('glpi_plugin_tralla_preventiva_answers', [
+                    'plugin_tralla_cards_id' => $cardId,
+                    'response_id'            => $responseId,
+                    'answered_at'            => date('Y-m-d H:i:s', $received),
+                    'has_problems'           => $hasProblems ? 1 : 0,
+                    'problems_text'          => mb_substr($problems, 0, 60000),
+                    'improvements_text'      => mb_substr($improvements, 0, 60000),
+                    'date_creation'          => $now,
+                ]);
                 PluginTrallaHistory::log($cardId, 0, 'preventiva_import', $marker . '.');
                 $DB->commit();
             } catch (Throwable $e) {

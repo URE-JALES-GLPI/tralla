@@ -576,6 +576,25 @@ function plugin_tralla_install(): bool
         ") or die($DB->error());
     }
 
+    // 1.8.0: respostas do formulário de Preventiva, em campos próprios (uma por card).
+    if (!$DB->tableExists('glpi_plugin_tralla_preventiva_answers')) {
+        $DB->doQuery("
+            CREATE TABLE `glpi_plugin_tralla_preventiva_answers` (
+                `id`                     INT {$sign} NOT NULL AUTO_INCREMENT,
+                `plugin_tralla_cards_id` INT {$sign} NOT NULL DEFAULT '0',
+                `response_id`            VARCHAR(64) NOT NULL DEFAULT '',
+                `answered_at`            DATETIME DEFAULT NULL,
+                `has_problems`           TINYINT(1) NOT NULL DEFAULT '0',
+                `problems_text`          TEXT DEFAULT NULL,
+                `improvements_text`      TEXT DEFAULT NULL,
+                `date_creation`          DATETIME DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `plugin_tralla_cards_id` (`plugin_tralla_cards_id`),
+                UNIQUE KEY `response_id` (`response_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}
+        ") or die($DB->error());
+    }
+
     if (!$DB->tableExists('glpi_plugin_tralla_comments')) {
         $DB->doQuery("
             CREATE TABLE `glpi_plugin_tralla_comments` (
@@ -792,6 +811,7 @@ function plugin_tralla_uninstall(): bool
         'glpi_plugin_tralla_calendar_days',
         'glpi_plugin_tralla_files',
         'glpi_plugin_tralla_comments',
+        'glpi_plugin_tralla_preventiva_answers',
         'glpi_plugin_tralla_update_items',
         'glpi_plugin_tralla_notifications',
         'glpi_plugin_tralla_history',
