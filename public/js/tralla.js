@@ -2222,13 +2222,13 @@
         if (!card) { return ''; }
         var machines = Number(card.stage) === 2 && card.parent ? (card.parent.machines || []) : (card.machines || []);
         if (!machines.length) { return ''; }
-        return '<div class="tralla-release-backup"><strong><i class="ti ti-database-export" aria-hidden="true"></i> Precisam de backup?</strong>'
+        return '<details class="tralla-release-backup"><summary><i class="ti ti-database-export" aria-hidden="true"></i> Precisam de backup? <em>(' + machines.length + ' máquinas · clique para abrir)</em></summary>'
             + '<small>Marque as máquinas que precisam de backup. Elas ficam roxas no card depois de liberar.</small>'
             + '<div class="tralla-release-backup-list">' + machines.map(function (machine, index) {
                 return '<label class="tralla-check"><input type="checkbox" data-release-backup value="' + Number(machine.id) + '"'
                     + (Number(machine.needs_backup) === 1 ? ' checked' : '') + '> ' + esc(machineDisplayTitle(machine, index + 1))
                     + (machine.model_name ? ' <small>' + esc(machine.model_name) + '</small>' : '') + '</label>';
-            }).join('') + '</div></div>';
+            }).join('') + '</div></details>';
     }
 
     function priorityDialog(card) {

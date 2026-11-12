@@ -5721,3 +5721,13 @@ body.tralla-embed .tralla-modal { border: 2px solid #4a6fa5; box-shadow: 0 0 0 6
 
 /* "Sem grupo" some quando está vazio (aparece só ao arrastar um quadro) */
 .tralla-board-group.is-empty-ungrouped:not(.is-peek) { display: none; }
+
+/* Liberar card: o diálogo rola quando não cabe na tela; backup fica recolhido */
+.tralla-priority-dialog { max-height: calc(100vh - 48px); overflow-y: auto; }
+details.tralla-release-backup { margin: 14px 24px 0; }
+details.tralla-release-backup > summary { align-items: center; color: #5e4db2; cursor: pointer; display: flex; font-weight: 700; gap: 6px; list-style: none; }
+details.tralla-release-backup > summary::-webkit-details-marker { display: none; }
+details.tralla-release-backup > summary::after { content: "▾"; margin-left: auto; transition: transform .15s; }
+details.tralla-release-backup[open] > summary::after { transform: rotate(180deg); }
+details.tralla-release-backup > summary em { color: #6b778c; font-size: .8rem; font-style: normal; font-weight: 400; }
+details.tralla-release-backup[open] > small { margin-top: 8px; }
