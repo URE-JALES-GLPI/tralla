@@ -5710,4 +5710,11 @@ html[data-theme="dark"] .tralla-backup-step, body[data-theme="dark"] .tralla-bac
 /* Modo embed (Dashure): só o modal do card sobre fundo transparente */
 html.tralla-embed, body.tralla-embed, body.tralla-embed #page { background: transparent !important; }
 body.tralla-embed .tralla-kanban-head, body.tralla-embed .tralla-board-scroll, body.tralla-embed #tralla-kanban { display: none !important; }
-body.tralla-embed .tralla-modal-backdrop { background: transparent; }
+body.tralla-embed .tralla-modal-backdrop { background: rgba(15, 23, 42, 0.55); backdrop-filter: blur(2px); }
+body.tralla-embed .tralla-modal { border: 2px solid #4a6fa5; box-shadow: 0 0 0 6px rgba(74, 111, 165, 0.25), 0 24px 60px rgba(0, 0, 0, 0.55); }
+
+/* Modo embed (Dashure): só o modal do card sobre fundo transparente */
+html.tralla-embed, body.tralla-embed, body.tralla-embed #page { background: transparent !important; }
+body.tralla-embed .tralla-kanban-head, body.tralla-embed .tralla-board-scroll, body.tralla-embed #tralla-kanban { display: none !important; }
+body.tralla-embed .tralla-modal-backdrop { background: rgba(15, 23, 42, 0.55); backdrop-filter: blur(2px); }
+body.tralla-embed .tralla-modal { border: 2px solid #4a6fa5; box-shadow: 0 0 0 6px rgba(74, 111, 165, 0.25), 0 24px 60px rgba(0, 0, 0, 0.55); }
