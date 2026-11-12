@@ -28,6 +28,21 @@ class PluginTrallaPreventiva
         return self::url() !== '' && PluginTrallaConfig::get('preventiva_secret_encrypted') !== '';
     }
 
+    /** IDs de entidades que não aparecem no formulário (configurável; padrão 9 e 25). */
+    public static function excludedIds(): array
+    {
+        $ids = array_map('intval', preg_split('/[^0-9]+/', PluginTrallaConfig::get('preventiva_exclude', '9,25')) ?: []);
+        return array_values(array_unique(array_filter($ids, static fn (int $id): bool => $id > 0)));
+    }
+
+    public static function saveExcluded(string $text): void
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', preg_split('/[^0-9]+/', $text) ?: []),
+            static fn (int $id): bool => $id > 0)));
+        PluginTrallaConfig::set('preventiva_exclude', implode(', ', $ids));
+        PluginTrallaConfig::clearCache();
+    }
+
     public static function saveConfig(string $url, string $secret, bool $removeSecret): void
     {
         $url = trim($url);
@@ -64,10 +79,11 @@ class PluginTrallaPreventiva
             $rows[] = $row;
         }
         $out = [];
+        $excluded = array_flip(self::excludedIds());
         foreach ($rows as $row) {
             $id = (int) $row['id'];
             $name = trim((string) $row['name']);
-            if ($id > 0 && $name !== '' && !isset($parents[$id])) {
+            if ($id > 0 && $name !== '' && !isset($parents[$id]) && !isset($excluded[$id])) {
                 $out[] = ['id' => $id, 'nome' => $name];
             }
         }

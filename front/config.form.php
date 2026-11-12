@@ -52,6 +52,7 @@ if (isset($_POST['save'])) {
             tralla_post_string('preventiva_secret'),
             !empty($_POST['preventiva_secret_remove'])
         );
+        PluginTrallaPreventiva::saveExcluded(tralla_post_string('preventiva_exclude'));
     } catch (Throwable $e) {
         Session::addMessageAfterRedirect($e->getMessage() . ' (Preventiva não foi salva.)', false, ERROR);
     }
@@ -92,6 +93,7 @@ if (isset($_POST['preventiva_sync_now'])) {
             tralla_post_string('preventiva_secret'),
             !empty($_POST['preventiva_secret_remove'])
         );
+        PluginTrallaPreventiva::saveExcluded(tralla_post_string('preventiva_exclude'));
         $total = PluginTrallaPreventiva::sendSchools();
         Session::addMessageAfterRedirect($total . ' escola(s) enviada(s) para o formulário de Preventiva.', true);
     } catch (Throwable $e) {
@@ -525,6 +527,12 @@ echo "<script>document.title = 'Tralla';</script>";
             <?php if (($config['preventiva_secret_encrypted'] ?? '') !== ''): ?>
                 <label class="tralla-check"><input type="checkbox" name="preventiva_secret_remove" value="1"> Remover o segredo salvo</label>
             <?php endif; ?>
+            <div class="tralla-field">
+                <label for="tralla-preventiva-exclude">Entidades que não aparecem no formulário (IDs)</label>
+                <input id="tralla-preventiva-exclude" type="text" name="preventiva_exclude" maxlength="500"
+                       placeholder="Ex.: 9, 25" value="<?= tralla_h($config['preventiva_exclude'] ?? '9, 25') ?>">
+                <small>IDs das entidades do GLPI separados por vírgula. Vale no próximo envio.</small>
+            </div>
             <?php
             $prevLast = (int) ($config['preventiva_last_sync'] ?? 0);
             $prevError = (string) ($config['preventiva_last_error'] ?? '');
