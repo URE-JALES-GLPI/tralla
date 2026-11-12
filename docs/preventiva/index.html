@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Preventiva de T.I. — URE Jales</title>
+  <style>
+    :root { --primary: #0079bf; --primary-strong: #026aa7; --soft: #e4f0f6; --text: #172b4d; --muted: #6b778c; --border: #dfe1e6; --danger: #c62828; --ok: #2e7d32; }
+    * { box-sizing: border-box; }
+    body { background: #f4f5f7; color: var(--text); font: 15px/1.5 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; margin: 0; padding: 16px; }
+    main { margin: 0 auto; max-width: 720px; }
+    .box { background: #fff; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 16px; padding: 22px; }
+    .hero { background: linear-gradient(120deg, #1e4f86, #0079bf); border: 0; color: #fff; }
+    .eyebrow { font-size: 11px; font-weight: 800; letter-spacing: .08em; margin: 0 0 6px; opacity: .85; text-transform: uppercase; }
+    h1 { font-size: 22px; margin: 0 0 6px; }
+    h2 { font-size: 16px; margin: 0 0 4px; }
+    p { margin: 0 0 10px; }
+    .hero p { margin: 0; opacity: .92; }
+    .deadline { background: rgba(255, 255, 255, .16); border-radius: 999px; display: inline-block; font-size: 13px; font-weight: 600; margin-top: 12px; padding: 3px 12px; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .field { margin-bottom: 18px; }
+    .field:last-child { margin-bottom: 0; }
+    label.title, .title { display: block; font-weight: 700; margin-bottom: 6px; }
+    .req { color: var(--danger); }
+    .hint { color: var(--muted); display: block; font-size: 12px; font-weight: 400; margin-top: 2px; }
+    input[type=text], input[list], select, textarea { background: #fff; border: 1px solid #c1c7d0; border-radius: 8px; color: inherit; display: block; font: inherit; min-height: 44px; padding: 9px 12px; width: 100%; }
+    textarea { min-height: 110px; resize: vertical; }
+    input:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--soft); outline: none; }
+    .invalid { border-color: var(--danger) !important; box-shadow: 0 0 0 3px #fdecea !important; }
+    .choices { display: flex; gap: 10px; }
+    .choice { align-items: center; border: 1px solid #c1c7d0; border-radius: 10px; cursor: pointer; display: flex; flex: 1; font-weight: 600; gap: 8px; min-height: 48px; padding: 10px 14px; }
+    .choice:has(input:checked) { background: var(--soft); border-color: var(--primary); }
+    .checks { display: grid; gap: 6px; grid-template-columns: 1fr 1fr; margin-bottom: 14px; }
+    .check { align-items: flex-start; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; display: flex; font-size: 14px; gap: 8px; padding: 8px 10px; }
+    .check:has(input:checked) { background: var(--soft); border-color: var(--primary); }
+    .check input { margin-top: 3px; }
+    .reveal { border-left: 3px solid var(--primary); margin-top: 14px; padding-left: 14px; }
+    .reveal[hidden], [hidden] { display: none !important; }
+    .send { background: var(--primary); border: 0; border-radius: 10px; color: #fff; cursor: pointer; font: inherit; font-size: 16px; font-weight: 700; min-height: 50px; width: 100%; }
+    .send:hover { background: var(--primary-strong); }
+    .send:disabled { cursor: progress; opacity: .6; }
+    .ghost { background: #fff; border: 1px solid var(--primary); color: var(--primary-strong); }
+    .ghost:hover { background: var(--soft); }
+    .error { background: #fdecea; border-radius: 8px; color: var(--danger); font-weight: 600; margin-bottom: 14px; padding: 10px 12px; }
+    .center { padding: 36px 22px; text-align: center; }
+    .icon { align-items: center; border-radius: 50%; display: inline-flex; font-size: 30px; height: 64px; justify-content: center; margin-bottom: 10px; width: 64px; }
+    .icon.ok { background: #e8f5e9; color: var(--ok); }
+    .icon.off { background: #fff4e5; color: #b26a00; }
+    .trap { height: 1px; left: -9999px; overflow: hidden; position: absolute; width: 1px; }
+    .counter { color: var(--muted); float: right; font-size: 12px; font-weight: 400; }
+    @media (max-width: 560px) { body { padding: 8px; } .box { padding: 18px; } .checks { grid-template-columns: 1fr; } .choices { flex-direction: column; } }
+  </style>
+</head>
+<body>
+<main>
+  <section class="box hero">
+    <p class="eyebrow">Unidade Regional de Ensino de Jales · T.I.</p>
+    <h1>Preventiva de T.I. nas escolas</h1>
+    <p>Conte para a equipe de T.I. da URE como está a tecnologia na sua escola. Leva cerca de 3 minutos.</p>
+    <span class="deadline" id="deadline" hidden></span>
+  </section>
+
+  <section class="box center" id="loading"><p class="muted">Carregando formulário…</p></section>
+
+  <section class="box center" id="closed" hidden>
+    <div class="icon off">⏰</div>
+    <h2>Formulário encerrado</h2>
+    <p class="muted" id="closed-text"></p>
+  </section>
+
+  <section class="box center" id="done" hidden>
+    <div class="icon ok">✓</div>
+    <h2>Resposta enviada!</h2>
+    <p class="muted">Obrigado. A equipe de T.I. da URE vai analisar as informações.</p>
+    <button type="button" class="send ghost" id="again">Enviar outra resposta</button>
+  </section>
+
+  <form id="form" novalidate hidden>
+    <div class="error" id="error" role="alert" hidden></div>
+
+    <section class="box">
+      <h2>Quem está respondendo</h2>
+      <p class="muted">Campos com <span class="req">*</span> são obrigatórios.</p>
+      <div class="field">
+        <label class="title" for="nome">Nome completo <span class="req">*</span></label>
+        <input type="text" id="nome" name="nome" maxlength="150" autocomplete="name" required>
+      </div>
+      <div class="field">
+        <label class="title" for="funcao">Função <span class="req">*</span></label>
+        <select id="funcao" name="funcao" required><option value="">Selecione…</option></select>
+        <input type="text" id="funcao_outra" name="funcao_outra" maxlength="100" placeholder="Escreva sua função" style="margin-top:8px" hidden>
+      </div>
+      <div class="field">
+        <label class="title" for="escola">Escola <span class="req">*</span>
+          <span class="hint">Comece a digitar o nome e escolha na lista.</span></label>
+        <input id="escola" list="escolas" autocomplete="off" placeholder="Ex.: EE Prof. …" required>
+        <datalist id="escolas"></datalist>
+      </div>
+      <div class="trap" aria-hidden="true"><label>Site <input type="text" name="site" tabindex="-1" autocomplete="off"></label></div>
+    </section>
+
+    <section class="box">
+      <h2>Problemas de T.I.</h2>
+      <div class="field">
+        <span class="title">Existem problemas de T.I. a serem resolvidos na escola? <span class="req">*</span></span>
+        <p class="muted">Por exemplo: internet lenta ou caindo, Wi-Fi fraco em alguma sala, computador que não liga, impressora sem funcionar, projetor ou TV com defeito, cabo de rede danificado, dificuldade de acesso à SED ou ao e-mail institucional.</p>
+        <div class="choices" id="tem-problemas">
+          <label class="choice"><input type="radio" name="tem_problemas" value="sim"> Sim</label>
+          <label class="choice"><input type="radio" name="tem_problemas" value="nao"> Não</label>
+        </div>
+        <div class="reveal" id="problemas" hidden>
+          <span class="title">Quais tipos? <span class="hint">Marque quantos quiser (opcional).</span></span>
+          <div class="checks" id="tipos"></div>
+          <label class="title" for="descricao">Descreva os problemas <span class="req">*</span>
+            <span class="counter" data-count-for="descricao"></span>
+            <span class="hint">Diga onde acontece (sala, laboratório, secretaria…), desde quando e o que já foi tentado.</span></label>
+          <textarea id="descricao" name="descricao" maxlength="4000"></textarea>
+        </div>
+      </div>
+    </section>
+
+    <section class="box">
+      <div class="field">
+        <label class="title" for="melhorias">Possíveis melhorias
+          <span class="counter" data-count-for="melhorias"></span>
+          <span class="hint">O que poderia melhorar na tecnologia da escola? Equipamentos, rede, sistemas, treinamentos… (opcional)</span></label>
+        <textarea id="melhorias" name="melhorias" maxlength="4000"></textarea>
+      </div>
+    </section>
+
+    <button type="submit" class="send" id="send">Enviar resposta</button>
+  </form>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  // URL do App da Web do Apps Script (termina em /exec). Atualize depois de implantar.
+  var SCRIPT_URL = 'COLE_AQUI_A_URL_DO_APP_DA_WEB';
+
+  var $ = function (id) { return document.getElementById(id); };
+  var form = $('form');
+  var schools = {};
+
+  function show(id) {
+    ['loading', 'closed', 'done', 'form'].forEach(function (s) { $(s).hidden = s !== id; });
+    window.scrollTo(0, 0);
+  }
+
+  function closed(message) {
+    $('closed-text').textContent = message;
+    show('closed');
+  }
+
+  function norm(t) {
+    return String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+  }
+
+  function fail(message, field) {
+    var box = $('error');
+    box.textContent = message;
+    box.hidden = false;
+    if (field) {
+      field.classList.add('invalid');
+      field.focus();
+      field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
+  async function load() {
+    if (SCRIPT_URL.indexOf('https://script.google.com/') !== 0) {
+      closed('Formulário ainda não configurado.');
+      return;
+    }
+    try {
+      var res = await fetch(SCRIPT_URL + '?action=escolas', { credentials: 'omit' });
+      var data = await res.json();
+      if (!data.ok) { throw new Error(data.error || 'Falha ao carregar.'); }
+      if (data.prazo && data.prazo.ate) {
+        $('deadline').textContent = (data.prazo.aberto ? 'Respostas até ' : 'Encerrado em ') + data.prazo.ate;
+        $('deadline').hidden = false;
+      }
+      if (data.prazo && !data.prazo.aberto) {
+        closed(data.prazo.mensagem);
+        return;
+      }
+      var funcao = $('funcao');
+      (data.funcoes || []).forEach(function (f) {
+        var o = document.createElement('option');
+        o.value = f; o.textContent = f;
+        funcao.appendChild(o);
+      });
+      var list = $('escolas');
+      (data.escolas || []).forEach(function (s) {
+        schools[norm(s.nome)] = s;
+        var o = document.createElement('option');
+        o.value = s.nome;
+        list.appendChild(o);
+      });
+      var tipos = $('tipos');
+      (data.problemas || []).forEach(function (p) {
+        var l = document.createElement('label');
+        l.className = 'check';
+        var i = document.createElement('input');
+        i.type = 'checkbox'; i.name = 'tipos'; i.value = p;
+        l.appendChild(i);
+        l.appendChild(document.createTextNode(' ' + p));
+        tipos.appendChild(l);
+      });
+      show('form');
+    } catch (e) {
+      closed('Não foi possível carregar o formulário. Verifique a internet e recarregue a página.');
+    }
+  }
+
+  $('funcao').addEventListener('change', function () {
+    var other = this.value === 'Outra';
+    $('funcao_outra').hidden = !other;
+    if (other) { $('funcao_outra').focus(); }
+  });
+
+  $('tem-problemas').addEventListener('change', function () {
+    var yes = form.querySelector('[name=tem_problemas]:checked');
+    $('problemas').hidden = !yes || yes.value !== 'sim';
+  });
+
+  form.addEventListener('input', function (e) {
+    e.target.classList.remove('invalid');
+    var counter = form.querySelector('[data-count-for="' + e.target.id + '"]');
+    if (counter) { counter.textContent = e.target.value.length + '/4000'; }
+  });
+
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    $('error').hidden = true;
+    var nome = $('nome').value.replace(/\s+/g, ' ').trim();
+    if (nome.split(' ').filter(function (p) { return p.length > 1; }).length < 2) {
+      return fail('Informe o nome completo (nome e sobrenome).', $('nome'));
+    }
+    if (!$('funcao').value) { return fail('Escolha a sua função.', $('funcao')); }
+    if ($('funcao').value === 'Outra' && $('funcao_outra').value.trim().length < 3) {
+      return fail('Escreva qual é a sua função.', $('funcao_outra'));
+    }
+    var school = schools[norm($('escola').value)];
+    if (!school) { return fail('Escolha a escola na lista de sugestões.', $('escola')); }
+    var answer = form.querySelector('[name=tem_problemas]:checked');
+    if (!answer) { return fail('Responda se existem problemas de T.I. na escola.', $('tem-problemas')); }
+    if (answer.value === 'sim' && $('descricao').value.trim().length < 10) {
+      return fail('Descreva os problemas (pelo menos algumas palavras).', $('descricao'));
+    }
+
+    var payload = {
+      action: 'enviar',
+      form: {
+        nome: nome,
+        funcao: $('funcao').value,
+        funcao_outra: $('funcao_outra').value.trim(),
+        escola_id: school.id,
+        tem_problemas: answer.value,
+        tipos: Array.prototype.map.call(form.querySelectorAll('[name=tipos]:checked'), function (c) { return c.value; }),
+        descricao: answer.value === 'sim' ? $('descricao').value.trim() : '',
+        melhorias: $('melhorias').value.trim(),
+        site: form.querySelector('[name=site]').value
+      }
+    };
+    var button = $('send');
+    button.disabled = true;
+    button.textContent = 'Enviando…';
+    try {
+      var res = await fetch(SCRIPT_URL, {
+        method: 'POST',
+        credentials: 'omit',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      });
+      var data = await res.json();
+      if (!data.ok) { throw new Error(data.error || 'Não foi possível enviar.'); }
+      show('done');
+    } catch (err) {
+      fail(err.message || 'Não foi possível enviar. Tente de novo.');
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Enviar resposta';
+    }
+  });
+
+  // Nova resposta: mantém nome, função e escola para facilitar (pode responder quantas vezes quiser).
+  $('again').addEventListener('click', function () {
+    form.querySelectorAll('[name=tem_problemas], [name=tipos]').forEach(function (c) { c.checked = false; });
+    $('descricao').value = '';
+    $('melhorias').value = '';
+    $('problemas').hidden = true;
+    form.querySelectorAll('.counter').forEach(function (c) { c.textContent = ''; });
+    show('form');
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>
