@@ -190,21 +190,9 @@ function submit_(form) {
   if (!prazo.aberto) {
     throw new Error(prazo.mensagem);
   }
+  // O formulário pede só a escola (nome e função saíram); as colunas continuam na planilha.
   var name = clean_(form.nome, 150).replace(/\s+/g, ' ');
-  if (name.split(' ').filter(function (p) { return p.length > 1; }).length < 2) {
-    throw new Error('Informe o nome completo.');
-  }
   var role = clean_(form.funcao, 100);
-  if (FUNCTIONS.indexOf(role) === -1) {
-    throw new Error('Escolha a função.');
-  }
-  if (role === 'Outra') {
-    role = clean_(form.funcao_outra, 100);
-    if (role.length < 3) {
-      throw new Error('Escreva qual é a sua função.');
-    }
-    role = 'Outra: ' + role;
-  }
   var schoolId = String(form.escola_id || '').replace(/\D/g, '');
   var school = schools_().filter(function (s) { return String(s.id) === schoolId; })[0];
   if (!school) {
@@ -229,7 +217,7 @@ function submit_(form) {
   // Evita envio duplicado (duplo clique / reenvio) da mesma pessoa na mesma escola por 2 minutos.
   var cache = CacheService.getScriptCache();
   var dupKey = 'dup_' + Utilities.base64EncodeWebSafe(Utilities.computeDigest(
-    Utilities.DigestAlgorithm.SHA_256, name.toLowerCase() + '|' + schoolId + '|' + description + '|' + improvements));
+    Utilities.DigestAlgorithm.SHA_256, schoolId + '|' + name.toLowerCase() + '|' + description + '|' + improvements));
   if (cache.get(dupKey)) {
     throw new Error('Esta resposta já foi enviada. Obrigado!');
   }

@@ -11,14 +11,24 @@
     body { background: #f4f5f7; color: var(--text); font: 15px/1.5 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; margin: 0; padding: 16px; }
     main { margin: 0 auto; max-width: 720px; }
     .box { background: #fff; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 16px; padding: 22px; }
-    .hero { background: linear-gradient(120deg, #1e4f86, #0079bf); border: 0; color: #fff; }
-    .logo { display: block; height: auto; margin: 0 auto 16px; max-width: 260px; width: 70%; }
-    .eyebrow { font-size: 11px; font-weight: 800; letter-spacing: .08em; margin: 0 0 6px; opacity: .85; text-transform: uppercase; }
+    .hero {
+      background:
+        radial-gradient(circle at 50% 0%, rgba(43, 196, 230, .28), transparent 60%),
+        radial-gradient(rgba(255, 255, 255, .09) 1px, transparent 1.4px) 0 0 / 22px 22px,
+        linear-gradient(160deg, #0a1f3f 0%, #0f3566 55%, #12508f 100%);
+      border: 0; border-radius: 16px; box-shadow: 0 14px 34px rgba(10, 31, 63, .28);
+      color: #fff; overflow: hidden; padding: 30px 26px 26px; position: relative; text-align: center;
+    }
+    .hero::after { background: linear-gradient(90deg, #2bc4e6, #2f7fd6); bottom: 0; content: ''; height: 4px; left: 0; position: absolute; right: 0; }
+    .logo { display: block; filter: drop-shadow(0 4px 14px rgba(0, 0, 0, .35)); height: auto; margin: 0 auto 22px; max-width: 300px; width: 78%; }
+    .eyebrow { background: rgba(43, 196, 230, .16); border: 1px solid rgba(43, 196, 230, .45); border-radius: 999px; color: #9fe6f7; display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: .12em; margin: 0 0 10px; padding: 3px 12px; text-transform: uppercase; }
+    .hero h1 { font-size: 26px; letter-spacing: -.01em; margin: 0 0 8px; }
+    .hero p:not(.eyebrow) { margin: 0 auto; max-width: 480px; opacity: .88; }
     h1 { font-size: 22px; margin: 0 0 6px; }
     h2 { font-size: 16px; margin: 0 0 4px; }
     p { margin: 0 0 10px; }
-    .hero p { margin: 0; opacity: .92; }
-    .deadline { background: rgba(255, 255, 255, .16); border-radius: 999px; display: inline-block; font-size: 13px; font-weight: 600; margin-top: 12px; padding: 3px 12px; }
+    .deadline { align-items: center; background: rgba(255, 255, 255, .12); border: 1px solid rgba(255, 255, 255, .25); border-radius: 999px; display: inline-flex; font-size: 13px; font-weight: 600; gap: 6px; margin-top: 16px; padding: 4px 14px; }
+    .deadline::before { content: '🗓'; }
     .muted { color: var(--muted); font-size: 13px; }
     .field { margin-bottom: 18px; }
     .field:last-child { margin-bottom: 0; }
@@ -48,9 +58,25 @@
     .icon { align-items: center; border-radius: 50%; display: inline-flex; font-size: 30px; height: 64px; justify-content: center; margin-bottom: 10px; width: 64px; }
     .icon.ok { background: #e8f5e9; color: var(--ok); }
     .icon.off { background: #fff4e5; color: #b26a00; }
+    .combo { position: relative; }
+    .combo input { padding-left: 38px; padding-right: 38px; }
+    .combo-icon { color: var(--muted); font-size: 14px; left: 13px; pointer-events: none; position: absolute; top: 12px; }
+    .combo-clear { background: none; border: 0; border-radius: 50%; color: var(--muted); cursor: pointer; font-size: 20px; height: 30px; line-height: 1; position: absolute; right: 7px; top: 7px; width: 30px; }
+    .combo-clear:hover { background: #eef1f5; color: var(--text); }
+    .combo.is-chosen input { background: #f2f9fc; border-color: var(--primary); font-weight: 600; }
+    .combo-list {
+      background: #fff; border: 1px solid #c1c7d0; border-radius: 10px; box-shadow: 0 14px 30px rgba(9, 30, 66, .16);
+      left: 0; list-style: none; margin: 6px 0 0; max-height: 280px; overflow-y: auto; padding: 6px; position: absolute;
+      right: 0; top: 100%; z-index: 20;
+    }
+    .combo-list li { border-radius: 7px; cursor: pointer; padding: 9px 12px; }
+    .combo-list li[aria-selected="true"], .combo-list li:hover { background: var(--soft); color: var(--primary-strong); }
+    .combo-list li mark { background: none; color: var(--primary-strong); font-weight: 800; }
+    .combo-list .combo-empty { color: var(--muted); cursor: default; font-style: italic; }
+    .combo-list .combo-empty:hover { background: none; color: var(--muted); }
     .trap { height: 1px; left: -9999px; overflow: hidden; position: absolute; width: 1px; }
     .counter { color: var(--muted); float: right; font-size: 12px; font-weight: 400; }
-    @media (max-width: 560px) { body { padding: 8px; } .box { padding: 18px; } .checks { grid-template-columns: 1fr; } .choices { flex-direction: column; } }
+    @media (max-width: 560px) { .hero { padding: 24px 18px 22px; } .hero h1 { font-size: 21px; } body { padding: 8px; } .box { padding: 18px; } .checks { grid-template-columns: 1fr; } .choices { flex-direction: column; } }
   </style>
 </head>
 <body>
@@ -59,7 +85,7 @@
     <img class="logo" src="logo-ure.webp" alt="Unidade Regional de Ensino de Jales" width="2000" height="700">
     <p class="eyebrow">Equipe de T.I.</p>
     <h1>Preventiva de T.I. nas escolas</h1>
-    <p>Conte para a equipe de T.I. da URE como está a tecnologia na sua escola. Leva cerca de 3 minutos.</p>
+    <p>Conte para a equipe de T.I. da URE como está a tecnologia na sua escola. Leva cerca de 2 minutos.</p>
     <span class="deadline" id="deadline" hidden></span>
   </section>
 
@@ -82,22 +108,18 @@
     <div class="error" id="error" role="alert" hidden></div>
 
     <section class="box">
-      <h2>Quem está respondendo</h2>
+      <h2>Sua escola</h2>
       <p class="muted">Campos com <span class="req">*</span> são obrigatórios.</p>
-      <div class="field">
-        <label class="title" for="nome">Nome completo <span class="req">*</span></label>
-        <input type="text" id="nome" name="nome" maxlength="150" autocomplete="name" required>
-      </div>
-      <div class="field">
-        <label class="title" for="funcao">Função <span class="req">*</span></label>
-        <select id="funcao" name="funcao" required><option value="">Selecione…</option></select>
-        <input type="text" id="funcao_outra" name="funcao_outra" maxlength="100" placeholder="Escreva sua função" style="margin-top:8px" hidden>
-      </div>
       <div class="field">
         <label class="title" for="escola">Escola <span class="req">*</span>
           <span class="hint">Comece a digitar o nome e escolha na lista.</span></label>
-        <input id="escola" list="escolas" autocomplete="off" placeholder="Ex.: EE Prof. …" required>
-        <datalist id="escolas"></datalist>
+        <div class="combo" id="escola-combo">
+          <span class="combo-icon" aria-hidden="true">🔍</span>
+          <input id="escola" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false"
+                 aria-controls="escola-list" autocomplete="off" spellcheck="false" placeholder="Digite o nome da escola…" required>
+          <button type="button" class="combo-clear" id="escola-clear" aria-label="Limpar escola" hidden>×</button>
+          <ul class="combo-list" id="escola-list" role="listbox" hidden></ul>
+        </div>
       </div>
       <div class="trap" aria-hidden="true"><label>Site <input type="text" name="site" tabindex="-1" autocomplete="off"></label></div>
     </section>
@@ -122,10 +144,11 @@
 
     <section class="box">
       <div class="field">
-        <label class="title" for="melhorias">Possíveis melhorias
+        <label class="title" for="melhorias">Como a equipe SEINTEC pode atender melhor a sua escola?
           <span class="counter" data-count-for="melhorias"></span>
-          <span class="hint">O que poderia melhorar na tecnologia da escola? Equipamentos, rede, sistemas, treinamentos… (opcional)</span></label>
-        <textarea id="melhorias" name="melhorias" maxlength="4000"></textarea>
+          <span class="hint">Sua opinião ajuda a melhorar o nosso trabalho. Conte o que já funciona bem e o que podemos fazer melhor: tempo de resposta aos chamados, comunicação e retorno, visitas preventivas, orientações e treinamentos para a equipe da escola… (opcional)</span></label>
+        <textarea id="melhorias" name="melhorias" maxlength="4000"
+                  placeholder="Ex.: o atendimento é rápido, mas seria bom avisar quando o técnico vem à escola; gostaríamos de uma orientação sobre o uso da lousa digital…"></textarea>
       </div>
     </section>
 
@@ -188,18 +211,9 @@
         closed(data.prazo.mensagem);
         return;
       }
-      var funcao = $('funcao');
-      (data.funcoes || []).forEach(function (f) {
-        var o = document.createElement('option');
-        o.value = f; o.textContent = f;
-        funcao.appendChild(o);
-      });
-      var list = $('escolas');
       (data.escolas || []).forEach(function (s) {
         schools[norm(s.nome)] = s;
-        var o = document.createElement('option');
-        o.value = s.nome;
-        list.appendChild(o);
+        schoolList.push({ id: s.id, nome: s.nome, key: norm(s.nome) });
       });
       show('form');
     } catch (e) {
@@ -207,11 +221,100 @@
     }
   }
 
-  $('funcao').addEventListener('change', function () {
-    var other = this.value === 'Outra';
-    $('funcao_outra').hidden = !other;
-    if (other) { $('funcao_outra').focus(); }
+  // ---- Escola: lista própria com busca (sem o datalist do navegador) ----
+  var schoolList = [];
+  var chosen = null;
+  var active = -1;
+  var input = $('escola');
+  var listbox = $('escola-list');
+  var combo = $('escola-combo');
+
+  function escapeHtml(t) {
+    return String(t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+  }
+
+  // Destaca o trecho digitado (comparando sem acento, mas mostrando o nome original).
+  function highlight(name, term) {
+    if (!term) { return escapeHtml(name); }
+    var key = norm(name);
+    var at = key.indexOf(term);
+    if (at < 0) { return escapeHtml(name); }
+    return escapeHtml(name.slice(0, at)) + '<mark>' + escapeHtml(name.slice(at, at + term.length)) + '</mark>' + escapeHtml(name.slice(at + term.length));
+  }
+
+  function choose(school) {
+    chosen = school;
+    input.value = school ? school.nome : '';
+    combo.classList.toggle('is-chosen', !!school);
+    $('escola-clear').hidden = !input.value;
+    input.classList.remove('invalid');
+    closeList();
+  }
+
+  function closeList() {
+    listbox.hidden = true;
+    input.setAttribute('aria-expanded', 'false');
+    active = -1;
+  }
+
+  function renderList() {
+    var term = norm(input.value);
+    var words = term.split(' ').filter(Boolean);
+    var found = schoolList.filter(function (s) {
+      return words.every(function (w) { return s.key.indexOf(w) !== -1; });
+    }).slice(0, 60);
+    listbox.innerHTML = '';
+    if (!found.length) {
+      listbox.innerHTML = '<li class="combo-empty">Nenhuma escola encontrada</li>';
+    }
+    found.forEach(function (s, i) {
+      var li = document.createElement('li');
+      li.id = 'escola-opt-' + i;
+      li.setAttribute('role', 'option');
+      li.setAttribute('aria-selected', i === active ? 'true' : 'false');
+      li.innerHTML = highlight(s.nome, words.length === 1 ? words[0] : '');
+      li.addEventListener('mousedown', function (e) { e.preventDefault(); choose(s); });
+      listbox.appendChild(li);
+    });
+    listbox._found = found;
+    listbox.hidden = false;
+    input.setAttribute('aria-expanded', 'true');
+  }
+
+  function move(step) {
+    var found = listbox._found || [];
+    if (!found.length) { return; }
+    active = (active + step + found.length) % found.length;
+    Array.prototype.forEach.call(listbox.children, function (li, i) {
+      li.setAttribute('aria-selected', i === active ? 'true' : 'false');
+      if (i === active) { li.scrollIntoView({ block: 'nearest' }); input.setAttribute('aria-activedescendant', li.id); }
+    });
+  }
+
+  input.addEventListener('focus', renderList);
+  input.addEventListener('input', function () {
+    chosen = null;
+    combo.classList.remove('is-chosen');
+    $('escola-clear').hidden = !input.value;
+    active = -1;
+    renderList();
   });
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowDown') { e.preventDefault(); if (listbox.hidden) { renderList(); } move(1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
+    else if (e.key === 'Enter' && !listbox.hidden) {
+      e.preventDefault();
+      var found = listbox._found || [];
+      if (active >= 0 && found[active]) { choose(found[active]); } else if (found.length === 1) { choose(found[0]); }
+    } else if (e.key === 'Escape') { closeList(); }
+  });
+  input.addEventListener('blur', function () {
+    // Digitou o nome exato sem clicar: aceita mesmo assim.
+    if (!chosen && schools[norm(input.value)]) { choose(schools[norm(input.value)]); }
+    closeList();
+  });
+  $('escola-clear').addEventListener('click', function () { choose(null); input.focus(); });
+
 
   $('tem-problemas').addEventListener('change', function () {
     var yes = form.querySelector('[name=tem_problemas]:checked');
@@ -227,16 +330,8 @@
   form.addEventListener('submit', async function (e) {
     e.preventDefault();
     $('error').hidden = true;
-    var nome = $('nome').value.replace(/\s+/g, ' ').trim();
-    if (nome.split(' ').filter(function (p) { return p.length > 1; }).length < 2) {
-      return fail('Informe o nome completo (nome e sobrenome).', $('nome'));
-    }
-    if (!$('funcao').value) { return fail('Escolha a sua função.', $('funcao')); }
-    if ($('funcao').value === 'Outra' && $('funcao_outra').value.trim().length < 3) {
-      return fail('Escreva qual é a sua função.', $('funcao_outra'));
-    }
-    var school = schools[norm($('escola').value)];
-    if (!school) { return fail('Escolha a escola na lista de sugestões.', $('escola')); }
+    var school = chosen || schools[norm($('escola').value)];
+    if (!school) { return fail('Escolha a escola na lista.', $('escola')); }
     var answer = form.querySelector('[name=tem_problemas]:checked');
     if (!answer) { return fail('Responda se existem problemas de T.I. na escola.', $('tem-problemas')); }
     if (answer.value === 'sim' && $('descricao').value.trim().length < 10) {
@@ -246,9 +341,6 @@
     var payload = {
       action: 'enviar',
       form: {
-        nome: nome,
-        funcao: $('funcao').value,
-        funcao_outra: $('funcao_outra').value.trim(),
         escola_id: school.id,
         tem_problemas: answer.value,
         tipos: Array.prototype.map.call(form.querySelectorAll('[name=tipos]:checked'), function (c) { return c.value; }),
@@ -278,7 +370,7 @@
     }
   });
 
-  // Nova resposta: mantém nome, função e escola para facilitar (pode responder quantas vezes quiser).
+  // Nova resposta: mantém a escola para facilitar (pode responder quantas vezes quiser).
   $('again').addEventListener('click', function () {
     form.querySelectorAll('[name=tem_problemas], [name=tipos]').forEach(function (c) { c.checked = false; });
     $('descricao').value = '';

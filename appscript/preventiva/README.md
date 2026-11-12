@@ -10,12 +10,11 @@ cada pessoa pode responder quantas vezes quiser e o formulário fecha sozinho de
 
 ## O que o formulário pergunta
 
-1. Nome completo
-2. Função (lista + "Outra")
-3. Escola (entidades do GLPI, com busca pelo nome)
-4. Existem problemas de T.I. a resolver? (Sim/Não). Se **Sim**: tipos de problema (opcional) e
-   descrição (obrigatória)
-5. Possíveis melhorias (sempre visível, opcional)
+1. Escola (entidades do GLPI, com busca pelo nome)
+2. Existem problemas de T.I. a resolver? (Sim/Não). Se **Sim**: descrição (obrigatória)
+3. Como a equipe SEINTEC pode atender melhor a escola? (sempre visível, opcional)
+
+As colunas "Nome completo" e "Função" continuam na planilha, mas ficam vazias (saíram do formulário).
 
 ## Instalação
 
