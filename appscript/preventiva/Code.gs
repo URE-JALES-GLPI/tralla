@@ -13,33 +13,13 @@ var TAB_ANSWERS = 'Respostas';
 var TAB_SCHOOLS = 'Escolas';
 var TAB_CONFIG = 'Configuração';
 var TIMEZONE = 'America/Sao_Paulo';
+// A ordem das colunas importa (o script grava e lê pela posição); os títulos podem ser renomeados.
 var ANSWER_HEADERS = [
-  'ID', 'Recebido em', 'Nome completo', 'Função', 'ID da escola (GLPI)', 'Escola',
-  'Tem problemas de T.I.?', 'Tipos de problema', 'Descrição dos problemas', 'Possíveis melhorias',
-  'Enviado ao GLPI em'
+  'ID', 'Data', 'ID da escola (GLPI)', 'Escola', 'Tem problemas de T.I.?',
+  'Descrição dos problemas', 'Possíveis melhorias', 'Enviado ao GLPI em'
 ];
 var COL_SYNCED = ANSWER_HEADERS.length; // última coluna
 var MAX_LIST = 50;
-
-/** Opções da página (a página mostra estas mesmas listas). */
-var FUNCTIONS = [
-  'Diretor(a) de Escola', 'Vice-diretor(a)', 'Coordenador(a) de Gestão Pedagógica (CGP)',
-  'Gerente de Organização Escolar (GOE)', 'Agente de Organização Escolar (AOE)',
-  'Secretário(a) de Escola', 'Professor(a)', 'Outra'
-];
-var PROBLEMS = [
-  'Internet lenta ou caindo',
-  'Wi-Fi sem sinal ou fraco em alguma sala',
-  'Computador lento, travando ou que não liga',
-  'Impressora com defeito, sem toner ou atolando papel',
-  'Projetor, TV ou lousa digital com problema',
-  'Cabo de rede, tomada ou rack danificado',
-  'Acesso a sistemas (SED, e-mail institucional, Secretaria Escolar Digital)',
-  'Notebooks / Chromebooks dos alunos com defeito',
-  'Telefone, câmeras ou som',
-  'Equipamento faltando ou precisando de troca',
-  'Outro'
-];
 
 // ---------------------------------------------------------------- instalação
 
@@ -144,7 +124,7 @@ function doGet(e) {
   var action = String(e && e.parameter && e.parameter.action || '');
   if (action === 'escolas') {
     var prazo = deadline_();
-    return json_({ ok: true, prazo: prazo, escolas: prazo.aberto ? schools_() : [], funcoes: FUNCTIONS, problemas: PROBLEMS });
+    return json_({ ok: true, prazo: prazo, escolas: prazo.aberto ? schools_() : [] });
   }
   return json_({ ok: true, servico: 'Preventiva URE Jales' });
 }
@@ -190,9 +170,6 @@ function submit_(form) {
   if (!prazo.aberto) {
     throw new Error(prazo.mensagem);
   }
-  // O formulário pede só a escola (nome e função saíram); as colunas continuam na planilha.
-  var name = clean_(form.nome, 150).replace(/\s+/g, ' ');
-  var role = clean_(form.funcao, 100);
   var schoolId = String(form.escola_id || '').replace(/\D/g, '');
   var school = schools_().filter(function (s) { return String(s.id) === schoolId; })[0];
   if (!school) {
@@ -202,11 +179,8 @@ function submit_(form) {
   if (!hasProblems) {
     throw new Error('Responda se existem problemas de T.I. a resolver.');
   }
-  var kinds = [];
   var description = '';
   if (hasProblems === 'Sim') {
-    kinds = (Array.isArray(form.tipos) ? form.tipos : []).map(String)
-      .filter(function (k) { return PROBLEMS.indexOf(k) !== -1; });
     description = clean_(form.descricao, 4000);
     if (description.length < 10) {
       throw new Error('Descreva os problemas (pelo menos algumas palavras).');
@@ -214,10 +188,10 @@ function submit_(form) {
   }
   var improvements = clean_(form.melhorias, 4000);
 
-  // Evita envio duplicado (duplo clique / reenvio) da mesma pessoa na mesma escola por 2 minutos.
+  // Evita envio duplicado (duplo clique / reenvio) da mesma resposta por 2 minutos.
   var cache = CacheService.getScriptCache();
   var dupKey = 'dup_' + Utilities.base64EncodeWebSafe(Utilities.computeDigest(
-    Utilities.DigestAlgorithm.SHA_256, schoolId + '|' + name.toLowerCase() + '|' + description + '|' + improvements));
+    Utilities.DigestAlgorithm.SHA_256, schoolId + '|' + description + '|' + improvements));
   if (cache.get(dupKey)) {
     throw new Error('Esta resposta já foi enviada. Obrigado!');
   }
@@ -227,8 +201,8 @@ function submit_(form) {
   try {
     var id = Utilities.getUuid();
     spreadsheet_().getSheetByName(TAB_ANSWERS).appendRow([
-      id, new Date(), cell_(name), cell_(role), Number(schoolId), cell_(school.nome), hasProblems,
-      cell_(kinds.join('; ')), cell_(description), cell_(improvements), ''
+      id, new Date(), Number(schoolId), cell_(school.nome), hasProblems,
+      cell_(description), cell_(improvements), ''
     ]);
     cache.put(dupKey, '1', 120);
     return id;
@@ -312,9 +286,8 @@ function pending_(limit) {
     out.push({
       id: String(r[0]),
       recebido_em: r[1] instanceof Date ? Utilities.formatDate(r[1], 'America/Sao_Paulo', "yyyy-MM-dd'T'HH:mm:ss") : String(r[1]),
-      nome: String(r[2]), funcao: String(r[3]), escola_id: Number(r[4]), escola: String(r[5]),
-      tem_problemas: String(r[6]) === 'Sim', tipos: String(r[7]) ? String(r[7]).split('; ') : [],
-      descricao: String(r[8]), melhorias: String(r[9])
+      escola_id: Number(r[2]), escola: String(r[3]), tem_problemas: String(r[4]) === 'Sim',
+      descricao: String(r[5]), melhorias: String(r[6])
     });
   }
   return out;

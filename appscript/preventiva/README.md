@@ -14,7 +14,7 @@ cada pessoa pode responder quantas vezes quiser e o formulário fecha sozinho de
 2. Existem problemas de T.I. a resolver? (Sim/Não). Se **Sim**: descrição (obrigatória)
 3. Como a equipe SEINTEC pode atender melhor a escola? (sempre visível, opcional)
 
-As colunas "Nome completo" e "Função" continuam na planilha, mas ficam vazias (saíram do formulário).
+Colunas da aba **Respostas**, nesta ordem: ID · Data · ID da escola (GLPI) · Escola · Tem problemas de T.I.? · Descrição dos problemas · Possíveis melhorias · Enviado ao GLPI em. Os títulos podem ser renomeados; a ordem não (o script usa a posição).
 
 ## Instalação
 
