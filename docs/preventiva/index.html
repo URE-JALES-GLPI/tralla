@@ -74,6 +74,11 @@
     .combo-list li mark { background: none; color: var(--primary-strong); font-weight: 800; }
     .combo-list .combo-empty { color: var(--muted); cursor: default; font-style: italic; }
     .combo-list .combo-empty:hover { background: none; color: var(--muted); }
+    .field-msg { border-radius: 8px; font-size: 13px; font-weight: 600; margin: 8px 0 0; padding: 8px 11px; }
+    .field-msg:empty { display: none; }
+    .field-msg.is-warn { background: #fff7e6; border: 1px solid #f5c26b; color: #8a5300; }
+    .field-msg.is-error { background: #fdecea; border: 1px solid #f1a9a0; color: var(--danger); }
+    .field-msg.is-ok { background: #e8f5e9; border: 1px solid #a5d6a7; color: var(--ok); }
     .trap { height: 1px; left: -9999px; overflow: hidden; position: absolute; width: 1px; }
     .counter { color: var(--muted); float: right; font-size: 12px; font-weight: 400; }
     @media (max-width: 560px) { .hero { padding: 24px 18px 22px; } .hero h1 { font-size: 21px; } body { padding: 8px; } .box { padding: 18px; } .checks { grid-template-columns: 1fr; } .choices { flex-direction: column; } }
@@ -137,7 +142,9 @@
           <label class="title" for="descricao">Descreva os problemas <span class="req">*</span>
             <span class="counter" data-count-for="descricao"></span>
             <span class="hint">Diga onde acontece (sala, laboratório, secretaria…), desde quando e o que já foi tentado.</span></label>
-          <textarea id="descricao" name="descricao" maxlength="4000"></textarea>
+          <textarea id="descricao" name="descricao" maxlength="4000"
+                    placeholder="Ex.: o Wi-Fi da sala 5 não conecta desde segunda-feira; já reiniciamos o roteador e continua igual."></textarea>
+          <p class="field-msg" id="descricao-msg" aria-live="polite"></p>
         </div>
       </div>
     </section>
@@ -321,6 +328,28 @@
     $('problemas').hidden = !yes || yes.value !== 'sim';
   });
 
+  // Descrição curta demais: avisa enquanto a pessoa escreve, para detalhar bem o problema.
+  var MIN_DESCRIPTION = 30;
+  function descriptionHint(onSubmit) {
+    var msg = $('descricao-msg');
+    var len = $('descricao').value.trim().length;
+    if (len >= MIN_DESCRIPTION) {
+      msg.className = 'field-msg is-ok';
+      msg.textContent = '✓ Ótimo, obrigado pelos detalhes.';
+      return true;
+    }
+    if (len === 0 && !onSubmit) {
+      msg.className = 'field-msg';
+      msg.textContent = '';
+      return false;
+    }
+    msg.className = 'field-msg ' + (onSubmit ? 'is-error' : 'is-warn');
+    msg.textContent = (onSubmit ? '⚠ Descreva melhor o problema: ' : 'Continue descrevendo: ')
+      + 'faltam ' + (MIN_DESCRIPTION - len) + ' caractere(s). Diga o que acontece, onde (sala, laboratório, secretaria…) e desde quando.';
+    return false;
+  }
+  $('descricao').addEventListener('input', function () { descriptionHint(false); });
+
   form.addEventListener('input', function (e) {
     e.target.classList.remove('invalid');
     var counter = form.querySelector('[data-count-for="' + e.target.id + '"]');
@@ -334,8 +363,11 @@
     if (!school) { return fail('Escolha a escola na lista.', $('escola')); }
     var answer = form.querySelector('[name=tem_problemas]:checked');
     if (!answer) { return fail('Responda se existem problemas de T.I. na escola.', $('tem-problemas')); }
-    if (answer.value === 'sim' && $('descricao').value.trim().length < 10) {
-      return fail('Descreva os problemas (pelo menos algumas palavras).', $('descricao'));
+    if (answer.value === 'sim' && !descriptionHint(true)) {
+      $('descricao').classList.add('invalid');
+      $('descricao').focus();
+      $('descricao').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
     }
 
     var payload = {
@@ -374,6 +406,8 @@
   $('again').addEventListener('click', function () {
     form.querySelectorAll('[name=tem_problemas], [name=tipos]').forEach(function (c) { c.checked = false; });
     $('descricao').value = '';
+    $('descricao-msg').className = 'field-msg';
+    $('descricao-msg').textContent = '';
     $('melhorias').value = '';
     $('problemas').hidden = true;
     form.querySelectorAll('.counter').forEach(function (c) { c.textContent = ''; });
