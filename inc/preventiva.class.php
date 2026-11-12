@@ -124,17 +124,68 @@ class PluginTrallaPreventiva
         }
     }
 
-    /** Quadro que recebe as respostas: o primeiro quadro Preventiva não arquivado. */
-    public static function targetBoard(): ?array
+    /** Garante a coluna do mês no quadro (cria sozinha se a atualização do plugin ainda não foi aplicada). */
+    public static function ensurePeriodColumn(): void
     {
         global $DB;
-        $row = $DB->request([
+        static $done = false;
+        if ($done) {
+            return;
+        }
+        $done = true;
+        if (!$DB->fieldExists('glpi_plugin_tralla_boards', 'period')) {
+            $DB->doQuery("ALTER TABLE `glpi_plugin_tralla_boards` ADD COLUMN `period` VARCHAR(7) DEFAULT NULL COMMENT 'Preventiva: mês das respostas (AAAA-MM)'");
+            // Quadros já existentes assumem o mês em que foram criados.
+            $DB->doQuery("UPDATE `glpi_plugin_tralla_boards` SET `period` = DATE_FORMAT(`date_creation`, '%Y-%m')"
+                . " WHERE `type` = 'preventiva' AND (`period` IS NULL OR `period` = '')");
+        }
+    }
+
+    /** "2026-11" válido ou ''. */
+    public static function normalizePeriod(string $period): string
+    {
+        return preg_match('/^(20\d{2})-(0[1-9]|1[0-2])$/', trim($period)) === 1 ? trim($period) : '';
+    }
+
+    /** "2026-11" -> "11/2026". */
+    public static function periodLabel(string $period): string
+    {
+        $period = self::normalizePeriod($period);
+        return $period === '' ? '' : substr($period, 5, 2) . '/' . substr($period, 0, 4);
+    }
+
+    /** Quadros Preventiva não arquivados, do mais recente para o mais antigo. */
+    public static function boards(): array
+    {
+        global $DB;
+        self::ensurePeriodColumn();
+        $out = [];
+        foreach ($DB->request([
             'FROM'  => 'glpi_plugin_tralla_boards',
             'WHERE' => ['type' => 'preventiva', 'is_archived' => 0],
-            'ORDER' => 'id ASC',
-            'LIMIT' => 1,
-        ])->current();
-        return is_array($row) ? $row : null;
+            'ORDER' => ['period DESC', 'id DESC'],
+        ]) as $row) {
+            $out[] = $row;
+        }
+        return $out;
+    }
+
+    /**
+     * Quadro de um mês (AAAA-MM). Sem mês informado: o do mês atual; se não houver, o mais recente.
+     */
+    public static function targetBoard(?string $period = null): ?array
+    {
+        $boards = self::boards();
+        if ($boards === []) {
+            return null;
+        }
+        $wanted = $period !== null ? self::normalizePeriod($period) : date('Y-m');
+        foreach ($boards as $board) {
+            if ((string) $board['period'] === $wanted) {
+                return $board;
+            }
+        }
+        return $period !== null ? null : $boards[0];
     }
 
     /** Resposta do formulário ligada ao card (campos separados) ou null. */
@@ -166,24 +217,30 @@ class PluginTrallaPreventiva
         if (!self::isConfigured()) {
             throw new RuntimeException('Informe a URL e o segredo do formulário de Preventiva.');
         }
-        $board = self::targetBoard();
-        if ($board === null) {
-            throw new RuntimeException('Crie um quadro do tipo Preventiva para receber as respostas.');
-        }
-        $boardId = (int) $board['id'];
-        $lists = PluginTrallaList::getListsForBoard($boardId);
-        if ($lists === []) {
-            throw new RuntimeException('O quadro Preventiva não tem listas.');
-        }
-        $inbox = $lists[0];
-        $noIssue = $inbox;
-        foreach ($lists as $list) {
-            if (mb_strtolower(trim((string) $list['name'])) === 'sem problemas relatados') {
-                $noIssue = $list;
+        // Cada quadro recebe só as respostas do mês dele (o formulário é reenviado todo mês).
+        $byPeriod = [];
+        foreach (self::boards() as $candidate) {
+            $month = self::normalizePeriod((string) $candidate['period']);
+            if ($month === '' || isset($byPeriod[$month])) {
+                continue;
             }
+            $boardLists = PluginTrallaList::getListsForBoard((int) $candidate['id']);
+            if ($boardLists === []) {
+                continue;
+            }
+            $noIssueList = $boardLists[0];
+            foreach ($boardLists as $list) {
+                if (mb_strtolower(trim((string) $list['name'])) === 'sem problemas relatados') {
+                    $noIssueList = $list;
+                }
+            }
+            $byPeriod[$month] = ['id' => (int) $candidate['id'], 'inbox' => $boardLists[0], 'noIssue' => $noIssueList];
+        }
+        if ($byPeriod === []) {
+            throw new RuntimeException('Crie um quadro do tipo Preventiva (com o mês) para receber as respostas.');
         }
 
-        $result = self::call('respostas', ['limit' => 50]);
+        $result = self::call('respostas', ['limit' => 50, 'meses' => array_keys($byPeriod)]);
         $created = 0;
         $ack = [];
         foreach ((array) ($result['respostas'] ?? []) as $answer) {
@@ -191,6 +248,13 @@ class PluginTrallaPreventiva
             if ($responseId === '') {
                 continue;
             }
+            $answerMonth = substr((string) ($answer['recebido_em'] ?? ''), 0, 7);
+            if (!isset($byPeriod[$answerMonth])) {
+                continue; // sem quadro para esse mês: a resposta fica na planilha até o quadro existir
+            }
+            $boardId = $byPeriod[$answerMonth]['id'];
+            $inbox = $byPeriod[$answerMonth]['inbox'];
+            $noIssue = $byPeriod[$answerMonth]['noIssue'];
             $marker = 'Resposta do formulário ' . $responseId;
             // Já importada e o card ainda existe (a confirmação anterior pode ter falhado): só confirma de novo.
             // Card excluído libera a resposta para ser importada outra vez.
@@ -276,7 +340,7 @@ class PluginTrallaPreventiva
     /** Cron: busca respostas a cada 5 minutos. */
     public static function importIfDue(): int
     {
-        if (!self::isConfigured() || self::targetBoard() === null
+        if (!self::isConfigured() || self::boards() === []
             || PluginTrallaConfig::getInt('preventiva_last_import_attempt') > time() - 300) {
             return 0;
         }

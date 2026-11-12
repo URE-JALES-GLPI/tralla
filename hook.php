@@ -576,6 +576,12 @@ function plugin_tralla_install(): bool
         ") or die($DB->error());
     }
 
+    // 1.9.0: quadro Preventiva por mês (cada quadro só recebe as respostas do mês dele).
+    if (!$DB->fieldExists('glpi_plugin_tralla_boards', 'period')) {
+        $DB->doQuery("ALTER TABLE `glpi_plugin_tralla_boards` ADD COLUMN `period` VARCHAR(7) DEFAULT NULL COMMENT 'Preventiva: mês das respostas (AAAA-MM)'");
+        $DB->doQuery("UPDATE `glpi_plugin_tralla_boards` SET `period` = DATE_FORMAT(`date_creation`, '%Y-%m') WHERE `type` = 'preventiva' AND (`period` IS NULL OR `period` = '')");
+    }
+
     // 1.8.0: respostas do formulário de Preventiva, em campos próprios (uma por card).
     if (!$DB->tableExists('glpi_plugin_tralla_preventiva_answers')) {
         $DB->doQuery("

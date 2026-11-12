@@ -8,6 +8,22 @@
     var bootstrapEl = document.getElementById('tralla-bootstrap');
     var root = document.getElementById('tralla-kanban');
     var boardModal = document.getElementById('tralla-board-create');
+    if (boardModal) {
+        // Preventiva: o quadro é de um mês específico.
+        var periodField = boardModal.querySelector('[data-period-field]');
+        var syncPeriod = function () {
+            var chosen = boardModal.querySelector('input[name="type"]:checked');
+            var show = !!chosen && chosen.value === 'preventiva';
+            if (periodField) {
+                periodField.hidden = !show;
+                periodField.querySelector('input').required = show;
+            }
+        };
+        boardModal.addEventListener('change', function (event) {
+            if (event.target && event.target.name === 'type') { syncPeriod(); }
+        });
+        syncPeriod();
+    }
     var organizer = document.querySelector('[data-board-organizer]');
     var categoryEditor = document.querySelector('[data-category-editor]');
 

@@ -21,6 +21,7 @@ if (isset($_POST['add'])) {
         'comment'      => tralla_post_string('comment'),
         'entities_id'  => tralla_post_int('entities_id', (int) ($_SESSION['glpiactive_entity'] ?? 0)),
         'is_recursive' => !empty($_POST['is_recursive']) ? 1 : 0,
+        'period'       => tralla_post_string('period'),
     ];
 
     $board->check(-1, CREATE, $input);
@@ -72,6 +73,9 @@ if (isset($_POST['update'])) {
         $input['is_archived'] = !empty($_POST['is_archived']) ? 1 : 0;
     } else {
         unset($input['is_archived']);
+    }
+    if ((string) $board->fields['type'] === 'preventiva') {
+        $input['period'] = tralla_post_string('period');
     }
     if ((string) $board->fields['type'] === 'maintenance') {
         $input['notify_email'] = !empty($_POST['notify_email']) ? 1 : 0;
@@ -247,6 +251,15 @@ echo "<script>document.title = 'Tralla';</script>";
                 <label for="tralla-edit-comment">Descrição</label>
                 <textarea id="tralla-edit-comment" name="comment" rows="4" maxlength="2000" <?= $canUpdate ? '' : 'disabled' ?>><?= tralla_h($board->fields['comment']) ?></textarea>
             </div>
+            <?php if ((string) $board->fields['type'] === 'preventiva'): ?>
+                <?php require_once GLPI_ROOT . '/plugins/tralla/inc/preventiva.class.php'; PluginTrallaPreventiva::ensurePeriodColumn(); ?>
+                <div class="tralla-field">
+                    <label for="tralla-edit-period">Mês das respostas</label>
+                    <input id="tralla-edit-period" type="month" name="period" required
+                           value="<?= tralla_h((string) ($board->fields['period'] ?? '')) ?>" <?= $canUpdate ? '' : 'disabled' ?>>
+                    <small>Este quadro só recebe as respostas do formulário enviadas neste mês.</small>
+                </div>
+            <?php endif; ?>
             <?php if ((string) $board->fields['type'] === 'maintenance'): ?>
                 <fieldset class="tralla-field tralla-notify-options">
                     <legend>Notificações</legend>

@@ -148,7 +148,7 @@ function doPost(e) {
       case 'escolas': // GLPI envia a lista completa de entidades: [{id, nome}]
         return json_({ ok: true, total: replaceSchools_(body.escolas) });
       case 'respostas': // GLPI busca as respostas ainda não enviadas
-        return json_({ ok: true, respostas: pending_(Number(body.limit) || MAX_LIST) });
+        return json_({ ok: true, respostas: pending_(Number(body.limit) || MAX_LIST, body.meses) });
       case 'ack': // GLPI confirma que gravou estas respostas
         return json_({ ok: true, marcadas: ack_(body.ids) });
       default:
@@ -270,7 +270,7 @@ function replaceSchools_(rows) {
 
 // ---------------------------------------------------------------- sincronização com o GLPI
 
-function pending_(limit) {
+function pending_(limit, months) {
   var sheet = spreadsheet_().getSheetByName(TAB_ANSWERS);
   var last = sheet.getLastRow();
   if (last < 2) {
@@ -283,9 +283,14 @@ function pending_(limit) {
     if (r[COL_SYNCED - 1] !== '' || !r[0]) {
       continue;
     }
+    var when = r[1] instanceof Date ? Utilities.formatDate(r[1], 'America/Sao_Paulo', "yyyy-MM-dd'T'HH:mm:ss") : String(r[1]);
+    // O GLPI só pede os meses que têm quadro Preventiva criado.
+    if (Array.isArray(months) && months.length && months.indexOf(when.substring(0, 7)) === -1) {
+      continue;
+    }
     out.push({
       id: String(r[0]),
-      recebido_em: r[1] instanceof Date ? Utilities.formatDate(r[1], 'America/Sao_Paulo', "yyyy-MM-dd'T'HH:mm:ss") : String(r[1]),
+      recebido_em: when,
       escola_id: Number(r[2]), escola: String(r[3]), tem_problemas: String(r[4]) === 'Sim',
       descricao: String(r[5]), melhorias: String(r[6])
     });

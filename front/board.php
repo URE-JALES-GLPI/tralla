@@ -111,7 +111,7 @@ $pluginUrl = $root . '/plugins/tralla';
                        href="<?= tralla_h($pluginUrl) ?>/front/kanban.php?boards_id=<?= $boardId ?>">
                         <span class="tralla-board-type <?= $isMaintenance ? 'is-maintenance' : '' ?>">
                             <i class="ti <?= $isMaintenance ? 'ti-tool' : ($type === 'updates' ? 'ti-refresh' : ($type === 'preventiva' ? 'ti-clipboard-check' : 'ti-layout-kanban')) ?>"></i>
-                            <?= $isMaintenance ? 'Manutenção' : ($type === 'updates' ? 'Atualizações' : ($type === 'preventiva' ? 'Preventiva' : 'Normal')) ?>
+                            <?= $isMaintenance ? 'Manutenção' : ($type === 'updates' ? 'Atualizações' : ($type === 'preventiva' ? 'Preventiva' . (preg_match('/^\d{4}-\d{2}$/', (string) ($board['period'] ?? '')) ? ' · ' . substr((string) $board['period'], 5, 2) . '/' . substr((string) $board['period'], 0, 4) : '') : 'Normal')) ?>
                         </span>
                         <h2><?= tralla_h($board['name']) ?></h2>
                         <?php if (trim((string) $board['comment']) !== ''): ?>
@@ -226,6 +226,11 @@ $backgrounds = tralla_backgrounds();
                         </div>
                         <small id="tralla-board-type-hint">O tipo é definido na criação e não pode ser alterado depois.</small>
                     </fieldset>
+                    <div class="tralla-field" data-period-field hidden>
+                        <label for="tralla-board-period">Mês das respostas</label>
+                        <input id="tralla-board-period" type="month" name="period" value="<?= tralla_h(date('Y-m')) ?>">
+                        <small>O quadro só recebe as respostas do formulário enviadas neste mês. Crie um quadro novo a cada mês.</small>
+                    </div>
                 </section>
 
                 <section class="tralla-board-create-section" aria-labelledby="tralla-board-create-appearance-title">

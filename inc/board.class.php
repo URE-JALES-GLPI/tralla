@@ -133,6 +133,17 @@ class PluginTrallaBoard extends CommonDBTM
         $input['background'] = tralla_valid_background((string) ($input['background'] ?? 'ocean'));
         $input['color'] = tralla_background_color($input['background']);
         $input['comment'] = trim(strip_tags((string) ($input['comment'] ?? '')));
+        if ($input['type'] === 'preventiva') {
+            require_once GLPI_ROOT . '/plugins/tralla/inc/preventiva.class.php';
+            PluginTrallaPreventiva::ensurePeriodColumn();
+            $input['period'] = PluginTrallaPreventiva::normalizePeriod((string) ($input['period'] ?? ''));
+            if ($input['period'] === '') {
+                Session::addMessageAfterRedirect('Informe o mês das respostas do quadro Preventiva.', false, ERROR);
+                return false;
+            }
+        } else {
+            unset($input['period']);
+        }
         $input['is_archived'] = !empty($input['is_archived']) ? 1 : 0;
         $input['is_recursive'] = !empty($input['is_recursive']) ? 1 : 0;
         $input['users_id'] = (int) Session::getLoginUserID();
@@ -169,6 +180,14 @@ class PluginTrallaBoard extends CommonDBTM
         }
         if (array_key_exists('is_archived', $input)) {
             $input['is_archived'] = !empty($input['is_archived']) ? 1 : 0;
+        }
+        if (array_key_exists('period', $input)) {
+            require_once GLPI_ROOT . '/plugins/tralla/inc/preventiva.class.php';
+            PluginTrallaPreventiva::ensurePeriodColumn();
+            $input['period'] = PluginTrallaPreventiva::normalizePeriod((string) $input['period']);
+            if ($input['period'] === '' || (string) ($this->fields['type'] ?? '') !== 'preventiva') {
+                unset($input['period']);
+            }
         }
         foreach (['notify_email', 'notify_whatsapp'] as $field) {
             if (array_key_exists($field, $input)) {
