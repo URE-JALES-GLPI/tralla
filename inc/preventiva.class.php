@@ -192,14 +192,23 @@ class PluginTrallaPreventiva
                 continue;
             }
             $marker = 'Resposta do formulário ' . $responseId;
-            // Já importada (a confirmação anterior pode ter falhado): só confirma de novo.
-            if (countElementsInTable('glpi_plugin_tralla_preventiva_answers', ['response_id' => $responseId]) > 0
-                || countElementsInTable('glpi_plugin_tralla_history', [
-                    'action' => 'preventiva_import', 'details' => ['LIKE', '%' . $responseId . '%'],
-                ]) > 0) {
+            // Já importada e o card ainda existe (a confirmação anterior pode ter falhado): só confirma de novo.
+            // Card excluído libera a resposta para ser importada outra vez.
+            $alive = $DB->request([
+                'COUNT'      => 'n',
+                'FROM'       => 'glpi_plugin_tralla_history AS h',
+                'INNER JOIN' => ['glpi_plugin_tralla_cards AS c' => ['ON' => ['c' => 'id', 'h' => 'plugin_tralla_cards_id']]],
+                'WHERE'      => [
+                    'h.action' => 'preventiva_import', 'h.details' => ['LIKE', '%' . $responseId . '%'],
+                    'c.is_deleted' => 0,
+                ],
+            ])->current();
+            if ((int) ($alive['n'] ?? 0) > 0) {
                 $ack[] = $responseId;
                 continue;
             }
+            // Resposta de um card que foi excluído: remove o vínculo antigo para recriar.
+            $DB->delete('glpi_plugin_tralla_preventiva_answers', ['response_id' => $responseId]);
 
             $entityId = (int) ($answer['escola_id'] ?? 0);
             $entity = $entityId > 0
