@@ -112,8 +112,6 @@
           <label class="choice"><input type="radio" name="tem_problemas" value="nao"> Não</label>
         </div>
         <div class="reveal" id="problemas" hidden>
-          <span class="title">Quais tipos? <span class="hint">Marque quantos quiser (opcional).</span></span>
-          <div class="checks" id="tipos"></div>
           <label class="title" for="descricao">Descreva os problemas <span class="req">*</span>
             <span class="counter" data-count-for="descricao"></span>
             <span class="hint">Diga onde acontece (sala, laboratório, secretaria…), desde quando e o que já foi tentado.</span></label>
@@ -202,16 +200,6 @@
         var o = document.createElement('option');
         o.value = s.nome;
         list.appendChild(o);
-      });
-      var tipos = $('tipos');
-      (data.problemas || []).forEach(function (p) {
-        var l = document.createElement('label');
-        l.className = 'check';
-        var i = document.createElement('input');
-        i.type = 'checkbox'; i.name = 'tipos'; i.value = p;
-        l.appendChild(i);
-        l.appendChild(document.createTextNode(' ' + p));
-        tipos.appendChild(l);
       });
       show('form');
     } catch (e) {
