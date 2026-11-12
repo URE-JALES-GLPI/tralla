@@ -5706,3 +5706,8 @@ html[data-theme="dark"] .tralla-backup-step, body[data-theme="dark"] .tralla-bac
 .tralla-prev-badge.is-yes { background: #fdecea; color: #c62828; }
 .tralla-prev-badge.is-no { background: #e8f5e9; color: #2e7d32; }
 @media (max-width: 560px) { .tralla-prev-fields { grid-template-columns: 1fr; } }
+
+/* Modo embed (Dashure): só o modal do card sobre fundo transparente */
+html.tralla-embed, body.tralla-embed, body.tralla-embed #page { background: transparent !important; }
+body.tralla-embed .tralla-kanban-head, body.tralla-embed .tralla-board-scroll, body.tralla-embed #tralla-kanban { display: none !important; }
+body.tralla-embed .tralla-modal-backdrop { background: transparent; }

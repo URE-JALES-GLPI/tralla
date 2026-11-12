@@ -132,7 +132,14 @@ $bootstrap = [
 
 $background = tralla_valid_background((string) $board->fields['background']);
 
-Html::header('Tralla', $_SERVER['PHP_SELF'], 'tools', 'PluginTrallaBoard');
+// ?embed=1: só o modal do card, para o Dashure abrir dentro de um quadro seu (iframe do mesmo servidor).
+$embed = isset($_GET['embed']) && $_GET['embed'] === '1';
+if ($embed) {
+    Html::popHeader('Tralla', $_SERVER['PHP_SELF'], false, 'tools', 'PluginTrallaBoard');
+    echo "<script>document.documentElement.classList.add('tralla-embed');document.body.classList.add('tralla-embed');</script>";
+} else {
+    Html::header('Tralla', $_SERVER['PHP_SELF'], 'tools', 'PluginTrallaBoard');
+}
 echo "<script>document.title = 'Tralla';</script>";
 ?>
 <div class="tralla-page tralla-kanban-page tr-bg-<?= tralla_h($background) ?>" id="tralla-kanban">
@@ -196,4 +203,8 @@ echo "<script>document.title = 'Tralla';</script>";
 <div id="tralla-toast-root" aria-live="polite" aria-atomic="true"></div>
 
 <?php
-Html::footer();
+if ($embed) {
+    Html::popFooter();
+} else {
+    Html::footer();
+}

@@ -1866,6 +1866,9 @@
         modalRoot.innerHTML = '';
         document.body.classList.remove('tralla-modal-open');
         activeCard = null;
+        if (document.body.classList.contains('tralla-embed') && window.parent !== window) {
+            window.parent.postMessage({ trallaEmbed: 'closed' }, window.location.origin);
+        }
 
         if (lastFocused && typeof lastFocused.focus === 'function' && document.contains(lastFocused)) {
             lastFocused.focus();
