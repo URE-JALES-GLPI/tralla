@@ -733,6 +733,27 @@ body[data-theme="dark"] .tralla-pill.withdrawal {
     background: linear-gradient(135deg, #831843 0%, #db2777 52%, #f9a8d4 100%);
 }
 
+/* Miniaturas da lista de quadros acompanham o tema de cada quadro. */
+.tralla-board-tile.tr-bg-aurora {
+    background: linear-gradient(135deg, #172554 0%, #4338ca 48%, #db2777 100%);
+}
+
+.tralla-board-tile.tr-bg-sunset {
+    background: linear-gradient(135deg, #7c2d12 0%, #ea580c 52%, #f59e0b 100%);
+}
+
+.tralla-board-tile.tr-bg-forest {
+    background: linear-gradient(135deg, #052e16 0%, #15803d 52%, #84cc16 100%);
+}
+
+.tralla-board-tile.tr-bg-graphite {
+    background: linear-gradient(135deg, #111827 0%, #374151 52%, #6b7280 100%);
+}
+
+.tralla-board-tile.tr-bg-candy {
+    background: linear-gradient(135deg, #831843 0%, #db2777 52%, #f9a8d4 100%);
+}
+
 .tralla-board-tile.tr-bg-linux,
 .tralla-kanban-page.tr-bg-linux,
 .tralla-board-create-theme-swatch.tr-bg-linux {
