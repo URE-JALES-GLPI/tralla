@@ -45,6 +45,16 @@ if (isset($_POST['save'])) {
     PluginTrallaConfig::set('sheet_tab', trim(tralla_post_string('sheet_tab', 'Página1')));
     PluginTrallaConfig::set('sheet_first_row', (string) max(2, tralla_post_int('sheet_first_row', 463)));
     PluginTrallaConfig::set('sheet_credentials_path', trim(tralla_post_string('sheet_credentials_path')));
+    require_once GLPI_ROOT . '/plugins/tralla/inc/preventiva.class.php';
+    try {
+        PluginTrallaPreventiva::saveConfig(
+            tralla_post_string('preventiva_url'),
+            tralla_post_string('preventiva_secret'),
+            !empty($_POST['preventiva_secret_remove'])
+        );
+    } catch (Throwable $e) {
+        Session::addMessageAfterRedirect($e->getMessage() . ' (Preventiva não foi salva.)', false, ERROR);
+    }
     require_once GLPI_ROOT . '/plugins/tralla/inc/reportai.class.php';
     if (!empty($_POST['groq_key_remove'])) {
         PluginTrallaReportAi::removeKey();
@@ -71,6 +81,23 @@ if (isset($_POST['save'])) {
     PluginTrallaConfig::clearCache();
 
     Session::addMessageAfterRedirect('Configurações salvas.', true);
+    Html::back();
+}
+
+if (isset($_POST['preventiva_sync_now'])) {
+    require_once GLPI_ROOT . '/plugins/tralla/inc/preventiva.class.php';
+    try {
+        PluginTrallaPreventiva::saveConfig(
+            tralla_post_string('preventiva_url'),
+            tralla_post_string('preventiva_secret'),
+            !empty($_POST['preventiva_secret_remove'])
+        );
+        $total = PluginTrallaPreventiva::sendSchools();
+        Session::addMessageAfterRedirect($total . ' escola(s) enviada(s) para o formulário de Preventiva.', true);
+    } catch (Throwable $e) {
+        PluginTrallaConfig::set('preventiva_last_error', mb_substr($e->getMessage(), 0, 500));
+        Session::addMessageAfterRedirect($e->getMessage(), false, ERROR);
+    }
     Html::back();
 }
 
@@ -305,6 +332,7 @@ echo "<script>document.title = 'Tralla';</script>";
             'contatos'      => ['ti-address-book', 'Contatos'],
             'ia'            => ['ti-sparkles', 'Inteligência artificial'],
             'categorias'    => ['ti-category', 'Categorias'],
+            'preventiva'    => ['ti-clipboard-check', 'Preventiva'],
             'modelos'       => ['ti-device-laptop', 'Modelos de máquina'],
         ] as $tabKey => [$tabIcon, $tabLabel]): ?>
             <button type="button" role="tab" class="tralla-config-tab" data-config-tab-button="<?= $tabKey ?>">
@@ -475,6 +503,39 @@ echo "<script>document.title = 'Tralla';</script>";
                     <i class="ti ti-plug-connected"></i> Testar chave e modelo
                 </button>
             <?php endif; ?>
+        </section>
+
+        <section class="tralla-card tralla-config-card" data-config-tab="preventiva">
+            <header>
+                <h2><i class="ti ti-clipboard-check"></i> Formulário de Preventiva</h2>
+                <p>O Tralla envia as escolas (entidades do GLPI sem entidades abaixo delas) para o formulário, uma vez por dia e pelo botão abaixo.</p>
+            </header>
+            <div class="tralla-field">
+                <label for="tralla-preventiva-url">URL do App da Web (Apps Script)</label>
+                <input id="tralla-preventiva-url" type="url" name="preventiva_url" maxlength="255"
+                       placeholder="https://script.google.com/macros/s/.../exec"
+                       value="<?= tralla_h($config['preventiva_url'] ?? '') ?>">
+            </div>
+            <div class="tralla-field">
+                <label for="tralla-preventiva-secret">Segredo do formulário</label>
+                <input id="tralla-preventiva-secret" type="password" name="preventiva_secret" maxlength="128" autocomplete="new-password"
+                       placeholder="<?= ($config['preventiva_secret_encrypted'] ?? '') !== '' ? 'Segredo salvo — deixe em branco para manter' : 'Cole o segredo mostrado pela função configurar' ?>">
+                <small>Fica criptografado com a chave do GLPI.</small>
+            </div>
+            <?php if (($config['preventiva_secret_encrypted'] ?? '') !== ''): ?>
+                <label class="tralla-check"><input type="checkbox" name="preventiva_secret_remove" value="1"> Remover o segredo salvo</label>
+            <?php endif; ?>
+            <?php
+            $prevLast = (int) ($config['preventiva_last_sync'] ?? 0);
+            $prevError = (string) ($config['preventiva_last_error'] ?? '');
+            ?>
+            <p class="tralla-config-hint">
+                <?= $prevLast > 0 ? 'Último envio: ' . tralla_h(date('d/m/Y H:i', $prevLast)) . '.' : 'Ainda não enviado.' ?>
+                <?php if ($prevError !== ''): ?><br><strong>Último erro:</strong> <?= tralla_h($prevError) ?><?php endif; ?>
+            </p>
+            <button type="submit" name="preventiva_sync_now" value="1" class="tralla-btn tralla-btn-ghost">
+                <i class="ti ti-send"></i> Salvar e enviar escolas agora
+            </button>
         </section>
 
         <footer class="tralla-config-actions">
