@@ -130,6 +130,10 @@ class PluginTrallaAsset
         $select = ['glpi_assets_assets.id', 'glpi_assets_assets.name', 'glpi_assets_assets.serial',
             'glpi_assets_assets.otherserial', 'glpi_entities.completename AS entity_name',
             'glpi_assets_assetmodels.name AS model_name'];
+        $hasCustom = $DB->fieldExists('glpi_assets_assets', 'custom_fields');
+        if ($hasCustom) {
+            $select[] = 'glpi_assets_assets.custom_fields';
+        }
         $out = [];
         foreach ($DB->request([
             'SELECT'    => $select,
@@ -147,7 +151,26 @@ class PluginTrallaAsset
             'ORDER'     => 'glpi_assets_assets.name ASC',
             'LIMIT'     => max(1, min(50, $limit)),
         ]) as $row) {
+            // Onde o termo foi achado (inclui campos que não aparecem no resumo, como IMEI).
+            $matches = [];
+            $needle = mb_strtolower($query);
+            if ($needle !== '') {
+                foreach (['name' => 'Nome', 'serial' => 'Série', 'otherserial' => 'Patrimônio'] as $column => $label) {
+                    if (mb_stripos((string) $row[$column], $needle) !== false) {
+                        $matches[] = ['label' => $label, 'value' => (string) $row[$column]];
+                    }
+                }
+                $custom = $hasCustom && !empty($row['custom_fields']) ? json_decode((string) $row['custom_fields'], true) : null;
+                if (is_array($custom)) {
+                    foreach ($custom as $key => $value) {
+                        if (is_scalar($value) && mb_stripos((string) $value, $needle) !== false) {
+                            $matches[] = ['label' => mb_strtoupper(str_replace('_', ' ', (string) $key)), 'value' => (string) $value];
+                        }
+                    }
+                }
+            }
             $out[] = [
+                'matches'     => $matches,
                 'id'          => (int) $row['id'],
                 'itemtype'    => self::itemtypeFor($system),
                 'name'        => (string) $row['name'],

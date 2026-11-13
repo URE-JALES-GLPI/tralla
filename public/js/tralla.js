@@ -2849,10 +2849,19 @@
                     var list = await api('asset_search', { type: typeEl.value, q: q, model_id: modelId });
                     if (mine !== seq) { return; }
                     found = Array.isArray(list) ? list : [];
+                    var mark = function (text) {
+                        var safe = esc(text);
+                        if (!q) { return safe; }
+                        var escaped = esc(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        return safe.replace(new RegExp(escaped, 'gi'), function (hit) { return '<mark>' + hit + '</mark>'; });
+                    };
                     resultsEl.innerHTML = found.length ? found.map(function (asset, index) {
+                        var where = (asset.matches || []).map(function (match) {
+                            return '<span class="tralla-asset-found">' + esc(match.label) + ': ' + mark(match.value) + '</span>';
+                        }).join('');
                         return '<button type="button" class="tralla-asset-result" data-asset-pick="' + index + '">'
-                            + '<strong>' + esc(asset.name || ('#' + asset.id)) + '</strong>'
-                            + '<small>' + esc(assetSummary(asset)) + '</small></button>';
+                            + '<strong>' + mark(asset.name || ('#' + asset.id)) + '</strong>'
+                            + '<small>' + mark(assetSummary(asset)) + '</small>' + where + '</button>';
                     }).join('') : '<p class="tralla-muted">Nenhum ativo encontrado nessa categoria.</p>';
                 } catch (error) {
                     if (mine === seq) { resultsEl.innerHTML = '<p class="tralla-muted">' + esc(error.message) + '</p>'; }

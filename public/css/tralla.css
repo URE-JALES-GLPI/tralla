@@ -5748,3 +5748,6 @@ details.tralla-release-backup[open] > small { margin-top: 8px; }
 
 .tralla-asset-prev { color: #2e7d32; font-size: .8rem; font-weight: 600; }
 .tralla-asset-prev.is-repeat { background: #fff4e0; border-radius: 6px; color: #b45f06; padding: 3px 8px; }
+
+.tralla-asset-result mark { background: #ffd54f; border-radius: 3px; color: #1f2937; padding: 0 2px; }
+.tralla-asset-found { color: #1f2937; font-size: .8rem; font-weight: 600; }
