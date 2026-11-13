@@ -2808,13 +2808,15 @@
                 + '<div class="tralla-field"><label>Categoria</label><select data-asset-type>'
                 + Object.keys(types).map(function (key) { return '<option value="' + attr(key) + '">' + esc(types[key]) + '</option>'; }).join('')
                 + '</select></div>'
+                + '<div class="tralla-field"><label>Modelo</label><select data-asset-model><option value="0">Todos os modelos</option></select></div>'
                 + '<div class="tralla-field"><label>Buscar</label><input type="search" data-asset-query autocomplete="off" '
-                + 'placeholder="Modelo, IMEI, número de série, patrimônio ou nome (mín. 2 letras)"></div>'
+                + 'placeholder="IMEI, número de série, patrimônio ou nome (mín. 2 letras)"></div>'
                 + '<div class="tralla-asset-results" data-asset-results><p class="tralla-muted">Digite para buscar.</p></div></div>'
                 + '<div class="tralla-dialog-actions"><button type="button" class="tralla-btn" data-asset-cancel>Cancelar</button></div></div>';
             document.body.appendChild(layer);
             var typeEl = layer.querySelector('[data-asset-type]');
             var queryEl = layer.querySelector('[data-asset-query]');
+            var modelEl = layer.querySelector('[data-asset-model]');
             var resultsEl = layer.querySelector('[data-asset-results]');
             var found = [];
             var timer = 0;
@@ -2829,11 +2831,13 @@
             }
             async function run() {
                 var q = queryEl.value.trim();
-                if (q.length < 2) { resultsEl.innerHTML = '<p class="tralla-muted">Digite ao menos 2 caracteres.</p>'; return; }
+                var modelId = Number(modelEl.value) || 0;
+                if (q.length < 2 && !modelId) { resultsEl.innerHTML = '<p class="tralla-muted">Escolha um modelo ou digite ao menos 2 caracteres.</p>'; return; }
+                if (q.length === 1) { q = ''; }
                 var mine = ++seq;
                 resultsEl.innerHTML = '<p class="tralla-muted">Buscando…</p>';
                 try {
-                    var list = await api('asset_search', { type: typeEl.value, q: q });
+                    var list = await api('asset_search', { type: typeEl.value, q: q, model_id: modelId });
                     if (mine !== seq) { return; }
                     found = Array.isArray(list) ? list : [];
                     resultsEl.innerHTML = found.length ? found.map(function (asset, index) {
@@ -2846,7 +2850,21 @@
                 }
             }
             queryEl.addEventListener('input', function () { window.clearTimeout(timer); timer = window.setTimeout(run, 300); });
-            typeEl.addEventListener('change', run);
+            async function loadModels() {
+                modelEl.innerHTML = '<option value="0">Todos os modelos</option>';
+                try {
+                    var models = await api('asset_models', { type: typeEl.value });
+                    (Array.isArray(models) ? models : []).forEach(function (model) {
+                        var option = document.createElement('option');
+                        option.value = String(model.id);
+                        option.textContent = model.name;
+                        modelEl.appendChild(option);
+                    });
+                } catch (error) { /* o filtro de modelo é opcional */ }
+            }
+            typeEl.addEventListener('change', function () { loadModels().then(run); });
+            modelEl.addEventListener('change', run);
+            loadModels();
             resultsEl.addEventListener('click', function (event) {
                 var pick = event.target.closest('[data-asset-pick]');
                 if (pick) { finish(found[Number(pick.getAttribute('data-asset-pick'))] || null); }

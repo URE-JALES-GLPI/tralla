@@ -643,8 +643,12 @@ try {
                 throw new RuntimeException('Sem permissão para vincular ativos.');
             }
             tralla_json(['ok' => true, 'data' => PluginTrallaAsset::search(
-                tralla_post_string('type'), tralla_post_string('q')
+                tralla_post_string('type'), tralla_post_string('q'), 30, tralla_post_int('model_id')
             )]);
+
+        case 'asset_models':
+            tralla_ajax_require(READ);
+            tralla_json(['ok' => true, 'data' => PluginTrallaAsset::models(tralla_post_string('type'))]);
 
         case 'machine_link_asset':
             tralla_ajax_require(UPDATE);

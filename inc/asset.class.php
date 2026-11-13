@@ -77,16 +77,41 @@ class PluginTrallaAsset
         return (int) ($row['id'] ?? 0);
     }
 
+    /** Modelos em uso na categoria (id => nome), para o filtro "Modelo" da busca. */
+    public static function models(string $system): array
+    {
+        global $DB;
+        if (!isset(self::types()[$system])) {
+            return [];
+        }
+        $definitionId = self::definitionId($system);
+        if ($definitionId <= 0) {
+            return [];
+        }
+        $out = [];
+        foreach ($DB->request([
+            'SELECT'    => ['glpi_assets_assetmodels.id', 'glpi_assets_assetmodels.name'],
+            'DISTINCT'  => true,
+            'FROM'      => 'glpi_assets_assets',
+            'INNER JOIN' => ['glpi_assets_assetmodels' => ['ON' => ['glpi_assets_assets' => 'assets_assetmodels_id', 'glpi_assets_assetmodels' => 'id']]],
+            'WHERE'     => ['glpi_assets_assets.assets_assetdefinitions_id' => $definitionId, 'glpi_assets_assets.is_deleted' => 0],
+            'ORDER'     => 'glpi_assets_assetmodels.name ASC',
+        ]) as $row) {
+            $out[] = ['id' => (int) $row['id'], 'name' => (string) $row['name']];
+        }
+        return $out;
+    }
+
     /**
      * Busca em todas as entidades por nome, modelo, serial, patrimônio ou IMEI (campos personalizados).
      * Só lê dados de identificação; quem chama já checou o direito no Tralla.
      */
-    public static function search(string $system, string $query, int $limit = 30): array
+    public static function search(string $system, string $query, int $limit = 30, int $modelId = 0): array
     {
         global $DB;
         $types = self::types();
         $query = trim($query);
-        if (!isset($types[$system]) || mb_strlen($query) < 2) {
+        if (!isset($types[$system]) || (mb_strlen($query) < 2 && $modelId <= 0)) {
             return [];
         }
         $definitionId = self::definitionId($system);
@@ -98,7 +123,6 @@ class PluginTrallaAsset
             ['glpi_assets_assets.name' => $like],
             ['glpi_assets_assets.serial' => $like],
             ['glpi_assets_assets.otherserial' => $like],
-            ['glpi_assets_assetmodels.name' => $like],
         ];
         if ($DB->fieldExists('glpi_assets_assets', 'custom_fields')) {
             $or[] = ['glpi_assets_assets.custom_fields' => $like]; // IMEI e demais campos personalizados
@@ -118,8 +142,8 @@ class PluginTrallaAsset
                 'glpi_assets_assets.assets_assetdefinitions_id' => $definitionId,
                 'glpi_assets_assets.is_deleted'  => 0,
                 'glpi_assets_assets.is_template' => 0,
-                ['OR' => $or],
-            ],
+            ] + ($modelId > 0 ? ['glpi_assets_assets.assets_assetmodels_id' => $modelId] : [])
+              + ($query !== '' ? [['OR' => $or]] : []),
             'ORDER'     => 'glpi_assets_assets.name ASC',
             'LIMIT'     => max(1, min(50, $limit)),
         ]) as $row) {
