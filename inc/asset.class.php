@@ -78,7 +78,7 @@ class PluginTrallaAsset
     }
 
     /** Modelos em uso na categoria (id => nome), para o filtro "Modelo" da busca. */
-    public static function models(string $system): array
+    public static function models(string $system, int $entityId = 0): array
     {
         global $DB;
         if (!isset(self::types()[$system])) {
@@ -94,7 +94,8 @@ class PluginTrallaAsset
             'DISTINCT'  => true,
             'FROM'      => 'glpi_assets_assets',
             'INNER JOIN' => ['glpi_assets_assetmodels' => ['ON' => ['glpi_assets_assets' => 'assets_assetmodels_id', 'glpi_assets_assetmodels' => 'id']]],
-            'WHERE'     => ['glpi_assets_assets.assets_assetdefinitions_id' => $definitionId, 'glpi_assets_assets.is_deleted' => 0],
+            'WHERE'     => ['glpi_assets_assets.assets_assetdefinitions_id' => $definitionId, 'glpi_assets_assets.is_deleted' => 0]
+                + ($entityId > 0 ? ['glpi_assets_assets.entities_id' => $entityId] : []),
             'ORDER'     => 'glpi_assets_assetmodels.name ASC',
         ]) as $row) {
             $out[] = ['id' => (int) $row['id'], 'name' => (string) $row['name']];
@@ -106,7 +107,7 @@ class PluginTrallaAsset
      * Busca em todas as entidades por nome, modelo, serial, patrimônio ou IMEI (campos personalizados).
      * Só lê dados de identificação; quem chama já checou o direito no Tralla.
      */
-    public static function search(string $system, string $query, int $limit = 30, int $modelId = 0): array
+    public static function search(string $system, string $query, int $limit = 30, int $modelId = 0, int $entityId = 0): array
     {
         global $DB;
         $types = self::types();
@@ -151,6 +152,7 @@ class PluginTrallaAsset
                 'glpi_assets_assets.is_deleted'  => 0,
                 'glpi_assets_assets.is_template' => 0,
             ] + ($modelId > 0 ? ['glpi_assets_assets.assets_assetmodels_id' => $modelId] : [])
+              + ($entityId > 0 ? ['glpi_assets_assets.entities_id' => $entityId] : [])
               + ($query !== '' ? [['OR' => $or]] : []),
             'ORDER'     => 'glpi_assets_assets.name ASC',
             'LIMIT'     => max(1, min(50, $limit)),

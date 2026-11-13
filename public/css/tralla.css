@@ -5752,3 +5752,5 @@ details.tralla-release-backup[open] > small { margin-top: 8px; }
 .tralla-asset-result mark { background: none; color: #111827; font-weight: 800; padding: 0; }
 .tralla-asset-found { color: #1f2937; font-size: .8rem; font-weight: 600; }
 .tralla-asset-result > strong { font-weight: 400; }
+
+.tralla-asset-all { display: inline-flex; margin-top: 6px; font-size: .85rem; }

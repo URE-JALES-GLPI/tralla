@@ -2803,8 +2803,17 @@
     }
 
     /** Escolhe um ativo (todas as entidades): categoria + busca por nome, modelo, série, patrimônio ou IMEI. */
-    function assetPicker() {
+    function entityNameFor(entityId) {
+        var found = (Array.isArray(state.entities) ? state.entities : []).filter(function (entity) {
+            return Number(entity.id) === Number(entityId);
+        })[0];
+        return found ? String(found.name || found.label || '').split(' > ').pop() : '';
+    }
+
+    /** entityId > 0: busca só nos ativos dessa entidade (com opção de ampliar para todas). */
+    function assetPicker(entityId) {
         var types = assetTypes();
+        var entityName = entityId > 0 ? (entityNameFor(entityId) || 'entidade do card') : '';
         return new Promise(function (resolve) {
             var layer = document.createElement('div');
             layer.className = 'tralla-dialog-layer';
@@ -2812,7 +2821,9 @@
                 + '<div class="tralla-modal tralla-dialog tralla-asset-picker" role="dialog" aria-modal="true" aria-label="Vincular ativo">'
                 + '<div class="tralla-dialog-head"><span class="tralla-dialog-icon" aria-hidden="true"><i class="ti ti-link"></i></span>'
                 + '<div class="tralla-dialog-copy"><h2 class="tralla-dialog-title">Vincular ativo do GLPI</h2>'
-                + '<p class="tralla-dialog-message">Busca em todas as entidades. O histórico de manutenção do ativo recebe os registros deste card.</p></div></div>'
+                + '<p class="tralla-dialog-message">' + (entityId > 0 ? 'Mostra só os ativos de <strong>' + esc(entityName) + '</strong>.' : 'Busca em todas as entidades.') + ' O histórico de manutenção do ativo recebe os registros deste card.</p>'
+                + (entityId > 0 ? '<label class="tralla-check tralla-asset-all"><input type="checkbox" data-asset-all> Buscar em todas as entidades</label>' : '')
+                + '</div></div>'
                 + '<div class="tralla-asset-picker-body">'
                 + '<div class="tralla-field"><label>Categoria</label><select data-asset-type>'
                 + Object.keys(types).map(function (key) { return '<option value="' + attr(key) + '">' + esc(types[key]) + '</option>'; }).join('')
@@ -2826,6 +2837,8 @@
             var typeEl = layer.querySelector('[data-asset-type]');
             var queryEl = layer.querySelector('[data-asset-query]');
             var modelEl = layer.querySelector('[data-asset-model]');
+            var allEl = layer.querySelector('[data-asset-all]');
+            function scopeEntity() { return entityId > 0 && !(allEl && allEl.checked) ? entityId : 0; }
             var resultsEl = layer.querySelector('[data-asset-results]');
             var found = [];
             var timer = 0;
@@ -2846,7 +2859,7 @@
                 var mine = ++seq;
                 resultsEl.innerHTML = '<p class="tralla-muted">Buscando…</p>';
                 try {
-                    var list = await api('asset_search', { type: typeEl.value, q: q, model_id: modelId });
+                    var list = await api('asset_search', { type: typeEl.value, q: q, model_id: modelId, entity_id: scopeEntity() });
                     if (mine !== seq) { return; }
                     found = Array.isArray(list) ? list : [];
                     var mark = function (text) {
@@ -2871,7 +2884,7 @@
             async function loadModels() {
                 modelEl.innerHTML = '<option value="0">Todos os modelos</option>';
                 try {
-                    var models = await api('asset_models', { type: typeEl.value });
+                    var models = await api('asset_models', { type: typeEl.value, entity_id: scopeEntity() });
                     (Array.isArray(models) ? models : []).forEach(function (model) {
                         var option = document.createElement('option');
                         option.value = String(model.id);
@@ -2882,6 +2895,7 @@
             }
             typeEl.addEventListener('change', function () { loadModels().then(run); });
             modelEl.addEventListener('change', run);
+            if (allEl) { allEl.addEventListener('change', function () { loadModels().then(run); }); }
             loadModels();
             resultsEl.addEventListener('click', function (event) {
                 var pick = event.target.closest('[data-asset-pick]');
@@ -6701,7 +6715,13 @@
         var createAssetPick = event.target.closest('[data-create-asset-pick]');
         if (createAssetPick) {
             var createRow = createAssetPick.closest('[data-create-machine]');
-            assetPicker().then(function (asset) {
+            var createEntityField = createRow ? createRow.closest('form').querySelector('[name="entity_id"]') : null;
+            var createEntityId = createEntityField ? Number(createEntityField.value) || 0 : 0;
+            if (!createEntityId) {
+                toast('Selecione primeiro a entidade (nome do card) para buscar os ativos dela.', 'error');
+                return;
+            }
+            assetPicker(createEntityId).then(function (asset) {
                 if (!asset || !createRow) { return; }
                 createRow.dataset.assetId = String(asset.id);
                 createRow.dataset.assetType = asset.itemtype;
@@ -6716,7 +6736,7 @@
         if ((assetLink || assetUnlink) && activeCard) {
             var assetMachineId = Number((assetLink || assetUnlink).getAttribute(assetLink ? 'data-asset-link' : 'data-asset-unlink'));
             var assetCardId = activeCard.id;
-            (assetUnlink ? Promise.resolve({ itemtype: '', id: 0 }) : assetPicker()).then(function (asset) {
+            (assetUnlink ? Promise.resolve({ itemtype: '', id: 0 }) : assetPicker(Number(activeCard.entities_id) || 0)).then(function (asset) {
                 if (!asset) { return null; }
                 return api('machine_link_asset', { machine_id: assetMachineId, itemtype: asset.itemtype, items_id: asset.id }).then(function () {
                     toast(asset.id ? 'Ativo vinculado.' : 'Ativo desvinculado.', 'success');
