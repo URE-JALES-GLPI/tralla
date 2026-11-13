@@ -287,7 +287,7 @@ class PluginTrallaAsset
 
         $cardLabel = self::cardLabel($cardId);
         if ($oldId > 0 && $oldType !== '' && ($oldId !== $itemsId || $oldType !== $itemtype)) {
-            self::record($oldType, $oldId, 'Desvinculado da máquina do ' . $cardLabel . ' no Tralla.', false, $cardId);
+            self::record($oldType, $oldId, 'Desvinculado da máquina do ' . $cardLabel . ' no Tralla.', false, $cardId, true);
             $old = self::describe($oldType, $oldId);
             PluginTrallaHistory::log($cardId, $userId, 'asset_unlinked',
                 'Ativo "' . ($old['name'] ?? ('#' . $oldId)) . '" desvinculado de uma máquina.');
@@ -338,7 +338,7 @@ class PluginTrallaAsset
      * Escreve nos dois históricos: o do próprio GLPI (aba Histórico do ativo) e o
      * "Histórico Manutenção" do plugin Inventário de Ativos, quando instalado.
      */
-    private static function record(string $itemtype, int $itemsId, string $text, bool $isMaintenance, int $cardId = 0): void
+    private static function record(string $itemtype, int $itemsId, string $text, bool $isMaintenance, int $cardId = 0, bool $unlink = false): void
     {
         try {
             if (class_exists('Log') && defined('Log::HISTORY_LOG_SIMPLE_MESSAGE')) {
@@ -352,6 +352,8 @@ class PluginTrallaAsset
             if (class_exists($class)) {
                 if ($isMaintenance && method_exists($class, 'logTrallaMaintenance')) {
                     $class::logTrallaMaintenance($itemtype, $itemsId, $text, $cardId);
+                } elseif ($unlink && method_exists($class, 'logTrallaUnlink')) {
+                    $class::logTrallaUnlink($itemtype, $itemsId, $text, $cardId);
                 } elseif (!$isMaintenance && method_exists($class, 'logTrallaLink')) {
                     $class::logTrallaLink($itemtype, $itemsId, $text, $cardId);
                 }
