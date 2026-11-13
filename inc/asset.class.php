@@ -125,7 +125,11 @@ class PluginTrallaAsset
             ['glpi_assets_assets.otherserial' => $like],
         ];
         if ($DB->fieldExists('glpi_assets_assets', 'custom_fields')) {
-            $or[] = ['glpi_assets_assets.custom_fields' => $like]; // IMEI e demais campos personalizados
+            // IMEI e demais campos personalizados: só os VALORES (não os nomes dos campos nem o JSON cru).
+            $expression = class_exists('\\Glpi\\DBAL\\QueryExpression') ? '\\Glpi\\DBAL\\QueryExpression' : '\\QueryExpression';
+            $or[] = new $expression(
+                "JSON_SEARCH(`glpi_assets_assets`.`custom_fields`, 'one', " . $DB->quote('%' . $query . '%') . ") IS NOT NULL"
+            );
         }
         $select = ['glpi_assets_assets.id', 'glpi_assets_assets.name', 'glpi_assets_assets.serial',
             'glpi_assets_assets.otherserial', 'glpi_entities.completename AS entity_name',
@@ -155,11 +159,6 @@ class PluginTrallaAsset
             $matches = [];
             $needle = mb_strtolower($query);
             if ($needle !== '') {
-                foreach (['name' => 'Nome', 'serial' => 'Série', 'otherserial' => 'Patrimônio'] as $column => $label) {
-                    if (mb_stripos((string) $row[$column], $needle) !== false) {
-                        $matches[] = ['label' => $label, 'value' => (string) $row[$column]];
-                    }
-                }
                 $custom = $hasCustom && !empty($row['custom_fields']) ? json_decode((string) $row['custom_fields'], true) : null;
                 if (is_array($custom)) {
                     foreach ($custom as $key => $value) {
