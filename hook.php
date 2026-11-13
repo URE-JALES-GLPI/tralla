@@ -576,6 +576,11 @@ function plugin_tralla_install(): bool
         ") or die($DB->error());
     }
 
+    // 1.10.0: máquina do card vinculada a um ativo do GLPI (histórico de manutenção do ativo).
+    if (!$DB->fieldExists('glpi_plugin_tralla_machines', 'asset_itemtype')) {
+        $DB->doQuery("ALTER TABLE `glpi_plugin_tralla_machines` ADD COLUMN `asset_itemtype` VARCHAR(100) NOT NULL DEFAULT '' COMMENT 'tipo do ativo vinculado (inventory_items_id = id)'");
+    }
+
     // 1.9.0: quadro Preventiva por mês (cada quadro só recebe as respostas do mês dele).
     if (!$DB->fieldExists('glpi_plugin_tralla_boards', 'period')) {
         $DB->doQuery("ALTER TABLE `glpi_plugin_tralla_boards` ADD COLUMN `period` VARCHAR(7) DEFAULT NULL COMMENT 'Preventiva: mês das respostas (AAAA-MM)'");

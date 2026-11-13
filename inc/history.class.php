@@ -547,6 +547,8 @@ class PluginTrallaHistory extends CommonDBTM
             'machine_added'         => 'Máquina adicionada',
             'machine_updated'       => 'Máquina atualizada',
             'machine_deleted'       => 'Máquina removida',
+            'asset_linked'          => 'Máquina vinculada a um ativo',
+            'asset_unlinked'        => 'Máquina desvinculada de um ativo',
             'card_finalized'        => 'Manutenção finalizada',
             'preventiva_import'     => 'Resposta do formulário de Preventiva',
             'finalization_reverted' => 'Finalização revertida',

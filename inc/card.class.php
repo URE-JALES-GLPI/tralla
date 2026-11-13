@@ -1116,13 +1116,19 @@ class PluginTrallaCard extends CommonDBTM
             ], ['id' => $cardId]);
 
             $rank = 1024.0;
+            $createdMachineIds = [];
+            $linkedAssets = [];
             foreach ($machines as $machine) {
                 PluginTrallaMachine::insertForCard($cardId, [
                     'model_id' => (int) $machine['model_id'],
                     'label'    => (string) ($machine['label'] ?? ''),
                     'serial'   => (string) ($machine['serial'] ?? ''),
+                    'asset_itemtype'     => (string) ($machine['asset_itemtype'] ?? ''),
+                    'inventory_items_id' => (int) ($machine['asset_id'] ?? 0),
                 ], $rank);
                 $rank += 1024.0;
+                $createdMachineIds[] = $newMachineId = (int) $DB->insertId();
+                $linkedAssets[$newMachineId] = [(string) ($machine['asset_itemtype'] ?? ''), (int) ($machine['asset_id'] ?? 0)];
             }
 
             if ($isDraft) {
@@ -1141,6 +1147,12 @@ class PluginTrallaCard extends CommonDBTM
             PluginTrallaHistory::log($cardId, $userId, 'card_created',
                 ($workflowType === 'call' ? 'Chamado' : 'Card de manutenção') . ' criado com ' . count($machines) . ' máquina(s).');
             $DB->commit();
+            // Ativos já escolhidos na criação: registra o vínculo no histórico do card e do ativo.
+            foreach ($linkedAssets as $linkedMachineId => [$linkedType, $linkedId]) {
+                if ($linkedId > 0 && $linkedType !== '') {
+                    PluginTrallaAsset::announce($linkedMachineId, $cardId, $linkedType, $linkedId, $userId);
+                }
+            }
             } catch (Throwable $e) {
                 $DB->rollBack();
                 throw $e;
@@ -1216,11 +1228,20 @@ class PluginTrallaCard extends CommonDBTM
 
             $label = tralla_normalize_label($machine['label'] ?? '');
             $serial = tralla_normalize_label($machine['serial'] ?? '');
+            // Ativo do GLPI só na criação de uma máquina avulsa (quantidade 1).
+            $assetType = $quantity === 1 ? (string) ($machine['asset_itemtype'] ?? '') : '';
+            $assetId = $quantity === 1 ? (int) ($machine['asset_id'] ?? 0) : 0;
+            if ($assetId > 0 && ($assetType === '' || PluginTrallaAsset::systemFor($assetType) === ''
+                || PluginTrallaAsset::describe($assetType, $assetId) === null)) {
+                throw new RuntimeException('Ativo do GLPI inválido.');
+            }
             for ($index = 0; $index < $quantity; $index++) {
                 $machines[] = [
                     'model_id' => $modelId,
                     'label'    => $quantity === 1 ? $label : '',
                     'serial'   => $quantity === 1 ? $serial : '',
+                    'asset_itemtype' => $assetId > 0 ? $assetType : '',
+                    'asset_id' => $assetId,
                 ];
             }
         }
@@ -3006,6 +3027,7 @@ class PluginTrallaCard extends CommonDBTM
             }
 
             $DB->commit();
+            PluginTrallaAsset::logFinalization($id, array_map('intval', (array) $partition['ready']));
         } catch (Throwable $e) {
             $DB->rollBack();
             throw $e;

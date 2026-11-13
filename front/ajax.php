@@ -637,6 +637,33 @@ try {
             $result = PluginTrallaCard::updateMachine($machineId, $data, $userId, $isAdmin);
             tralla_json(['ok' => true, 'data' => $result]);
 
+        case 'asset_search':
+            tralla_ajax_require(READ);
+            if (!Session::haveRight('plugin_tralla', UPDATE) && !Session::haveRight('plugin_tralla', CREATE)) {
+                throw new RuntimeException('Sem permissão para vincular ativos.');
+            }
+            tralla_json(['ok' => true, 'data' => PluginTrallaAsset::search(
+                tralla_post_string('type'), tralla_post_string('q')
+            )]);
+
+        case 'machine_link_asset':
+            tralla_ajax_require(UPDATE);
+            $linkMachine = PluginTrallaMachine::getMachine(tralla_post_int('machine_id'));
+            if ($linkMachine === null) {
+                throw new RuntimeException('Máquina não encontrada.');
+            }
+            $linkCard = PluginTrallaCard::getCard((int) $linkMachine['plugin_tralla_cards_id']);
+            $linkPermissions = $linkCard === null ? [] : PluginTrallaCard::permissionsFor(
+                $linkCard, PluginTrallaCard::getBoardType((int) $linkCard['plugin_tralla_boards_id']), $userId, $isAdmin
+            );
+            if (empty($linkPermissions['edit_machines'])) {
+                throw new RuntimeException('Somente o técnico responsável pode vincular ativos às máquinas.');
+            }
+            PluginTrallaAsset::link(
+                (int) $linkMachine['id'], tralla_post_string('itemtype'), tralla_post_int('items_id'), $userId
+            );
+            tralla_json(['ok' => true, 'data' => ['machines' => PluginTrallaMachine::getMachinesForCard((int) $linkCard['id'])]]);
+
         case 'machine_bulk_update':
             tralla_ajax_require(UPDATE);
             $cardId = tralla_post_int('card_id');

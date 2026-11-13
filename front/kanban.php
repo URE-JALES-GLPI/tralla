@@ -87,6 +87,7 @@ $bootstrap = [
             'name' => (string) $model['name'],
         ];
     }, $models),
+    'asset_types' => PluginTrallaAsset::canLink() ? PluginTrallaAsset::types() : [],
     'machine_quantity_max' => PluginTrallaCard::MAX_MACHINE_QUANTITY,
     'labels' => [
         'priorities'       => tralla_priority_choices_for_js(),

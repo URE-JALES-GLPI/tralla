@@ -56,6 +56,8 @@ class PluginTrallaMachine extends CommonDBTM
             $row['backup_extracted_by_name'] = (int) ($row['backup_extracted_by'] ?? 0) > 0 ? tralla_user_name((int) $row['backup_extracted_by']) : '';
             $row['backup_done_by_name'] = (int) ($row['backup_done_by'] ?? 0) > 0 ? tralla_user_name((int) $row['backup_done_by']) : '';
             $row['is_filled'] = tralla_machine_is_filled($row);
+            $row['asset'] = (int) ($row['inventory_items_id'] ?? 0) > 0 && (string) ($row['asset_itemtype'] ?? '') !== ''
+                ? PluginTrallaAsset::describe((string) $row['asset_itemtype'], (int) $row['inventory_items_id']) : null;
             $machines[] = $row;
         }
 
@@ -122,6 +124,8 @@ class PluginTrallaMachine extends CommonDBTM
 
         $now = tralla_now();
 
+        $assetType = (string) ($data['asset_itemtype'] ?? '');
+        $withAsset = $assetType !== '' && (int) ($data['inventory_items_id'] ?? 0) > 0 && PluginTrallaAsset::canLink();
         $DB->insert('glpi_plugin_tralla_machines', [
             'plugin_tralla_cards_id'          => $cards_id,
             'plugin_tralla_machine_models_id' => (int) ($data['model_id'] ?? 0),
@@ -134,12 +138,12 @@ class PluginTrallaMachine extends CommonDBTM
             'service_done'                    => !empty($data['service_done'])
                 && tralla_machine_service_done_allowed((string) ($data['status'] ?? 'in_progress')) ? 1 : 0,
             'needs_inventory'                 => !empty($data['needs_inventory']) ? 1 : 0,
-            'inventory_items_id'              => (int) ($data['inventory_items_id'] ?? 0),
+            'inventory_items_id'              => $withAsset ? (int) $data['inventory_items_id'] : 0,
             'rank'                            => $rank,
             'report_saved_at'                 => null,
             'date_creation'                   => $now,
             'date_mod'                        => $now,
-        ]);
+        ] + ($withAsset ? ['asset_itemtype' => $assetType] : []));
 
         return (int) $DB->insertId();
     }

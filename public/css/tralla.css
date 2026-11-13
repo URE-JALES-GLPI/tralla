@@ -5731,3 +5731,17 @@ details.tralla-release-backup > summary::after { content: "▾"; margin-left: au
 details.tralla-release-backup[open] > summary::after { transform: rotate(180deg); }
 details.tralla-release-backup > summary em { color: #6b778c; font-size: .8rem; font-style: normal; font-weight: 400; }
 details.tralla-release-backup[open] > small { margin-top: 8px; }
+
+/* Vínculo máquina com ativo do GLPI */
+.tralla-asset-link { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 2px; }
+.tralla-asset-link.is-linked { background: #e8f3ff; border: 1px solid #b8d7f5; border-radius: 8px; padding: 8px 10px; }
+.tralla-asset-link.is-linked > i { color: #2f6fb3; font-size: 1.3rem; }
+.tralla-asset-link-text { display: flex; flex: 1 1 200px; flex-direction: column; min-width: 0; }
+.tralla-asset-link-text small { color: #6b778c; }
+.tralla-create-asset-chip { background: #e8f3ff; border-radius: 999px; font-size: .85rem; padding: 3px 10px; }
+.tralla-asset-picker { max-width: 560px; }
+.tralla-asset-picker-body { display: grid; gap: 10px; padding: 12px 20px 0; }
+.tralla-asset-results { display: grid; gap: 6px; max-height: 320px; overflow-y: auto; }
+.tralla-asset-result { background: var(--tr-surface, #fff); border: 1px solid #d6dbe4; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; padding: 8px 10px; text-align: left; }
+.tralla-asset-result:hover { background: #f2f8ff; border-color: #2f6fb3; }
+.tralla-asset-result small { color: #6b778c; }

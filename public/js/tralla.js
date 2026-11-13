@@ -2761,6 +2761,103 @@
         };
     }
 
+    /* ----------------------------------------- vínculo com ativos do GLPI */
+
+    function assetTypes() {
+        return state.asset_types && !Array.isArray(state.asset_types) ? state.asset_types : {};
+    }
+
+    function assetSummary(asset) {
+        var parts = [];
+        if (asset.otherserial) { parts.push('Patrimônio ' + asset.otherserial); }
+        if (asset.serial) { parts.push('Série ' + asset.serial); }
+        if (asset.model) { parts.push(asset.model); }
+        if (asset.entity) { parts.push(asset.entity); }
+        return parts.join(' · ');
+    }
+
+    function assetBox(machine, canEdit) {
+        var asset = machine.asset;
+        var hasTypes = Object.keys(assetTypes()).length > 0;
+        if (!asset && (!canEdit || !hasTypes)) { return ''; }
+        if (!asset) {
+            return '<div class="tralla-asset-link"><button type="button" class="tralla-btn tralla-btn-ghost" data-asset-link="'
+                + Number(machine.id) + '"><i class="ti ti-link" aria-hidden="true"></i> Vincular ativo do GLPI</button></div>';
+        }
+        return '<div class="tralla-asset-link is-linked"><i class="ti ti-device-laptop" aria-hidden="true"></i>'
+            + '<span class="tralla-asset-link-text"><strong>' + esc(asset.name || ('#' + asset.id)) + '</strong>'
+            + ' <small>' + esc(asset.type_label || '') + '</small><small>' + esc(assetSummary(asset)) + '</small></span>'
+            + '<a class="tralla-icon-btn" href="' + attr(asset.url) + '" target="_blank" rel="noopener" title="Abrir o ativo no GLPI"><i class="ti ti-external-link"></i></a>'
+            + (canEdit ? '<button type="button" class="tralla-icon-btn" data-asset-link="' + Number(machine.id) + '" title="Trocar ativo"><i class="ti ti-replace"></i></button>'
+                + '<button type="button" class="tralla-icon-btn" data-asset-unlink="' + Number(machine.id) + '" title="Desvincular"><i class="ti ti-unlink"></i></button>' : '')
+            + '</div>';
+    }
+
+    /** Escolhe um ativo (todas as entidades): categoria + busca por nome, modelo, série, patrimônio ou IMEI. */
+    function assetPicker() {
+        var types = assetTypes();
+        return new Promise(function (resolve) {
+            var layer = document.createElement('div');
+            layer.className = 'tralla-dialog-layer';
+            layer.innerHTML = '<div class="tralla-dialog-backdrop" data-asset-backdrop></div>'
+                + '<div class="tralla-modal tralla-dialog tralla-asset-picker" role="dialog" aria-modal="true" aria-label="Vincular ativo">'
+                + '<div class="tralla-dialog-head"><span class="tralla-dialog-icon" aria-hidden="true"><i class="ti ti-link"></i></span>'
+                + '<div class="tralla-dialog-copy"><h2 class="tralla-dialog-title">Vincular ativo do GLPI</h2>'
+                + '<p class="tralla-dialog-message">Busca em todas as entidades. O histórico de manutenção do ativo recebe os registros deste card.</p></div></div>'
+                + '<div class="tralla-asset-picker-body">'
+                + '<div class="tralla-field"><label>Categoria</label><select data-asset-type>'
+                + Object.keys(types).map(function (key) { return '<option value="' + attr(key) + '">' + esc(types[key]) + '</option>'; }).join('')
+                + '</select></div>'
+                + '<div class="tralla-field"><label>Buscar</label><input type="search" data-asset-query autocomplete="off" '
+                + 'placeholder="Modelo, IMEI, número de série, patrimônio ou nome (mín. 2 letras)"></div>'
+                + '<div class="tralla-asset-results" data-asset-results><p class="tralla-muted">Digite para buscar.</p></div></div>'
+                + '<div class="tralla-dialog-actions"><button type="button" class="tralla-btn" data-asset-cancel>Cancelar</button></div></div>';
+            document.body.appendChild(layer);
+            var typeEl = layer.querySelector('[data-asset-type]');
+            var queryEl = layer.querySelector('[data-asset-query]');
+            var resultsEl = layer.querySelector('[data-asset-results]');
+            var found = [];
+            var timer = 0;
+            var seq = 0;
+            function finish(value) {
+                document.removeEventListener('keydown', onKey, true);
+                layer.remove();
+                resolve(value);
+            }
+            function onKey(event) {
+                if (event.key === 'Escape') { event.stopPropagation(); finish(null); }
+            }
+            async function run() {
+                var q = queryEl.value.trim();
+                if (q.length < 2) { resultsEl.innerHTML = '<p class="tralla-muted">Digite ao menos 2 caracteres.</p>'; return; }
+                var mine = ++seq;
+                resultsEl.innerHTML = '<p class="tralla-muted">Buscando…</p>';
+                try {
+                    var list = await api('asset_search', { type: typeEl.value, q: q });
+                    if (mine !== seq) { return; }
+                    found = Array.isArray(list) ? list : [];
+                    resultsEl.innerHTML = found.length ? found.map(function (asset, index) {
+                        return '<button type="button" class="tralla-asset-result" data-asset-pick="' + index + '">'
+                            + '<strong>' + esc(asset.name || ('#' + asset.id)) + '</strong>'
+                            + '<small>' + esc(assetSummary(asset)) + '</small></button>';
+                    }).join('') : '<p class="tralla-muted">Nenhum ativo encontrado nessa categoria.</p>';
+                } catch (error) {
+                    if (mine === seq) { resultsEl.innerHTML = '<p class="tralla-muted">' + esc(error.message) + '</p>'; }
+                }
+            }
+            queryEl.addEventListener('input', function () { window.clearTimeout(timer); timer = window.setTimeout(run, 300); });
+            typeEl.addEventListener('change', run);
+            resultsEl.addEventListener('click', function (event) {
+                var pick = event.target.closest('[data-asset-pick]');
+                if (pick) { finish(found[Number(pick.getAttribute('data-asset-pick'))] || null); }
+            });
+            layer.querySelector('[data-asset-cancel]').addEventListener('click', function () { finish(null); });
+            layer.querySelector('[data-asset-backdrop]').addEventListener('click', function () { finish(null); });
+            document.addEventListener('keydown', onKey, true);
+            queryEl.focus();
+        });
+    }
+
     function renderMachine(machine, canEdit, permissions, sequence, canBulkSelect, awaitingRelease) {
         var id = Number(machine.id);
         var title = machineDisplayTitle(machine, sequence);
@@ -2814,6 +2911,7 @@
             + (machine.is_filled ? 'Preenchida' : 'Pendente') + '</span>'
             + '</div>'
             + backupSteps
+            + assetBox(machine, canEdit)
             + '<div class="tralla-machine-grid is-single">'
             + '<div class="tralla-field"><label>Status</label>'
             + '<select data-machine-field="status"' + disabled + '>' + machineStatusOptions(machine.status || '') + '</select></div>'
@@ -5447,6 +5545,18 @@
         if (!model || !quantity || !summary) {
             return;
         }
+        // Ativo do GLPI só para uma máquina avulsa (quantidade 1).
+        var assetHolder = row.querySelector('[data-create-asset]');
+        if (assetHolder) {
+            var single = Number(quantity.value) === 1 && Number(model.value) > 0;
+            assetHolder.hidden = !single;
+            if (!single) {
+                delete row.dataset.assetId;
+                delete row.dataset.assetType;
+                var chip = assetHolder.querySelector('[data-create-asset-chip]');
+                if (chip) { chip.hidden = true; chip.textContent = ''; }
+            }
+        }
         var option = model.options[model.selectedIndex];
         var modelName = option && option.value && option.value !== '__new'
             ? option.textContent.trim()
@@ -5477,6 +5587,11 @@
             + modelOptions('') + '</select></div>'
             + '</div>'
             + '<div class="tralla-create-machine-summary" data-create-summary aria-live="polite" hidden></div>'
+            + (Object.keys(assetTypes()).length
+                ? '<div class="tralla-asset-link tralla-create-asset" data-create-asset hidden>'
+                    + '<button type="button" class="tralla-btn tralla-btn-ghost" data-create-asset-pick><i class="ti ti-link"></i> Vincular ativo do GLPI (opcional)</button>'
+                    + '<span class="tralla-create-asset-chip" data-create-asset-chip hidden></span></div>'
+                : '')
             + '<button type="button" class="tralla-icon-btn" data-remove-create-machine title="Remover modelo">'
             + '<i class="ti ti-x"></i></button>';
         container.appendChild(row);
@@ -5992,10 +6107,12 @@
                     invalidQuantity = true;
                     return;
                 }
-                machines.push({
-                    model_id: modelId,
-                    quantity: quantity
-                });
+                var created = { model_id: modelId, quantity: quantity };
+                if (quantity === 1 && row.dataset.assetId) {
+                    created.asset_itemtype = row.dataset.assetType;
+                    created.asset_id = Number(row.dataset.assetId);
+                }
+                machines.push(created);
             }
         });
 
@@ -6543,6 +6660,33 @@
                 toast(error.message, 'error');
                 setBusy(backupToggle, false);
             });
+            return;
+        }
+        var createAssetPick = event.target.closest('[data-create-asset-pick]');
+        if (createAssetPick) {
+            var createRow = createAssetPick.closest('[data-create-machine]');
+            assetPicker().then(function (asset) {
+                if (!asset || !createRow) { return; }
+                createRow.dataset.assetId = String(asset.id);
+                createRow.dataset.assetType = asset.itemtype;
+                var chipEl = createRow.querySelector('[data-create-asset-chip]');
+                chipEl.textContent = (asset.name || ('#' + asset.id)) + (asset.otherserial ? ' · patr. ' + asset.otherserial : '');
+                chipEl.hidden = false;
+            });
+            return;
+        }
+        var assetLink = event.target.closest('[data-asset-link]');
+        var assetUnlink = event.target.closest('[data-asset-unlink]');
+        if ((assetLink || assetUnlink) && activeCard) {
+            var assetMachineId = Number((assetLink || assetUnlink).getAttribute(assetLink ? 'data-asset-link' : 'data-asset-unlink'));
+            var assetCardId = activeCard.id;
+            (assetUnlink ? Promise.resolve({ itemtype: '', id: 0 }) : assetPicker()).then(function (asset) {
+                if (!asset) { return null; }
+                return api('machine_link_asset', { machine_id: assetMachineId, itemtype: asset.itemtype, items_id: asset.id }).then(function () {
+                    toast(asset.id ? 'Ativo vinculado.' : 'Ativo desvinculado.', 'success');
+                    return refreshState().then(function () { return openCard(assetCardId); });
+                });
+            }).catch(function (error) { toast(error.message, 'error'); });
             return;
         }
         var backupStep = event.target.closest('[data-backup-step]');
