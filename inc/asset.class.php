@@ -196,6 +196,44 @@ class PluginTrallaAsset
         ];
     }
 
+    /**
+     * Outros cards do Tralla em que este ativo já esteve vinculado (um por manutenção:
+     * cards da mesma família, criados por separação, contam uma vez só).
+     */
+    public static function previousCards(string $itemtype, int $itemsId, int $machineId, int $currentCardId): array
+    {
+        global $DB;
+        if ($itemsId <= 0 || $itemtype === '') {
+            return [];
+        }
+        $current = PluginTrallaCard::getCard($currentCardId);
+        $family = (int) ($current['code_root_cards_id'] ?? 0) ?: $currentCardId;
+        $out = [];
+        foreach ($DB->request([
+            'SELECT'     => ['c.id', 'c.name', 'c.date_creation', 'c.code_root_cards_id', 'c.plugin_tralla_boards_id'],
+            'FROM'       => 'glpi_plugin_tralla_machines AS m',
+            'INNER JOIN' => ['glpi_plugin_tralla_cards AS c' => ['ON' => ['m' => 'plugin_tralla_cards_id', 'c' => 'id']]],
+            'WHERE'      => [
+                'm.asset_itemtype' => $itemtype, 'm.inventory_items_id' => $itemsId,
+                ['m.id' => ['<>', $machineId]], 'c.is_deleted' => 0,
+            ],
+            'ORDER'      => 'c.date_creation DESC',
+        ]) as $row) {
+            $root = (int) ($row['code_root_cards_id'] ?? 0) ?: (int) $row['id'];
+            if ($root === $family || isset($out[$root])) {
+                continue;
+            }
+            $card = PluginTrallaCard::getCard((int) $row['id']);
+            $out[$root] = [
+                'id'   => (int) $row['id'],
+                'code' => $card !== null ? tralla_display_code($card, PluginTrallaCard::getBoardType((int) $row['plugin_tralla_boards_id'])) : '#' . (int) $row['id'],
+                'name' => (string) $row['name'],
+                'date' => date('d/m/Y', strtotime((string) $row['date_creation'])),
+            ];
+        }
+        return array_values($out);
+    }
+
     private static function cardLabel(int $cardId): string
     {
         $card = PluginTrallaCard::getCard($cardId);

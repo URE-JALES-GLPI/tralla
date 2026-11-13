@@ -2784,9 +2784,18 @@
             return '<div class="tralla-asset-link"><button type="button" class="tralla-btn tralla-btn-ghost" data-asset-link="'
                 + Number(machine.id) + '"><i class="ti ti-link" aria-hidden="true"></i> Vincular ativo do GLPI</button></div>';
         }
+        var previous = Array.isArray(asset.previous) ? asset.previous : [];
+        var previousLine = previous.length
+            ? '<span class="tralla-asset-prev is-repeat" title="' + attr(previous.map(function (card) {
+                return card.code + ' · ' + card.name + ' (' + card.date + ')';
+            }).join('\n')) + '"><i class="ti ti-history" aria-hidden="true"></i> Já passou por ' + previous.length
+                + (previous.length === 1 ? ' card' : ' cards') + ' de manutenção: '
+                + previous.slice(0, 4).map(function (card) { return esc(card.code) + ' (' + esc(card.date) + ')'; }).join(', ')
+                + (previous.length > 4 ? ' e mais ' + (previous.length - 4) : '') + '</span>'
+            : '<span class="tralla-asset-prev"><i class="ti ti-sparkles" aria-hidden="true"></i> Primeira manutenção deste ativo no Tralla</span>';
         return '<div class="tralla-asset-link is-linked"><i class="ti ti-device-laptop" aria-hidden="true"></i>'
             + '<span class="tralla-asset-link-text"><strong>' + esc(asset.name || ('#' + asset.id)) + '</strong>'
-            + ' <small>' + esc(asset.type_label || '') + '</small><small>' + esc(assetSummary(asset)) + '</small></span>'
+            + ' <small>' + esc(asset.type_label || '') + '</small><small>' + esc(assetSummary(asset)) + '</small>' + previousLine + '</span>'
             + '<a class="tralla-icon-btn" href="' + attr(asset.url) + '" target="_blank" rel="noopener" title="Abrir o ativo no GLPI"><i class="ti ti-external-link"></i></a>'
             + (canEdit ? '<button type="button" class="tralla-icon-btn" data-asset-link="' + Number(machine.id) + '" title="Trocar ativo"><i class="ti ti-replace"></i></button>'
                 + '<button type="button" class="tralla-icon-btn" data-asset-unlink="' + Number(machine.id) + '" title="Desvincular"><i class="ti ti-unlink"></i></button>' : '')

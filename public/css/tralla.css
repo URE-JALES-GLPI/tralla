@@ -5745,3 +5745,6 @@ details.tralla-release-backup[open] > small { margin-top: 8px; }
 .tralla-asset-result { background: var(--tr-surface, #fff); border: 1px solid #d6dbe4; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; padding: 8px 10px; text-align: left; }
 .tralla-asset-result:hover { background: #f2f8ff; border-color: #2f6fb3; }
 .tralla-asset-result small { color: #6b778c; }
+
+.tralla-asset-prev { color: #2e7d32; font-size: .8rem; font-weight: 600; }
+.tralla-asset-prev.is-repeat { background: #fff4e0; border-radius: 6px; color: #b45f06; padding: 3px 8px; }

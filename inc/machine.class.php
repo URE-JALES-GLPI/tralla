@@ -58,6 +58,11 @@ class PluginTrallaMachine extends CommonDBTM
             $row['is_filled'] = tralla_machine_is_filled($row);
             $row['asset'] = (int) ($row['inventory_items_id'] ?? 0) > 0 && (string) ($row['asset_itemtype'] ?? '') !== ''
                 ? PluginTrallaAsset::describe((string) $row['asset_itemtype'], (int) $row['inventory_items_id']) : null;
+            if ($row['asset'] !== null) {
+                $row['asset']['previous'] = PluginTrallaAsset::previousCards(
+                    (string) $row['asset_itemtype'], (int) $row['inventory_items_id'], (int) $row['id'], $cards_id
+                );
+            }
             $machines[] = $row;
         }
 
