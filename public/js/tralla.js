@@ -2772,7 +2772,7 @@
         if (asset.otherserial) { parts.push('Patrimônio ' + asset.otherserial); }
         if (asset.serial) { parts.push('Série ' + asset.serial); }
         if (asset.model) { parts.push(asset.model); }
-        if (asset.entity) { parts.push(asset.entity); }
+        if (asset.entity) { parts.push(String(asset.entity).split(' > ').pop()); }
         return parts.join(' · ');
     }
 
