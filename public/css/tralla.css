@@ -5671,7 +5671,19 @@ html[data-theme="dark"] .tralla-chat-readonly, body[data-theme="dark"] .tralla-c
 /* Painel dos técnicos aberto dentro do quadro */
 .tralla-tech-modal { display: flex; flex-direction: column; margin: 0; max-height: calc(100vh - 48px); max-width: 1200px; position: relative; width: 100%; z-index: 1; }
 .tralla-tech-body { overflow-y: auto; padding: 16px 20px 20px; }
-.tralla-tech-body .tralla-user-dash { margin: 0; }
+.tralla-tech-body .tralla-user-dash { margin: 0; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); align-items: stretch; }
+.tralla-tech-body .tralla-user-dash-card { min-width: 0; padding: var(--tr-space-3); }
+.tralla-tech-body .tralla-user-dash-card header { flex-wrap: wrap; row-gap: var(--tr-space-2); }
+.tralla-tech-body .tralla-user-dash-person { flex: 1 1 180px; }
+.tralla-tech-body .tralla-user-dash-person > span { min-width: 0; }
+.tralla-tech-body .tralla-user-dash-card header small { overflow-wrap: anywhere; word-break: normal; }
+.tralla-tech-body .tralla-user-dash-card dl { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.tralla-tech-body .tralla-user-dash-card dl > div { min-width: 0; padding: 6px 4px; }
+.tralla-tech-body .tralla-user-dash-card dt { font-size: 10.5px; overflow-wrap: anywhere; min-width: 0; }
+.tralla-tech-body .tralla-user-dash-card dt button { min-width: 0; align-items: center; }
+.tralla-tech-body .tralla-user-dash-priorities { grid-column: 1 / -1; }
+.tralla-tech-body .tralla-user-dash-priorities dl { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
+@media (max-width: 400px) { .tralla-tech-body .tralla-user-dash { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 700px) { .tralla-tech-modal { border-radius: 12px 12px 0 0; max-height: 92vh; } }
 
 /* Backup das máquinas: roxo para destacar */
