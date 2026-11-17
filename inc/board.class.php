@@ -479,6 +479,13 @@ class PluginTrallaBoard extends CommonDBTM
         $people = self::getUserMaintenanceSummary(self::DASHBOARD_EMAILS, $maintenanceBoardIds);
         $technicianIds = array_filter(array_column($people, 'users_id'));
 
+        // Prioridades por técnico: mesma consulta do total global, filtrada por um técnico.
+        foreach ($people as $i => $person) {
+            $people[$i]['priorities'] = (int) $person['users_id'] > 0
+                ? self::getDashboardPriorityTotals([(int) $person['users_id']], $maintenanceBoardIds)
+                : array_fill_keys(array_keys(tralla_priorities()), 0);
+        }
+
         return [
             'people' => $people,
             'priorities' => self::getDashboardPriorityTotals($technicianIds, $maintenanceBoardIds),
@@ -567,6 +574,14 @@ class PluginTrallaBoard extends CommonDBTM
                         <div class="is-withdrawal"><dt><button type="button" data-user-profile="<?= (int) $person['users_id'] ?>" data-user-stage="withdrawal">Retirada <b><?= (int) $person['withdrawal'] ?></b></button></dt></div>
                         <div class="is-done"><dt><button type="button" data-user-profile="<?= (int) $person['users_id'] ?>" data-user-stage="done">Concluído <b><?= (int) $person['done'] ?></b></button></dt></div>
                     </dl>
+                    <div class="tralla-user-dash-prio" aria-label="Chamados por prioridade">
+                        <?php foreach (array_keys(tralla_priorities()) as $priority): ?>
+                            <span title="<?= tralla_h($priority) ?>">
+                                <span class="tralla-card-badge tralla-priority-badge is-<?= tralla_h(strtolower($priority)) ?>"><?= tralla_h($priority) ?></span>
+                                <b><?= (int) ($person['priorities'][$priority] ?? 0) ?></b>
+                            </span>
+                        <?php endforeach; ?>
+                    </div>
                 <?php endif; ?>
             </article>
         <?php endforeach; ?>
