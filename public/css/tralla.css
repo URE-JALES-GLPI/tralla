@@ -4955,6 +4955,11 @@ body[data-theme="dark"] .tralla-dialog-danger .tralla-finalize-requirements {
     padding: var(--tr-space-4);
     color: var(--tr-text);
 }
+.tralla-user-dash-priorities { grid-column: 1 / -1; }
+.tralla-user-dash-priorities h3 {
+    margin: 0 0 var(--tr-space-2);
+    font-size: 15px;
+}
 .tralla-user-dash-card header {
     display: flex;
     align-items: center;

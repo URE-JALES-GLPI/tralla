@@ -476,7 +476,54 @@ class PluginTrallaBoard extends CommonDBTM
             }
         }
 
-        return self::getUserMaintenanceSummary(self::DASHBOARD_EMAILS, $maintenanceBoardIds);
+        $people = self::getUserMaintenanceSummary(self::DASHBOARD_EMAILS, $maintenanceBoardIds);
+        $technicianIds = array_filter(array_column($people, 'users_id'));
+
+        return [
+            'people' => $people,
+            'priorities' => self::getDashboardPriorityTotals($technicianIds, $maintenanceBoardIds),
+        ];
+    }
+
+    /** Conta os cards do painel por prioridade, incluindo os que geraram créditos de pausa. */
+    private static function getDashboardPriorityTotals(array $technicianIds, array $boardIds): array
+    {
+        global $DB;
+
+        $totals = array_fill_keys(array_keys(tralla_priorities()), 0);
+        if ($technicianIds === [] || $boardIds === []) {
+            return $totals;
+        }
+
+        $technicians = implode(',', array_map('intval', $technicianIds));
+        $boards = implode(',', array_map('intval', $boardIds));
+        $rows = $DB->doQuery(
+            "SELECT c.`priority`, COUNT(*) AS `total`
+             FROM `glpi_plugin_tralla_cards` AS c
+             WHERE c.`plugin_tralla_boards_id` IN ({$boards})
+               AND c.`stage` = 1 AND c.`is_deleted` = 0 AND c.`is_draft` = 0
+               AND c.`priority` IN ('P1', 'P2', 'P3', 'P4')
+               AND (
+                   (c.`status` = 'pending' AND c.`is_archived` = 0
+                    AND c.`technician_id` = 0 AND c.`users_id` IN ({$technicians}))
+                   OR (c.`status` IN ('in_progress', 'withdrawal') AND c.`is_archived` = 0
+                       AND c.`is_paused` = 0 AND c.`technician_id` IN ({$technicians}))
+                   OR (c.`status` = 'done' AND c.`technician_id` IN ({$technicians}))
+                   OR EXISTS (
+                       SELECT 1 FROM `glpi_plugin_tralla_cards` AS a
+                       WHERE a.`parent_cards_id` = c.`id`
+                         AND a.`stage` = 2 AND a.`approval_kind` = 'pause' AND a.`status` = 'approved'
+                         AND a.`technician_id` IN ({$technicians})
+                         AND a.`plugin_tralla_boards_id` IN ({$boards})
+                   )
+               )
+             GROUP BY c.`priority`"
+        );
+        while ($row = $rows->fetch_assoc()) {
+            $totals[strtoupper((string) $row['priority'])] = (int) $row['total'];
+        }
+
+        return $totals;
     }
 
     /**
@@ -484,7 +531,7 @@ class PluginTrallaBoard extends CommonDBTM
      */
     public static function renderUserDashboard(array $dashboard, string $ajaxUrl = '', string $csrf = ''): string
     {
-        if ($dashboard === []) {
+        if ($dashboard['people'] === []) {
             return '';
         }
         ob_start();
@@ -492,7 +539,7 @@ class PluginTrallaBoard extends CommonDBTM
     <section class="tralla-user-dash" aria-label="Manutenções por usuário"<?php if ($ajaxUrl !== ''): ?>
              data-user-profile-ajax="<?= tralla_h($ajaxUrl) ?>"
              data-user-profile-csrf="<?= tralla_h($csrf) ?>"<?php endif; ?>>
-        <?php foreach ($dashboard as $person): ?>
+        <?php foreach ($dashboard['people'] as $person): ?>
             <article class="tralla-user-dash-card">
                 <header>
                     <?php $personPicture = (int) $person['users_id'] > 0 ? tralla_user_picture_url((int) $person['users_id']) : ''; ?>
@@ -523,6 +570,17 @@ class PluginTrallaBoard extends CommonDBTM
                 <?php endif; ?>
             </article>
         <?php endforeach; ?>
+        <section class="tralla-user-dash-card tralla-user-dash-priorities" aria-labelledby="tralla-priority-totals">
+            <h3 id="tralla-priority-totals">Total de chamados por prioridade</h3>
+            <dl>
+                <?php foreach ($dashboard['priorities'] as $priority => $total): ?>
+                    <div>
+                        <dt><span class="tralla-card-badge tralla-priority-badge is-<?= tralla_h(strtolower($priority)) ?>"><?= tralla_h($priority) ?></span></dt>
+                        <dd><?= (int) $total ?></dd>
+                    </div>
+                <?php endforeach; ?>
+            </dl>
+        </section>
     </section>
         <?php
         return (string) ob_get_clean();
