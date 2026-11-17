@@ -5163,6 +5163,12 @@ body[data-theme="dark"] .tralla-dialog-danger .tralla-finalize-requirements {
     .tralla-user-dash-card dl { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* prioridades por técnico (compacto, dentro do card) */
+.tralla-user-dash-prio { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 6px; }
+.tralla-user-dash-prio > span { display: flex; align-items: center; justify-content: center; gap: 4px; min-width: 0; padding: 3px 2px; border-radius: var(--tr-radius, 6px); background: rgba(127, 127, 127, .08); }
+.tralla-user-dash-prio .tralla-priority-badge { font-size: 9.5px; padding: 1px 5px; }
+.tralla-user-dash-prio b { font-size: 13px; font-variant-numeric: tabular-nums; }
+
 /* ---------------------------------------------------------------- prioridade / SLA (1.6.0) */
 .tralla-page, .tralla-modal, .tralla-dialog {
     --tr-p1: #d93025; --tr-p2: #e37400; --tr-p3: #2e7d32; --tr-p4: #5f6368; --tr-p5: #1a4fa0;
