@@ -5285,6 +5285,14 @@ class PluginTrallaCard extends CommonDBTM
             $current = $currentById[$machineId];
             $needsBackup = array_key_exists('needs_backup', $entry)
                 ? (!empty($entry['needs_backup']) ? 1 : 0) : (int) ($current['needs_backup'] ?? 0);
+            $currentModelId = (int) ($current['plugin_tralla_machine_models_id'] ?? 0);
+            $modelId = array_key_exists('model_id', $entry) ? (int) $entry['model_id'] : $currentModelId;
+            if ($modelId !== $currentModelId) {
+                if ($modelId <= 0 || !PluginTrallaMachineModel::canUseModel($modelId)) {
+                    throw new RuntimeException('Modelo de máquina inválido.');
+                }
+                $hasChange = true;
+            }
 
             if ($status !== (string) $current['status']
                 || $report !== trim((string) $current['report'])
@@ -5301,6 +5309,7 @@ class PluginTrallaCard extends CommonDBTM
                 'service_done'    => $serviceDone,
                 'needs_inventory' => $needsInventory,
                 'needs_backup'    => $needsBackup,
+                'model_id'        => $modelId,
             ];
         }
 
@@ -5396,12 +5405,18 @@ class PluginTrallaCard extends CommonDBTM
                 throw new RuntimeException('Status de máquina inválido.');
             }
 
+            $newModelId = (int) ($entry['model_id'] ?? 0);
+            if ($newModelId > 0 && $newModelId !== (int) ($currentById[$machineId]['plugin_tralla_machine_models_id'] ?? 0)
+                && PluginTrallaMachineModel::getModel($newModelId, true) === null) {
+                throw new RuntimeException('Modelo de máquina inválido.');
+            }
             PluginTrallaMachine::updateMachine($machineId, [
                 'status'          => $status,
                 'report'          => tralla_normalize_report($entry['report'] ?? ''),
                 'service_done'    => !empty($entry['service_done']) ? 1 : 0,
                 'needs_inventory' => !empty($entry['needs_inventory']) ? 1 : 0,
-            ] + (array_key_exists('needs_backup', $entry) ? ['needs_backup' => !empty($entry['needs_backup']) ? 1 : 0] : []));
+            ] + (array_key_exists('needs_backup', $entry) ? ['needs_backup' => !empty($entry['needs_backup']) ? 1 : 0] : [])
+              + ($newModelId > 0 ? ['model_id' => $newModelId] : []));
         }
 
         foreach (array_keys($currentById) as $machineId) {
@@ -5568,6 +5583,19 @@ class PluginTrallaCard extends CommonDBTM
             }
             $current = $currentById[$machineId];
             $label = $machineLabel($current);
+
+            $entryModel = (int) ($entry['model_id'] ?? 0);
+            $currentModel = (int) ($current['plugin_tralla_machine_models_id'] ?? 0);
+            if ($entryModel > 0 && $entryModel !== $currentModel) {
+                $newModel = PluginTrallaMachineModel::getModel($entryModel, true);
+                $changes[] = [
+                    'type'       => 'machine_model',
+                    'label'      => $label . ': modelo',
+                    'before'     => trim((string) ($current['model_name'] ?? '')) ?: '—',
+                    'after'      => $newModel !== null ? (string) $newModel['name'] : ('Modelo #' . $entryModel),
+                    'machine_id' => $machineId,
+                ];
+            }
 
             $status = (string) ($entry['status'] ?? '');
             if ($status !== (string) $current['status']) {

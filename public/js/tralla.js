@@ -4811,7 +4811,10 @@
             + '<strong>' + esc(machineDisplayTitle(machine, sequence)) + '</strong>'
             + '<button type="button" class="tralla-icon-btn" data-remove-edit-machine title="Remover do card">'
             + '<i class="ti ti-trash"></i></button></div>'
-            + '<div class="tralla-machine-grid is-single">'
+            + '<div class="tralla-machine-grid">'
+            + '<div class="tralla-field"><label>Modelo</label>'
+            + '<select data-edit-field="model_id">'
+            + modelOptions(machine.plugin_tralla_machine_models_id || '').replace(/<option value="__new">[^<]*<\/option>/, '') + '</select></div>'
             + '<div class="tralla-field"><label>Status</label>'
             + '<select data-edit-field="status">' + machineStatusOptions(machine.status || '') + '</select></div>'
             + '</div>'
@@ -4921,6 +4924,7 @@
             var service = row.querySelector('[data-edit-field="service_done"]');
             var inventory = row.querySelector('[data-edit-field="needs_inventory"]');
             var backupField = row.querySelector('[data-edit-field="needs_backup"]');
+            var modelField = row.querySelector('[data-edit-field="model_id"]');
             var entry = {
                 id: id,
                 status: status ? status.value : '',
@@ -4929,6 +4933,7 @@
                 needs_inventory: inventory && inventory.checked ? 1 : 0
             };
             if (backupField) { entry.needs_backup = backupField.checked ? 1 : 0; }
+            if (modelField && Number(modelField.value) > 0) { entry.model_id = Number(modelField.value); }
             machines.push(entry);
         });
 
