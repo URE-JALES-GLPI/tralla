@@ -5839,3 +5839,9 @@ details.tralla-release-backup[open] > small { margin-top: 8px; }
 .tralla-prio-toggle::before { content: attr(data-closed); }
 .tralla-user-dash-priorities[open] .tralla-prio-toggle::before { content: attr(data-open); }
 .tralla-user-dash-priorities > dl { padding: 0 18px 16px; }
+
+/* Painel por técnico: os cards dividem toda a largura da linha (sem coluna vazia à direita) */
+.tralla-user-dash { display: flex; flex-wrap: wrap; }
+.tralla-user-dash > .tralla-user-dash-card { flex: 1 1 380px; }
+.tralla-user-dash > .tralla-user-dash-priorities { flex: 1 1 100%; }
+.tralla-tech-body .tralla-user-dash { display: flex; }
