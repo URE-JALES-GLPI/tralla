@@ -5777,3 +5777,15 @@ details.tralla-release-backup[open] > small { margin-top: 8px; }
 .tralla-asset-result > strong { font-weight: 400; }
 
 .tralla-asset-all { display: inline-flex; margin-top: 6px; font-size: .85rem; }
+
+/* Painel por técnico na lista de quadros: cards mais largos, rótulos sem quebrar no meio da palavra */
+.tralla-user-dash { grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); align-items: stretch; }
+.tralla-user-dash-card { min-width: 0; }
+.tralla-user-dash-person { flex: 1 1 auto; }
+.tralla-user-dash-person > span { min-width: 0; }
+.tralla-user-dash-card header small { overflow-wrap: anywhere; word-break: normal; }
+.tralla-user-dash-card dl > div { min-width: 0; padding: 8px 4px; }
+.tralla-user-dash-card dt { font-size: 10.5px; hyphens: none; overflow-wrap: normal; white-space: nowrap; word-break: normal; }
+.tralla-user-dash-card dt button { min-height: 0; min-width: 0; }
+.tralla-user-dash-prio { margin-top: 8px; }
+@media (max-width: 460px) { .tralla-user-dash { grid-template-columns: minmax(0, 1fr); } }
