@@ -25,7 +25,35 @@ class PluginTrallaCron extends CommonDBTM
         ];
     }
 
+    /** Janela do reinício diário da VM (07:00): a ação não começa perto dele, para o MySQL não cair no meio. */
+    private const REBOOT_QUIET_FROM = '06:58';
+    private const REBOOT_QUIET_TO = '07:04';
+
+    /** Em quietude (perto do reinício diário ou logo após o boot)? Então a ação espera o próximo minuto. */
+    private static function inRebootWindow(): bool
+    {
+        $hm = date('H:i');
+        if ($hm >= self::REBOOT_QUIET_FROM && $hm <= self::REBOOT_QUIET_TO) {
+            return true;
+        }
+        $uptime = @file_get_contents('/proc/uptime');
+        return $uptime !== false && (float) strtok($uptime, ' ') < 180;
+    }
+
     public static function cronNotify(CronTask $task): int
+    {
+        if (self::inRebootWindow()) {
+            return 0;
+        }
+        try {
+            return self::runNotify($task);
+        } catch (\Throwable $e) {
+            // Banco indisponível (reinício, "server has gone away"): encerra sem erro e tenta no próximo minuto.
+            return 0;
+        }
+    }
+
+    private static function runNotify(CronTask $task): int
     {
         global $DB;
 
