@@ -4958,6 +4958,28 @@
             return;
         }
 
+        // Troca de modelo em máquina com ativo vinculado: o vínculo continua, então pede confirmação explícita.
+        var linkedModelChanges = [];
+        Array.prototype.forEach.call(form.querySelectorAll('[data-edit-machine]'), function (row) {
+            var modelField = row.querySelector('[data-edit-field="model_id"]');
+            var original = (activeCard.machines || []).filter(function (item) {
+                return Number(item.id) === Number(row.dataset.machineId || 0);
+            })[0];
+            if (modelField && original && original.asset
+                && Number(modelField.value) > 0
+                && Number(modelField.value) !== Number(original.plugin_tralla_machine_models_id || 0)) {
+                linkedModelChanges.push(machineDisplayTitle(original, 0) + ' (ativo: ' + (original.asset.name || ('#' + original.asset.id)) + ')');
+            }
+        });
+        if (linkedModelChanges.length && !await checkboxConfirmation({
+            title: 'Modelo com ativo vinculado',
+            message: 'Estas máquinas já estão vinculadas a um ativo do GLPI e o vínculo será mantido: '
+                + linkedModelChanges.join('; ') + '. Confirme que o ativo vinculado é mesmo desta máquina com o novo modelo.',
+            confirmLabel: 'Manter vínculo e continuar'
+        })) {
+            return;
+        }
+
         var submit = form.querySelector('button[type="submit"]');
         setBusy(submit, true);
         if ((activeCard.permissions || {}).tablet_edit) {
