@@ -5789,3 +5789,42 @@ details.tralla-release-backup[open] > small { margin-top: 8px; }
 .tralla-user-dash-card dt button { min-height: 0; min-width: 0; }
 .tralla-user-dash-prio { margin-top: 8px; }
 @media (max-width: 460px) { .tralla-user-dash { grid-template-columns: minmax(0, 1fr); } }
+
+/* Painel por técnico — refinamento visual */
+.tralla-user-dash { gap: 14px; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); }
+.tralla-user-dash-card { border-radius: 14px; padding: 16px 18px; transition: box-shadow .18s ease, transform .18s ease; }
+.tralla-user-dash-card:hover { box-shadow: 0 8px 22px rgba(15, 23, 42, .10); transform: translateY(-1px); }
+.tralla-user-dash-card header { align-items: center; margin-bottom: 14px; }
+.tralla-user-dash-card .tralla-user-dash-avatar { border-width: 3px; height: 48px; width: 48px; }
+.tralla-user-dash-card header strong { font-size: 15.5px; }
+.tralla-user-dash-card header small { display: block; margin-top: 2px; }
+.tralla-user-dash-total { background: var(--tr-primary-soft); border-color: transparent; border-radius: 999px; color: var(--tr-primary); padding: 4px 14px; }
+.tralla-user-dash-total b { color: var(--tr-primary); }
+
+/* quatro situações: número em destaque, rótulo embaixo, faixa colorida na lateral */
+.tralla-user-dash-card dl { gap: 8px; }
+.tralla-user-dash-card dl > div { border-left: 3px solid transparent; border-radius: 10px; padding: 10px 6px 8px; transition: filter .15s ease; }
+.tralla-user-dash-card dl > div:hover { filter: brightness(.97); }
+.tralla-user-dash-card dt button { align-items: center; gap: 0; justify-content: center; }
+.tralla-user-dash-card dt button b { font-size: 24px; line-height: 1.1; order: -1; }
+.tralla-user-dash-card dt { color: var(--tr-text-soft); font-size: 10.5px; letter-spacing: .02em; }
+.tralla-user-dash-card .is-pending { border-left-color: var(--tr-warning); }
+.tralla-user-dash-card .is-progress { border-left-color: var(--tr-primary); }
+.tralla-user-dash-card .is-withdrawal { border-left-color: var(--tr-purple); }
+.tralla-user-dash-card .is-done { border-left-color: var(--tr-success); }
+
+/* prioridades do técnico: linha separada, discreta */
+.tralla-user-dash-prio { border-top: 1px dashed var(--tr-border); gap: 8px; margin-top: 12px; padding-top: 12px; }
+.tralla-user-dash-prio > span { background: var(--tr-surface-2); border-radius: 999px; gap: 6px; padding: 4px 8px; }
+.tralla-user-dash-prio b { font-size: 14px; }
+
+/* total geral por prioridade: quatro blocos com topo colorido */
+.tralla-user-dash-priorities h3 { font-size: 14px; letter-spacing: .02em; margin-bottom: 12px; }
+.tralla-user-dash-priorities dl { gap: 12px; }
+.tralla-user-dash-priorities dl > div { align-items: center; background: var(--tr-surface-2); border-radius: 12px; border-top: 4px solid var(--tr-border); display: flex; flex-direction: column; gap: 6px; padding: 12px 8px; }
+.tralla-user-dash-priorities dd { color: var(--tr-text); font-size: 30px; font-variant-numeric: tabular-nums; font-weight: 700; line-height: 1; margin: 0; }
+.tralla-user-dash-priorities dl > div:nth-child(1) { border-top-color: var(--tr-p1); }
+.tralla-user-dash-priorities dl > div:nth-child(2) { border-top-color: var(--tr-p2); }
+.tralla-user-dash-priorities dl > div:nth-child(3) { border-top-color: var(--tr-p3); }
+.tralla-user-dash-priorities dl > div:nth-child(4) { border-top-color: var(--tr-p4); }
+.tralla-user-dash-priorities:hover { box-shadow: var(--tr-shadow-sm); transform: none; }
