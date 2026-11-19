@@ -5845,3 +5845,6 @@ details.tralla-release-backup[open] > small { margin-top: 8px; }
 .tralla-user-dash > .tralla-user-dash-card { flex: 1 1 380px; }
 .tralla-user-dash > .tralla-user-dash-priorities { flex: 1 1 100%; }
 .tralla-tech-body .tralla-user-dash { display: flex; }
+
+.tralla-user-dash-priorities { padding: 16px 18px; }
+.tralla-user-dash-priorities > dl { padding: 0; }

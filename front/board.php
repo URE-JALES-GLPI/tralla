@@ -44,6 +44,12 @@ $pluginUrl = $root . '/plugins/tralla';
             </div>
         </div>
         <div class="tralla-head-actions">
+            <?php if (!empty($dashboard['people'])): ?>
+                <button type="button" class="tralla-btn tralla-btn-ghost" aria-expanded="false" aria-controls="tralla-priority-box"
+                        onclick="var b=document.getElementById('tralla-priority-box');if(!b){return;}b.hidden=!b.hidden;this.setAttribute('aria-expanded',b.hidden?'false':'true');this.querySelector('span').textContent=b.hidden?'Exibir totais por prioridade':'Ocultar totais por prioridade';">
+                    <i class="ti ti-chart-bar"></i> <span>Exibir totais por prioridade</span>
+                </button>
+            <?php endif; ?>
             <a class="tralla-btn tralla-btn-ghost" href="?archived=<?= $showArchived ? '0' : '1' ?>">
                 <i class="ti ti-archive"></i>
                 <?= $showArchived ? 'Ver ativos' : 'Ver arquivados' ?>
