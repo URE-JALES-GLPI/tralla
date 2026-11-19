@@ -585,8 +585,9 @@ class PluginTrallaBoard extends CommonDBTM
                 <?php endif; ?>
             </article>
         <?php endforeach; ?>
-        <section class="tralla-user-dash-card tralla-user-dash-priorities" aria-labelledby="tralla-priority-totals">
-            <h3 id="tralla-priority-totals">Total de chamados por prioridade</h3>
+        <details class="tralla-user-dash-card tralla-user-dash-priorities">
+            <summary id="tralla-priority-totals"><span><i class="ti ti-chart-bar" aria-hidden="true"></i> Total de chamados por prioridade</span>
+                <em class="tralla-prio-toggle" data-open="Ocultar" data-closed="Exibir"></em></summary>
             <dl>
                 <?php foreach ($dashboard['priorities'] as $priority => $total): ?>
                     <div>
@@ -595,7 +596,7 @@ class PluginTrallaBoard extends CommonDBTM
                     </div>
                 <?php endforeach; ?>
             </dl>
-        </section>
+        </details>
     </section>
         <?php
         return (string) ob_get_clean();

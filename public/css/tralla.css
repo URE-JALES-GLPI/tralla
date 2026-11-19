@@ -5828,3 +5828,14 @@ details.tralla-release-backup[open] > small { margin-top: 8px; }
 .tralla-user-dash-priorities dl > div:nth-child(3) { border-top-color: var(--tr-p3); }
 .tralla-user-dash-priorities dl > div:nth-child(4) { border-top-color: var(--tr-p4); }
 .tralla-user-dash-priorities:hover { box-shadow: var(--tr-shadow-sm); transform: none; }
+
+/* Painel por técnico: cards ocupam toda a largura; total por prioridade fica recolhido */
+.tralla-user-dash { grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); }
+.tralla-user-dash-priorities { padding: 0; }
+.tralla-user-dash-priorities > summary { align-items: center; cursor: pointer; display: flex; font-size: 14px; font-weight: 700; gap: 10px; justify-content: space-between; list-style: none; padding: 12px 18px; }
+.tralla-user-dash-priorities > summary::-webkit-details-marker { display: none; }
+.tralla-user-dash-priorities > summary > span { align-items: center; display: inline-flex; gap: 8px; }
+.tralla-prio-toggle { background: var(--tr-primary-soft); border-radius: 999px; color: var(--tr-primary); font-size: 12px; font-style: normal; font-weight: 600; padding: 4px 14px; }
+.tralla-prio-toggle::before { content: attr(data-closed); }
+.tralla-user-dash-priorities[open] .tralla-prio-toggle::before { content: attr(data-open); }
+.tralla-user-dash-priorities > dl { padding: 0 18px 16px; }
