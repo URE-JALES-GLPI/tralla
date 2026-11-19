@@ -6754,8 +6754,10 @@
         if (createAssetPick) {
             var createRow = createAssetPick.closest('[data-create-machine]');
             var createEntityField = createRow ? createRow.closest('form').querySelector('[name="entity_id"]') : null;
-            var createEntityId = createEntityField ? Number(createEntityField.value) || 0 : 0;
-            if (!createEntityId) {
+            // A entidade raiz tem id 0: só vale como "não escolhida" quando o campo está vazio.
+            var createEntityRaw = createEntityField ? String(createEntityField.value).trim() : '';
+            var createEntityId = Number(createEntityRaw) || 0;
+            if (createEntityRaw === '') {
                 toast('Selecione primeiro a entidade (nome do card) para buscar os ativos dela.', 'error');
                 return;
             }
