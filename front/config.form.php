@@ -341,6 +341,36 @@ echo "<script>document.title = 'Tralla';</script>";
         </div>
     </header>
 
+    <?php
+    // Aviso: a ação automática do Tralla (busca da Preventiva, lembretes) precisa rodar a cada minuto.
+    $cronRow = $DB->request([
+        'FROM'  => 'glpi_crontasks',
+        'WHERE' => ['itemtype' => 'PluginTrallaCron', 'name' => 'notify'],
+        'LIMIT' => 1,
+    ])->current();
+    $cronProblem = '';
+    if (!$cronRow) {
+        $cronProblem = 'A ação automática do Tralla (notify) não está registrada.';
+    } else {
+        $cronState = (int) $cronRow['state'];
+        $cronLast = !empty($cronRow['lastrun']) ? strtotime((string) $cronRow['lastrun']) : 0;
+        $cronAge = $cronLast > 0 ? time() - $cronLast : PHP_INT_MAX;
+        if ($cronState === 0) {
+            $cronProblem = 'A ação automática do Tralla (notify) está desabilitada: a busca de respostas da Preventiva e os lembretes de cards não estão rodando.';
+        } elseif ($cronAge > 600) {
+            $cronProblem = 'A ação automática do Tralla (notify) não roda há ' . ($cronLast > 0 ? (int) floor($cronAge / 60) . ' minutos' : 'muito tempo')
+                . ($cronState === 2 ? ' e está marcada como "Executando" (travada)' : '')
+                . '. A busca de respostas da Preventiva e os lembretes podem estar parados.';
+        }
+    }
+    if ($cronProblem !== '') : ?>
+        <div role="alert" style="align-items:center;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;color:#991b1b;display:flex;flex-wrap:wrap;gap:10px;margin:0 0 14px;padding:10px 14px;">
+            <i class="ti ti-alert-triangle" aria-hidden="true"></i>
+            <span><?= tralla_h($cronProblem) ?></span>
+            <a href="<?= tralla_h((string) $CFG_GLPI['root_doc']) ?>/front/crontask.form.php?id=<?= (int) ($cronRow['id'] ?? 0) ?>" style="font-weight:700;margin-left:auto;">Abrir a ação automática</a>
+        </div>
+    <?php endif; ?>
+
     <nav class="tralla-config-tabs" role="tablist" aria-label="Guias das configurações" data-config-tabs hidden>
         <?php foreach ([
             'assignature'   => ['ti-link', 'assignat-ure'],
