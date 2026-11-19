@@ -5856,3 +5856,5 @@ details.tralla-release-backup[open] > small { margin-top: 8px; }
 .tralla-user-profile-prio-grid strong { font-size: 23px; }
 .tralla-user-profile-stats { cursor: default; user-select: none; }
 @media (max-width: 520px) { .tralla-user-profile-prio-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.tralla-user-dash-stalled { align-items: center; background: color-mix(in srgb, var(--tr-danger) 12%, transparent); border-radius: 8px; color: var(--tr-danger); display: flex; font-size: 12px; font-weight: 600; gap: 6px; margin: 10px 0 0; padding: 6px 10px; }

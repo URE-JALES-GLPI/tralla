@@ -486,10 +486,54 @@ class PluginTrallaBoard extends CommonDBTM
                 : array_fill_keys(array_keys(tralla_priorities()), 0);
         }
 
+        $stalled = self::getStalledHighPriority($technicianIds, $maintenanceBoardIds);
+        foreach ($people as $i => $person) {
+            $people[$i]['stalled'] = $stalled[(int) $person['users_id']] ?? ['count' => 0, 'days' => 0];
+        }
+
         return [
             'people' => $people,
             'priorities' => self::getDashboardPriorityTotals($technicianIds, $maintenanceBoardIds),
         ];
+    }
+
+    /** Dias sem movimentação para um card P1/P2 ser considerado parado. */
+    public const STALLED_DAYS = 3;
+
+    /**
+     * Cards P1/P2 pendentes ou em andamento, sem alteração há STALLED_DAYS ou mais, por técnico.
+     * @return array<int, array{count:int, days:int}> users_id => quantidade e maior tempo parado (dias)
+     */
+    public static function getStalledHighPriority(array $technicianIds, array $boardIds): array
+    {
+        global $DB;
+
+        if ($technicianIds === [] || $boardIds === []) {
+            return [];
+        }
+        $technicians = implode(',', array_map('intval', $technicianIds));
+        $boards = implode(',', array_map('intval', $boardIds));
+        $limit = (int) self::STALLED_DAYS;
+        $rows = $DB->doQuery(
+            "SELECT IF(c.`status` = 'pending', c.`users_id`, c.`technician_id`) AS `owner`,
+                    COUNT(*) AS `total`, MAX(DATEDIFF(NOW(), c.`date_mod`)) AS `days`
+             FROM `glpi_plugin_tralla_cards` AS c
+             WHERE c.`plugin_tralla_boards_id` IN ({$boards})
+               AND c.`stage` = 1 AND c.`is_deleted` = 0 AND c.`is_draft` = 0 AND c.`is_archived` = 0
+               AND c.`priority` IN ('P1', 'P2')
+               AND c.`date_mod` <= DATE_SUB(NOW(), INTERVAL {$limit} DAY)
+               AND (
+                   (c.`status` = 'pending' AND c.`technician_id` = 0 AND c.`users_id` IN ({$technicians}))
+                   OR (c.`status` = 'in_progress' AND c.`is_paused` = 0 AND c.`technician_id` IN ({$technicians}))
+               )
+             GROUP BY `owner`"
+        );
+        $result = [];
+        while ($row = $rows->fetch_assoc()) {
+            $result[(int) $row['owner']] = ['count' => (int) $row['total'], 'days' => (int) $row['days']];
+        }
+
+        return $result;
     }
 
     /** Conta os cards do painel por prioridade, incluindo os que geraram créditos de pausa. */
@@ -580,6 +624,13 @@ class PluginTrallaBoard extends CommonDBTM
                         <div class="is-withdrawal"><dt><button type="button" data-user-profile="<?= (int) $person['users_id'] ?>" data-user-stage="withdrawal">Retirada <b><?= (int) $person['withdrawal'] ?></b></button></dt></div>
                         <div class="is-done"><dt><button type="button" data-user-profile="<?= (int) $person['users_id'] ?>" data-user-stage="done">Concluído <b><?= (int) $person['done'] ?></b></button></dt></div>
                     </dl>
+                    <?php if ((int) ($person['stalled']['count'] ?? 0) > 0): ?>
+                        <p class="tralla-user-dash-stalled" title="P1/P2 pendentes ou em andamento sem alteração há <?= (int) self::STALLED_DAYS ?> dias ou mais">
+                            <i class="ti ti-alert-triangle" aria-hidden="true"></i>
+                            <?= (int) $person['stalled']['count'] ?> P1/P2 parado<?= (int) $person['stalled']['count'] > 1 ? 's' : '' ?>
+                            · há até <?= (int) $person['stalled']['days'] ?> dias
+                        </p>
+                    <?php endif; ?>
                     <div class="tralla-user-dash-prio" aria-label="Chamados por prioridade">
                         <?php foreach (array_keys(tralla_priorities()) as $priority): ?>
                             <span title="<?= tralla_h($priority) ?>">
