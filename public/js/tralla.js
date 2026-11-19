@@ -646,10 +646,15 @@
                 + (user.email ? '<p>' + dialogEscape(user.email) + '</p>' : '')
                 + '<small>Usuário GLPI #' + Number(user.id) + '</small></div></div>'
                 + '<h3>Manutenções</h3><p class="tralla-user-profile-caption">Quadros de manutenção aos quais você tem acesso</p>'
-                + '<div class="tralla-user-profile-stats">' + steps.map(function (step) {
+                + '<div class="tralla-user-profile-stats" data-user-prio-toggle title="Clique 2 vezes para ver as prioridades">' + steps.map(function (step) {
                     return '<div class="' + step[2] + (stage === step[0] ? ' is-selected' : '') + '"><span>'
                         + step[1] + '</span><strong>' + Number(stats[step[0]] || 0) + '</strong></div>';
-                }).join('') + '</div></section>';
+                }).join('') + '</div>'
+                + '<div class="tralla-user-profile-prio" data-user-prio hidden><h3>Chamados por prioridade</h3><div class="tralla-user-profile-prio-grid">'
+                + ['P1', 'P2', 'P3', 'P4'].map(function (priority) {
+                    return '<div><span class="tralla-card-badge tralla-priority-badge is-' + priority.toLowerCase() + '">' + priority + '</span>'
+                        + '<strong>' + Number((user.priorities || {})[priority] || 0) + '</strong></div>';
+                }).join('') + '</div></div></section>';
             document.body.appendChild(profileLayer);
             document.body.classList.add('tralla-modal-open');
             bindBackdropDismiss(profileLayer.querySelector('[data-user-profile-backdrop]'), closeUserProfile);
@@ -673,6 +678,12 @@
             profileLayer.classList.toggle('is-photo-expanded');
             photo.setAttribute('aria-label', profileLayer.classList.contains('is-photo-expanded') ? 'Reduzir foto' : 'Ampliar foto');
         }
+    });
+    // Duplo clique nos números do perfil: mostra/oculta P1–P4 do técnico.
+    document.addEventListener('dblclick', function (event) {
+        if (!profileLayer || !event.target.closest('[data-user-prio-toggle]')) { return; }
+        var box = profileLayer.querySelector('[data-user-prio]');
+        if (box) { box.hidden = !box.hidden; }
     });
     document.addEventListener('keydown', function (event) {
         if (event.key === 'Escape' && profileLayer) {

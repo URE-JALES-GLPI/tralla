@@ -5848,3 +5848,11 @@ details.tralla-release-backup[open] > small { margin-top: 8px; }
 
 .tralla-user-dash-priorities { padding: 16px 18px; }
 .tralla-user-dash-priorities > dl { padding: 0; }
+
+.tralla-user-profile-prio { margin-top: 14px; }
+.tralla-user-profile-prio h3 { font-size: 14px; margin: 0 0 8px; }
+.tralla-user-profile-prio-grid { display: grid; gap: 9px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.tralla-user-profile-prio-grid > div { align-items: center; background: var(--tr-surface-2); border-radius: 8px; display: flex; flex-direction: column; gap: 6px; padding: 11px 8px; }
+.tralla-user-profile-prio-grid strong { font-size: 23px; }
+.tralla-user-profile-stats { cursor: default; user-select: none; }
+@media (max-width: 520px) { .tralla-user-profile-prio-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

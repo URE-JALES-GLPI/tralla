@@ -108,6 +108,7 @@ try {
                 'email' => $email,
                 'picture_url' => $profile['picture_url'],
                 'stats' => PluginTrallaBoard::getUserMaintenanceStats($profileUserId, $maintenanceBoardIds),
+                'priorities' => PluginTrallaBoard::getUserPriorityTotals($profileUserId, $maintenanceBoardIds),
             ]]);
 
         case 'technician_dashboard':

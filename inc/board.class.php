@@ -493,6 +493,12 @@ class PluginTrallaBoard extends CommonDBTM
     }
 
     /** Conta os cards do painel por prioridade, incluindo os que geraram créditos de pausa. */
+    /** Prioridades (P1..P4) dos cards de um usuário nos quadros de manutenção (perfil do técnico). */
+    public static function getUserPriorityTotals(int $usersId, array $boardIds): array
+    {
+        return self::getDashboardPriorityTotals([$usersId], $boardIds);
+    }
+
     private static function getDashboardPriorityTotals(array $technicianIds, array $boardIds): array
     {
         global $DB;
