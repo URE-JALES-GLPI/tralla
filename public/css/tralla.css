@@ -5880,10 +5880,11 @@ details.tralla-release-backup[open] > small { margin-top: 8px; }
 .tralla-edit-asset-chip small { color: var(--tr-muted); display: block; font-size: 11px; }
 
 /* Janela "Técnicos": todos os técnicos lado a lado, numa linha só (empilha só em tela estreita) */
-.tralla-tech-body .tralla-user-dash { grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; grid-template-columns: none; }
-.tralla-tech-body .tralla-user-dash-card { padding: 14px; }
+.tralla-tech-body .tralla-user-dash { display: flex; flex-wrap: nowrap; }
+.tralla-tech-body .tralla-user-dash > .tralla-user-dash-card { flex: 1 1 0; min-width: 0; padding: 14px; }
 .tralla-tech-body .tralla-user-dash-card .tralla-user-dash-avatar { height: 42px; width: 42px; }
 .tralla-tech-body .tralla-user-dash-card dt button b { font-size: 21px; }
 @media (max-width: 1000px) {
-    .tralla-tech-body .tralla-user-dash { grid-auto-flow: row; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+    .tralla-tech-body .tralla-user-dash { flex-wrap: wrap; }
+    .tralla-tech-body .tralla-user-dash > .tralla-user-dash-card { flex: 1 1 320px; }
 }
