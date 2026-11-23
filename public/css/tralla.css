@@ -5888,3 +5888,24 @@ details.tralla-release-backup[open] > small { margin-top: 8px; }
     .tralla-tech-body .tralla-user-dash { flex-wrap: wrap; }
     .tralla-tech-body .tralla-user-dash > .tralla-user-dash-card { flex: 1 1 320px; }
 }
+
+/* Janela "Técnicos": cards mais organizados (cabeçalho fixo, números em 2x2, prioridades no rodapé) */
+.tralla-tech-body .tralla-user-dash { gap: 18px; padding: 4px 2px 6px; }
+.tralla-tech-body .tralla-user-dash > .tralla-user-dash-card { border-radius: 16px; border-top: 4px solid var(--tr-primary); display: flex; flex-direction: column; padding: 18px 18px 16px; }
+.tralla-tech-body .tralla-user-dash-card:hover { transform: none; }
+.tralla-tech-body .tralla-user-dash-card header { align-items: flex-start; flex-wrap: nowrap; gap: 10px; margin-bottom: 16px; min-height: 56px; }
+.tralla-tech-body .tralla-user-dash-person { align-items: center; flex: 1 1 auto; min-width: 0; }
+.tralla-tech-body .tralla-user-dash-card .tralla-user-dash-avatar { height: 52px; width: 52px; }
+.tralla-tech-body .tralla-user-dash-card header strong { font-size: 15px; line-height: 1.25; }
+.tralla-tech-body .tralla-user-dash-card header small { font-size: 11.5px; margin-top: 3px; }
+.tralla-tech-body .tralla-user-dash-total { align-items: center; display: flex; flex: 0 0 auto; flex-direction: column; gap: 0; line-height: 1.1; padding: 7px 14px; text-align: center; }
+.tralla-tech-body .tralla-user-dash-total b { display: block; font-size: 22px; }
+.tralla-tech-body .tralla-user-dash-card dl { gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.tralla-tech-body .tralla-user-dash-card dl > div { padding: 12px 10px 10px; }
+.tralla-tech-body .tralla-user-dash-card dt { font-size: 12px; font-weight: 600; }
+.tralla-tech-body .tralla-user-dash-card dt button b { font-size: 30px; }
+.tralla-tech-body .tralla-user-dash-prio { gap: 8px; margin-top: auto; padding-top: 14px; }
+.tralla-tech-body .tralla-user-dash-card dl + .tralla-user-dash-stalled, .tralla-tech-body .tralla-user-dash-stalled { margin-bottom: 4px; }
+.tralla-tech-body .tralla-user-dash-card dl { margin-bottom: 14px; }
+.tralla-tech-body .tralla-user-dash-prio > span { padding: 6px 4px; }
+.tralla-tech-body .tralla-user-dash-prio b { font-size: 15px; }
