@@ -5858,3 +5858,18 @@ details.tralla-release-backup[open] > small { margin-top: 8px; }
 @media (max-width: 520px) { .tralla-user-profile-prio-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 .tralla-user-dash-stalled { align-items: center; background: color-mix(in srgb, var(--tr-danger) 12%, transparent); border-radius: 8px; color: var(--tr-danger); display: flex; font-size: 12px; font-weight: 600; gap: 6px; margin: 10px 0 0; padding: 6px 10px; }
+
+/* Solicitar/Editar card: respiro entre os blocos e campos de máquina com larguras iguais */
+#tralla-edit-form .tralla-modal-body { display: flex; flex-direction: column; gap: 18px; padding: 14px 24px 26px; }
+#tralla-edit-form .tralla-modal-body .tralla-detail-section { margin-bottom: 0; padding: 16px 18px; }
+#tralla-edit-form .tralla-field > label { display: block; margin-bottom: 6px; }
+#tralla-edit-form .tralla-detail-section > h3 { margin-bottom: 14px; }
+#tralla-edit-form .tralla-edit-machine { margin-bottom: 14px; padding: 18px; }
+#tralla-edit-form .tralla-edit-machine-head { margin-bottom: 14px; }
+#tralla-edit-form .tralla-edit-machine .tralla-machine-grid { gap: 14px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+#tralla-edit-form .tralla-edit-machine .tralla-field { margin-top: 14px; }
+#tralla-edit-form .tralla-edit-machine .tralla-machine-grid .tralla-field { margin-top: 0; }
+#tralla-edit-form .tralla-edit-machine textarea { min-height: 96px; }
+#tralla-edit-form .tralla-edit-machine .tralla-machine-flags { gap: 10px 22px; margin-top: 16px; }
+#tralla-edit-form [data-add-edit-machine] { margin-top: 4px; }
+@media (max-width: 560px) { #tralla-edit-form .tralla-edit-machine .tralla-machine-grid { grid-template-columns: minmax(0, 1fr); } }
