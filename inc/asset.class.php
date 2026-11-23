@@ -12,7 +12,7 @@ class PluginTrallaAsset
 {
     private const LEGACY_SUFFIX = ['Desktop', 'Notebook', 'Celular', 'Tablet'];
 
-    /** Categoria extra: os "Computadores" nativos do GLPI (glpi_computers), fora dos ativos personalizados. */
+    /** Os "Computadores" nativos do GLPI (glpi_computers) entram junto com a categoria Desktop. */
     public const CORE_COMPUTER = 'Computer';
 
     /** O GLPI tem ativos personalizados (glpi_assets_assets) neste ambiente? */
@@ -52,11 +52,7 @@ class PluginTrallaAsset
         foreach ($DB->request(['SELECT' => ['system_name'], 'FROM' => 'glpi_assets_assetdefinitions']) as $row) {
             $existing[(string) $row['system_name']] = true;
         }
-        $types = array_intersect_key($wanted, $existing);
-        if ($DB->tableExists('glpi_computers')) {
-            $types[self::CORE_COMPUTER] = 'Computador (GLPI)';
-        }
-        return $types;
+        return array_intersect_key($wanted, $existing);
     }
 
     public static function itemtypeFor(string $system): string
@@ -70,6 +66,10 @@ class PluginTrallaAsset
     /** 'Glpi\CustomAsset\NotebookAsset' => 'Notebook' ('' se não for um ativo conhecido). */
     public static function systemFor(string $itemtype): string
     {
+        global $DB;
+        if ($itemtype === 'Computer') {
+            return $DB->tableExists('glpi_computers') ? self::CORE_COMPUTER : '';
+        }
         foreach (array_keys(self::types()) as $system) {
             if (self::itemtypeFor($system) === $itemtype) {
                 return $system;
@@ -94,8 +94,9 @@ class PluginTrallaAsset
         if (!isset(self::types()[$system])) {
             return [];
         }
-        if ($system === self::CORE_COMPUTER) {
-            $out = [];
+        $out = [];
+        if ($system === 'Desktop' && $DB->tableExists('glpi_computers')) {
+            // Modelos dos Computadores nativos: id negativo para não confundir com os dos ativos personalizados.
             foreach ($DB->request([
                 'SELECT'     => ['glpi_computermodels.id', 'glpi_computermodels.name'],
                 'DISTINCT'   => true,
@@ -105,15 +106,13 @@ class PluginTrallaAsset
                     + ($entityId > 0 ? ['glpi_computers.entities_id' => $entityId] : []),
                 'ORDER'      => 'glpi_computermodels.name ASC',
             ]) as $row) {
-                $out[] = ['id' => (int) $row['id'], 'name' => (string) $row['name']];
+                $out[] = ['id' => -(int) $row['id'], 'name' => (string) $row['name']];
             }
-            return $out;
         }
         $definitionId = self::definitionId($system);
         if ($definitionId <= 0) {
-            return [];
+            return $out;
         }
-        $out = [];
         foreach ($DB->request([
             'SELECT'    => ['glpi_assets_assetmodels.id', 'glpi_assets_assetmodels.name'],
             'DISTINCT'  => true,
@@ -137,15 +136,32 @@ class PluginTrallaAsset
         global $DB;
         $types = self::types();
         $query = trim($query);
-        if (!isset($types[$system]) || (mb_strlen($query) < 2 && $modelId <= 0)) {
+        if ($system === '*') {
+            // "Todos": junta o resultado de todas as categorias (só por texto, sem filtro de modelo).
+            if (mb_strlen($query) < 2) {
+                return [];
+            }
+            $all = [];
+            foreach (array_keys($types) as $each) {
+                $all = array_merge($all, self::search($each, $query, $limit, 0, $entityId));
+            }
+            usort($all, static fn (array $a, array $b): int => strnatcasecmp($a['name'], $b['name']));
+            return array_slice($all, 0, 50);
+        }
+        if (!isset($types[$system]) || (mb_strlen($query) < 2 && $modelId === 0)) {
             return [];
         }
-        if ($system === self::CORE_COMPUTER) {
-            return self::searchComputers($query, $limit, $modelId, $entityId);
+        $computers = [];
+        if ($system === 'Desktop' && $modelId <= 0 && $DB->tableExists('glpi_computers')) {
+            // Desktop = ativos personalizados + Computadores nativos (modelo negativo = só computadores).
+            $computers = self::searchComputers($query, $limit, 0, $entityId);
+        }
+        if ($modelId < 0) {
+            return self::searchComputers($query, $limit, -$modelId, $entityId);
         }
         $definitionId = self::definitionId($system);
         if ($definitionId <= 0) {
-            return [];
+            return $computers;
         }
         $like = ['LIKE', '%' . $query . '%'];
         $or = [
@@ -209,7 +225,7 @@ class PluginTrallaAsset
                 'entity'      => (string) ($row['entity_name'] ?? ''),
             ];
         }
-        return $out;
+        return array_slice(array_merge($out, $computers), 0, 50);
     }
 
     /** Busca nos Computadores nativos do GLPI por nome, serial ou patrimônio. */

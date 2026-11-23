@@ -2878,7 +2878,7 @@
                 + (entityId > 0 ? '<label class="tralla-check tralla-asset-all"><input type="checkbox" data-asset-all> Buscar em todas as entidades</label>' : '')
                 + '</div></div>'
                 + '<div class="tralla-asset-picker-body">'
-                + '<div class="tralla-field"><label>Categoria</label><select data-asset-type>'
+                + '<div class="tralla-field"><label>Categoria</label><select data-asset-type><option value="*">Todos</option>'
                 + Object.keys(types).map(function (key) { return '<option value="' + attr(key) + '">' + esc(types[key]) + '</option>'; }).join('')
                 + '</select></div>'
                 + '<div class="tralla-field"><label>Modelo</label><select data-asset-model><option value="0">Todos os modelos</option></select></div>'
