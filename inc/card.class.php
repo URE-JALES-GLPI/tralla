@@ -921,6 +921,11 @@ class PluginTrallaCard extends CommonDBTM
             'delete_machine'   => $canEditMachines && !$isCall,
             'split'            => $canSplit,
             'edit_request'     => $canEditRequest,
+            // Texto pronto para abrir o chamado no CRM: só aprovador, em card de manutenção com máquinas.
+            'copy_crm_text'    => $boardType === 'maintenance' && !$isCall && $stage === 1
+                && empty($card['is_deleted']) && empty($card['is_archived'])
+                && ($card['machines'] ?? []) !== []
+                && self::userIsApprover($userId, $boardId),
             'take'             => $canTake,
             'assign_technician' => $canTake && $isAdmin,
             'request_call_release' => $canRequestCallRelease,
@@ -947,7 +952,7 @@ class PluginTrallaCard extends CommonDBTM
         if ($paused) {
             // Pausado: nada além de ver o card e pedir para despausar.
             foreach ($permissions as $name => $allowed) {
-                $permissions[$name] = in_array($name, ['view', 'request_resume', 'edit_pause_codes', 'change_priority', 'edit_comments'], true) ? $allowed : false;
+                $permissions[$name] = in_array($name, ['view', 'request_resume', 'edit_pause_codes', 'change_priority', 'edit_comments', 'copy_crm_text'], true) ? $allowed : false;
             }
         }
 

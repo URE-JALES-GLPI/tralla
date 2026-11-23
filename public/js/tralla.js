@@ -1004,6 +1004,43 @@
         }, next.duration || 3800);
     }
 
+    /** "Fazer manutenção técnica em 2x Notebook Positivo, 5x Tablet Positivo" para abrir o chamado no CRM. */
+    function crmTextFor(card) {
+        var counts = {};
+        var order = [];
+        (card.machines || []).forEach(function (machine) {
+            var name = String(machine.model_name || '').trim() || 'Máquina';
+            if (!counts[name]) { counts[name] = 0; order.push(name); }
+            counts[name] += 1;
+        });
+        return 'Fazer manutenção técnica em ' + order.map(function (name) { return counts[name] + 'x ' + name; }).join(', ');
+    }
+
+    function copyCrmText(card) {
+        var text = crmTextFor(card);
+        function fallback() {
+            // O GLPI roda em http (sem a API moderna de área de transferência): usa o método clássico.
+            var area = document.createElement('textarea');
+            area.value = text;
+            area.setAttribute('readonly', '');
+            area.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+            document.body.appendChild(area);
+            area.select();
+            var ok = false;
+            try { ok = document.execCommand('copy'); } catch (error) { ok = false; }
+            area.remove();
+            return ok;
+        }
+        function done(ok) {
+            toast(ok ? 'Copiado: ' + text : 'Não consegui copiar. Texto: ' + text, ok ? 'success' : 'error', ok ? 6000 : 15000);
+        }
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(fallback()); });
+        } else {
+            done(fallback());
+        }
+    }
+
     function toast(message, type, duration) {
         if (!toastRoot) {
             return;
@@ -2661,6 +2698,11 @@
                 + '<i class="ti ti-pencil"></i> Editar</button>';
         }
 
+        if (permissions.copy_crm_text) {
+            buttons += '<button type="button" class="tralla-btn tralla-btn-ghost" data-card-action="copy_crm" title="Copia o texto para abrir o chamado no CRM">'
+                + '<i class="ti ti-copy"></i> Copiar texto do CRM</button>';
+        }
+
         if (permissions.withdraw) {
             buttons += '<button type="button" class="tralla-btn tralla-btn-primary" data-card-action="withdraw">'
                 + '<i class="ti ti-package-export"></i> Confirmar retirada</button>';
@@ -4297,6 +4339,10 @@
         }
         if (action === 'edit') {
             openEditModal(activeCard);
+            return;
+        }
+        if (action === 'copy_crm') {
+            copyCrmText(activeCard);
             return;
         }
 
