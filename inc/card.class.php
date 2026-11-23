@@ -3394,7 +3394,7 @@ class PluginTrallaCard extends CommonDBTM
                     throw new RuntimeException('Payload da edição inválido.');
                 }
 
-                self::applyEditPayload($parentId, $payload);
+                self::applyEditPayload($parentId, $payload, $userId);
                 if (array_key_exists('description', $payload)) {
                     PluginTrallaHistory::log($parentId, $userId, 'card_description_updated',
                         tralla_history_change('Descrição', (string) $parent['description'], (string) $payload['description']));
@@ -5295,6 +5295,24 @@ class PluginTrallaCard extends CommonDBTM
                 $hasChange = true;
             }
 
+            // Vínculo com ativo do GLPI: só entra no pedido quando o usuário trocou ou removeu.
+            $assetChange = [];
+            if (array_key_exists('asset_id', $entry)) {
+                $newAssetId = max(0, (int) $entry['asset_id']);
+                $newAssetType = $newAssetId > 0 ? (string) ($entry['asset_itemtype'] ?? '') : '';
+                if ($newAssetId !== (int) ($current['inventory_items_id'] ?? 0)
+                    || $newAssetType !== (string) ($current['asset_itemtype'] ?? '')) {
+                    if ($newAssetId > 0) {
+                        if (!PluginTrallaAsset::canLink() || PluginTrallaAsset::systemFor($newAssetType) === ''
+                            || PluginTrallaAsset::describe($newAssetType, $newAssetId) === null) {
+                            throw new RuntimeException('Ativo do GLPI inválido.');
+                        }
+                    }
+                    $assetChange = ['asset_itemtype' => $newAssetType, 'asset_id' => $newAssetId];
+                    $hasChange = true;
+                }
+            }
+
             if ($status !== (string) $current['status']
                 || $report !== trim((string) $current['report'])
                 || $serviceDone !== (int) $current['service_done']
@@ -5311,7 +5329,7 @@ class PluginTrallaCard extends CommonDBTM
                 'needs_inventory' => $needsInventory,
                 'needs_backup'    => $needsBackup,
                 'model_id'        => $modelId,
-            ];
+            ] + $assetChange;
         }
 
         if (count($seen) !== count($currentById)) {
@@ -5369,7 +5387,7 @@ class PluginTrallaCard extends CommonDBTM
     }
 
     /** Aplica nome, descrição e máquinas de uma edição validada ao card. */
-    private static function applyEditPayload(int $parentId, array $payload): void
+    private static function applyEditPayload(int $parentId, array $payload, int $userId = 0): void
     {
         global $DB;
 
@@ -5418,6 +5436,11 @@ class PluginTrallaCard extends CommonDBTM
                 'needs_inventory' => !empty($entry['needs_inventory']) ? 1 : 0,
             ] + (array_key_exists('needs_backup', $entry) ? ['needs_backup' => !empty($entry['needs_backup']) ? 1 : 0] : [])
               + ($newModelId > 0 ? ['model_id' => $newModelId] : []));
+
+            if (array_key_exists('asset_id', $entry)) {
+                $assetId = max(0, (int) $entry['asset_id']);
+                PluginTrallaAsset::link($machineId, $assetId > 0 ? (string) ($entry['asset_itemtype'] ?? '') : '', $assetId, $userId);
+            }
         }
 
         foreach (array_keys($currentById) as $machineId) {
@@ -5506,7 +5529,7 @@ class PluginTrallaCard extends CommonDBTM
                 $payload['description'] = $proposedDescription;
             }
             $changes = self::buildEditChanges($fresh, $payload);
-            self::applyEditPayload($id, $payload);
+            self::applyEditPayload($id, $payload, $userId);
 
             $lines = array_map(static function (array $change): string {
                 $short = static fn (string $text): string => function_exists('mb_strimwidth')
@@ -5639,6 +5662,25 @@ class PluginTrallaCard extends CommonDBTM
                     'label'      => $label . ': precisa de backup',
                     'before'     => !empty($current['needs_backup']) ? 'Sim' : 'Não',
                     'after'      => !empty($entry['needs_backup']) ? 'Sim' : 'Não',
+                    'machine_id' => $machineId,
+                ];
+            }
+
+            if (array_key_exists('asset_id', $entry)) {
+                $assetName = static function (string $type, int $id): string {
+                    if ($id <= 0 || $type === '') {
+                        return 'Sem ativo vinculado';
+                    }
+                    $asset = PluginTrallaAsset::describe($type, $id);
+                    return $asset !== null
+                        ? trim($asset['name'] . ($asset['otherserial'] !== '' ? ' (patrimônio ' . $asset['otherserial'] . ')' : ''))
+                        : ('Ativo #' . $id);
+                };
+                $changes[] = [
+                    'type'       => 'machine_asset',
+                    'label'      => $label . ': ativo do GLPI',
+                    'before'     => $assetName((string) ($current['asset_itemtype'] ?? ''), (int) ($current['inventory_items_id'] ?? 0)),
+                    'after'      => $assetName((string) ($entry['asset_itemtype'] ?? ''), (int) $entry['asset_id']),
                     'machine_id' => $machineId,
                 ];
             }

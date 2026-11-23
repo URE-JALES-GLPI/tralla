@@ -5873,3 +5873,8 @@ details.tralla-release-backup[open] > small { margin-top: 8px; }
 #tralla-edit-form .tralla-edit-machine .tralla-machine-flags { gap: 10px 22px; margin-top: 16px; }
 #tralla-edit-form [data-add-edit-machine] { margin-top: 4px; }
 @media (max-width: 560px) { #tralla-edit-form .tralla-edit-machine .tralla-machine-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* Vínculo com ativo do GLPI no formulário de edição */
+#tralla-edit-form .tralla-edit-asset { align-items: center; display: flex; flex-wrap: wrap; gap: 8px 10px; margin-top: 14px; }
+.tralla-edit-asset-chip { align-items: center; background: var(--tr-surface); border: 1px solid var(--tr-border); border-radius: 8px; display: inline-flex; flex: 1 1 220px; gap: 8px; min-width: 0; padding: 8px 12px; }
+.tralla-edit-asset-chip small { color: var(--tr-muted); display: block; font-size: 11px; }

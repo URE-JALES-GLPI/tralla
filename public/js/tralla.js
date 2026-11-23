@@ -4815,9 +4815,26 @@
         }
     }
 
+    /** Vínculo com ativo do GLPI dentro do formulário de edição (só vale ao salvar/aprovar). */
+    function editAssetHtml(asset) {
+        if (Object.keys(assetTypes()).length === 0 && !asset) { return ''; }
+        if (!asset) {
+            return '<button type="button" class="tralla-btn tralla-btn-ghost" data-edit-asset-pick>'
+                + '<i class="ti ti-link" aria-hidden="true"></i> Vincular ativo do GLPI</button>';
+        }
+        return '<span class="tralla-edit-asset-chip"><i class="ti ti-device-laptop" aria-hidden="true"></i>'
+            + '<span><strong>' + esc(asset.name || ('#' + asset.id)) + '</strong>'
+            + (assetSummary(asset) ? ' <small>' + esc(assetSummary(asset)) + '</small>' : '') + '</span></span>'
+            + '<button type="button" class="tralla-icon-btn" data-edit-asset-pick title="Trocar ativo"><i class="ti ti-replace"></i></button>'
+            + '<button type="button" class="tralla-icon-btn" data-edit-asset-clear title="Desvincular"><i class="ti ti-unlink"></i></button>';
+    }
+
     function editMachineRow(machine, sequence) {
         var id = Number(machine.id);
-        return '<div class="tralla-edit-machine" data-edit-machine data-machine-id="' + id + '">'
+        var linked = machine.asset || null;
+        var assetBlock = editAssetHtml(linked);
+        return '<div class="tralla-edit-machine" data-edit-machine data-machine-id="' + id + '"'
+            + ' data-asset-type="' + attr(linked ? (linked.itemtype || '') : '') + '" data-asset-id="' + (linked ? Number(linked.id) : 0) + '">'
             + '<div class="tralla-edit-machine-head">'
             + '<strong>' + esc(machineDisplayTitle(machine, sequence)) + '</strong>'
             + '<button type="button" class="tralla-icon-btn" data-remove-edit-machine title="Remover do card">'
@@ -4829,6 +4846,7 @@
             + '<div class="tralla-field"><label>Status</label>'
             + '<select data-edit-field="status">' + machineStatusOptions(machine.status || '') + '</select></div>'
             + '</div>'
+            + (assetBlock ? '<div class="tralla-edit-asset" data-edit-asset>' + assetBlock + '</div>' : '')
             + '<div class="tralla-field" style="margin-top:9px"><label>Relatório técnico</label>'
             + '<textarea data-edit-field="report" maxlength="200000" placeholder="Descreva o diagnóstico e o serviço executado...">'
             + esc(machine.report || '') + '</textarea></div>'
@@ -4945,6 +4963,10 @@
             };
             if (backupField) { entry.needs_backup = backupField.checked ? 1 : 0; }
             if (modelField && Number(modelField.value) > 0) { entry.model_id = Number(modelField.value); }
+            if (row.dataset.assetChanged === '1') {
+                entry.asset_id = Number(row.dataset.assetId || 0);
+                entry.asset_itemtype = entry.asset_id > 0 ? String(row.dataset.assetType || '') : '';
+            }
             machines.push(entry);
         });
 
@@ -6768,6 +6790,28 @@
                 var chipEl = createRow.querySelector('[data-create-asset-chip]');
                 chipEl.textContent = (asset.name || ('#' + asset.id)) + (asset.otherserial ? ' · patr. ' + asset.otherserial : '');
                 chipEl.hidden = false;
+            });
+            return;
+        }
+        var editAssetPick = event.target.closest('[data-edit-asset-pick]');
+        var editAssetClear = event.target.closest('[data-edit-asset-clear]');
+        if ((editAssetPick || editAssetClear) && activeCard) {
+            var editAssetRow = (editAssetPick || editAssetClear).closest('[data-edit-machine]');
+            var editAssetBox = editAssetRow ? editAssetRow.querySelector('[data-edit-asset]') : null;
+            if (!editAssetRow || !editAssetBox) { return; }
+            if (editAssetClear) {
+                editAssetRow.dataset.assetId = '0';
+                editAssetRow.dataset.assetType = '';
+                editAssetRow.dataset.assetChanged = '1';
+                editAssetBox.innerHTML = editAssetHtml(null);
+                return;
+            }
+            assetPicker(Number(activeCard.entities_id) || 0).then(function (asset) {
+                if (!asset) { return; }
+                editAssetRow.dataset.assetId = String(asset.id);
+                editAssetRow.dataset.assetType = asset.itemtype;
+                editAssetRow.dataset.assetChanged = '1';
+                editAssetBox.innerHTML = editAssetHtml(asset);
             });
             return;
         }
