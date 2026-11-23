@@ -5095,8 +5095,9 @@ class PluginTrallaCard extends CommonDBTM
     {
         global $DB;
 
+        // A própria URE é a entidade raiz do GLPI (id 0), então 0 também vale; só o nome decide abaixo.
         $entityId = (int) ($card['entities_id'] ?? 0);
-        if ($entityId <= 0 || (string) ($card['workflow_type'] ?? 'maintenance') === 'call') {
+        if ($entityId < 0 || (string) ($card['workflow_type'] ?? 'maintenance') === 'call') {
             return false;
         }
         $row = $DB->request(['SELECT' => ['name'], 'FROM' => 'glpi_entities', 'WHERE' => ['id' => $entityId], 'LIMIT' => 1])->current();
