@@ -12,6 +12,9 @@ class PluginTrallaAsset
 {
     private const LEGACY_SUFFIX = ['Desktop', 'Notebook', 'Celular', 'Tablet'];
 
+    /** Categoria extra: os "Computadores" nativos do GLPI (glpi_computers), fora dos ativos personalizados. */
+    public const CORE_COMPUTER = 'Computer';
+
     /** O GLPI tem ativos personalizados (glpi_assets_assets) neste ambiente? */
     public static function isAvailable(): bool
     {
@@ -49,11 +52,18 @@ class PluginTrallaAsset
         foreach ($DB->request(['SELECT' => ['system_name'], 'FROM' => 'glpi_assets_assetdefinitions']) as $row) {
             $existing[(string) $row['system_name']] = true;
         }
-        return array_intersect_key($wanted, $existing);
+        $types = array_intersect_key($wanted, $existing);
+        if ($DB->tableExists('glpi_computers')) {
+            $types[self::CORE_COMPUTER] = 'Computador (GLPI)';
+        }
+        return $types;
     }
 
     public static function itemtypeFor(string $system): string
     {
+        if ($system === self::CORE_COMPUTER) {
+            return 'Computer';
+        }
         return 'Glpi\\CustomAsset\\' . $system . (in_array($system, self::LEGACY_SUFFIX, true) ? 'Asset' : '');
     }
 
@@ -83,6 +93,21 @@ class PluginTrallaAsset
         global $DB;
         if (!isset(self::types()[$system])) {
             return [];
+        }
+        if ($system === self::CORE_COMPUTER) {
+            $out = [];
+            foreach ($DB->request([
+                'SELECT'     => ['glpi_computermodels.id', 'glpi_computermodels.name'],
+                'DISTINCT'   => true,
+                'FROM'       => 'glpi_computers',
+                'INNER JOIN' => ['glpi_computermodels' => ['ON' => ['glpi_computers' => 'computermodels_id', 'glpi_computermodels' => 'id']]],
+                'WHERE'      => ['glpi_computers.is_deleted' => 0, 'glpi_computers.is_template' => 0]
+                    + ($entityId > 0 ? ['glpi_computers.entities_id' => $entityId] : []),
+                'ORDER'      => 'glpi_computermodels.name ASC',
+            ]) as $row) {
+                $out[] = ['id' => (int) $row['id'], 'name' => (string) $row['name']];
+            }
+            return $out;
         }
         $definitionId = self::definitionId($system);
         if ($definitionId <= 0) {
@@ -114,6 +139,9 @@ class PluginTrallaAsset
         $query = trim($query);
         if (!isset($types[$system]) || (mb_strlen($query) < 2 && $modelId <= 0)) {
             return [];
+        }
+        if ($system === self::CORE_COMPUTER) {
+            return self::searchComputers($query, $limit, $modelId, $entityId);
         }
         $definitionId = self::definitionId($system);
         if ($definitionId <= 0) {
@@ -184,12 +212,78 @@ class PluginTrallaAsset
         return $out;
     }
 
+    /** Busca nos Computadores nativos do GLPI por nome, serial ou patrimônio. */
+    private static function searchComputers(string $query, int $limit, int $modelId, int $entityId): array
+    {
+        global $DB;
+        $like = ['LIKE', '%' . $query . '%'];
+        $out = [];
+        foreach ($DB->request([
+            'SELECT'    => ['glpi_computers.id', 'glpi_computers.name', 'glpi_computers.serial', 'glpi_computers.otherserial',
+                'glpi_entities.completename AS entity_name', 'glpi_computermodels.name AS model_name'],
+            'FROM'      => 'glpi_computers',
+            'LEFT JOIN' => [
+                'glpi_entities'       => ['ON' => ['glpi_computers' => 'entities_id', 'glpi_entities' => 'id']],
+                'glpi_computermodels' => ['ON' => ['glpi_computers' => 'computermodels_id', 'glpi_computermodels' => 'id']],
+            ],
+            'WHERE'     => ['glpi_computers.is_deleted' => 0, 'glpi_computers.is_template' => 0]
+                + ($modelId > 0 ? ['glpi_computers.computermodels_id' => $modelId] : [])
+                + ($entityId > 0 ? ['glpi_computers.entities_id' => $entityId] : [])
+                + ($query !== '' ? [['OR' => [
+                    ['glpi_computers.name' => $like],
+                    ['glpi_computers.serial' => $like],
+                    ['glpi_computers.otherserial' => $like],
+                ]]] : []),
+            'ORDER'     => 'glpi_computers.name ASC',
+            'LIMIT'     => max(1, min(50, $limit)),
+        ]) as $row) {
+            $out[] = [
+                'matches'     => [],
+                'id'          => (int) $row['id'],
+                'itemtype'    => 'Computer',
+                'name'        => (string) $row['name'],
+                'serial'      => (string) $row['serial'],
+                'otherserial' => (string) $row['otherserial'],
+                'model'       => (string) ($row['model_name'] ?? ''),
+                'entity'      => (string) ($row['entity_name'] ?? ''),
+            ];
+        }
+        return $out;
+    }
+
     /** Dados de exibição de um ativo vinculado (ou null se não existe mais). */
     public static function describe(string $itemtype, int $itemsId): ?array
     {
         global $DB, $CFG_GLPI;
         if ($itemsId <= 0 || $itemtype === '') {
             return null;
+        }
+        if ($itemtype === 'Computer') {
+            $row = $DB->request([
+                'SELECT'    => ['glpi_computers.id', 'glpi_computers.name', 'glpi_computers.serial', 'glpi_computers.otherserial',
+                    'glpi_entities.completename AS entity_name', 'glpi_computermodels.name AS model_name'],
+                'FROM'      => 'glpi_computers',
+                'LEFT JOIN' => [
+                    'glpi_entities'       => ['ON' => ['glpi_computers' => 'entities_id', 'glpi_entities' => 'id']],
+                    'glpi_computermodels' => ['ON' => ['glpi_computers' => 'computermodels_id', 'glpi_computermodels' => 'id']],
+                ],
+                'WHERE'     => ['glpi_computers.id' => $itemsId],
+                'LIMIT'     => 1,
+            ])->current();
+            if (!is_array($row)) {
+                return null;
+            }
+            return [
+                'id'          => $itemsId,
+                'itemtype'    => 'Computer',
+                'type_label'  => 'Computador (GLPI)',
+                'name'        => (string) $row['name'],
+                'serial'      => (string) $row['serial'],
+                'otherserial' => (string) $row['otherserial'],
+                'model'       => (string) ($row['model_name'] ?? ''),
+                'entity'      => (string) ($row['entity_name'] ?? ''),
+                'url'         => (string) $CFG_GLPI['root_doc'] . '/front/computer.form.php?id=' . $itemsId,
+            ];
         }
         $row = $DB->request([
             'SELECT'    => ['glpi_assets_assets.id', 'glpi_assets_assets.name', 'glpi_assets_assets.serial',
