@@ -444,6 +444,61 @@ class PluginTrallaAsset
             . (($asset['otherserial'] ?? '') !== '' ? ' (patrimônio ' . $asset['otherserial'] . ')' : '') . '.');
     }
 
+    /** Status da máquina no Tralla => nome do status do ativo no GLPI (Pendente e Em andamento não alteram). */
+    private const STATE_NAMES = [
+        'done'           => 'Concluído',
+        'not_repairable' => 'Inservível',
+        'warranty'       => 'Garantia',
+    ];
+
+    /** Id do status do GLPI com esse nome; cria se ainda não existir. */
+    private static function stateId(string $name): int
+    {
+        global $DB;
+        foreach ($DB->request(['SELECT' => ['id', 'name'], 'FROM' => 'glpi_states']) as $row) {
+            if (mb_strtolower(trim((string) $row['name'])) === mb_strtolower($name)) {
+                return (int) $row['id'];
+            }
+        }
+        $state = new State();
+        $id = (int) $state->add(['name' => $name, 'entities_id' => 0, 'is_recursive' => 1]);
+        if ($id > 0) {
+            return $id;
+        }
+        $DB->insert('glpi_states', ['name' => $name, 'completename' => $name, 'entities_id' => 0, 'is_recursive' => 1,
+            'states_id' => 0, 'level' => 1, 'date_creation' => tralla_now(), 'date_mod' => tralla_now()]);
+        return (int) $DB->insertId();
+    }
+
+    /** Pelo resultado da máquina no card, atualiza o status do ativo vinculado no GLPI. */
+    private static function applyMachineState(string $itemtype, int $itemsId, string $machineStatus): void
+    {
+        global $DB;
+        $name = self::STATE_NAMES[$machineStatus] ?? '';
+        if ($name === '' || $itemsId <= 0 || $itemtype === '') {
+            return;
+        }
+        try {
+            $stateId = self::stateId($name);
+            if ($stateId <= 0) {
+                return;
+            }
+            $item = function_exists('getItemForItemtype') ? getItemForItemtype($itemtype) : null;
+            if ($item instanceof CommonDBTM && $item->getFromDB($itemsId)) {
+                if ((int) ($item->fields['states_id'] ?? 0) === $stateId) {
+                    return;
+                }
+                if ($item->update(['id' => $itemsId, 'states_id' => $stateId])) {
+                    return;
+                }
+            }
+            $table = $itemtype === 'Computer' ? 'glpi_computers' : 'glpi_assets_assets';
+            $DB->update($table, ['states_id' => $stateId], ['id' => $itemsId]);
+        } catch (Throwable $e) {
+            error_log('[Tralla] status do ativo no GLPI: ' . $e->getMessage());
+        }
+    }
+
     /** Ao finalizar o card, cada máquina vinculada e pronta vira "Manutenção realizada" no histórico do ativo. */
     public static function logFinalization(int $cardId, array $machineIds): void
     {
@@ -457,6 +512,7 @@ class PluginTrallaAsset
                 if ($machine === null || (int) ($machine['inventory_items_id'] ?? 0) <= 0 || (string) ($machine['asset_itemtype'] ?? '') === '') {
                     continue;
                 }
+                self::applyMachineState((string) $machine['asset_itemtype'], (int) $machine['inventory_items_id'], (string) $machine['status']);
                 $report = trim((string) ($machine['report'] ?? ''));
                 $text = 'Manutenção no ' . self::cardLabel($cardId) . ' — resultado: '
                     . ($statusLabels[(string) $machine['status']] ?? (string) $machine['status'])
