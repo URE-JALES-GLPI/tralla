@@ -922,7 +922,7 @@ class PluginTrallaCard extends CommonDBTM
             'split'            => $canSplit,
             'edit_request'     => $canEditRequest,
             // Texto pronto para abrir o chamado no CRM: só aprovador, em card de manutenção com máquinas.
-            'copy_crm_text'    => $boardType === 'maintenance' && !$isCall && $stage === 1
+            'copy_crm_text'    => $boardType === 'maintenance' && !$isCall && in_array($stage, [1, 2], true)
                 && empty($card['is_deleted']) && empty($card['is_archived'])
                 && ($card['machines'] ?? []) !== []
                 && self::userIsApprover($userId, $boardId),
