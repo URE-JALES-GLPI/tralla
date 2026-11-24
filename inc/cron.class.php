@@ -26,6 +26,9 @@ class PluginTrallaCron extends CommonDBTM
     }
 
     /** Janela do reinício diário da VM (07:00): a ação não começa perto dele, para o MySQL não cair no meio. */
+    /** Acima disso, os lembretes do Pendente de um quadro viram uma mensagem só. */
+    private const PENDING_SUMMARY_FROM = 4;
+
     private const REBOOT_QUIET_FROM = '06:58';
     private const REBOOT_QUIET_TO = '07:04';
 
@@ -188,6 +191,7 @@ class PluginTrallaCron extends CommonDBTM
         global $DB;
 
         $count = 0;
+        $due = [];
         $now = time();
         if (!$force && !tralla_pending_reminder_allowed_at($now)) {
             return 0;
@@ -211,16 +215,39 @@ class PluginTrallaCron extends CommonDBTM
                 continue;
             }
 
-            $code = tralla_display_code($card, 'maintenance');
-            $waiting = max(1, (int) round(($now - strtotime((string) ($card['date_sla_start'] ?: $card['date_creation']))) / 60));
-            $text = "Tralla – card #{$code} aguardando técnico\n"
-                . $card['name'] . "\n"
-                . 'Prioridade: ' . (tralla_priorities()[$card['priority']]['label'] ?? $card['priority']) . "\n"
-                . 'No Pendente há ' . self::durationLabel($waiting);
-            self::notifyUsers($card, self::boardMemberIds((int) $card['plugin_tralla_boards_id']), 'pending_priority',
-                'card pendente #' . $code, $text);
-            $DB->update('glpi_plugin_tralla_cards', ['pending_reminded_at' => tralla_now()], ['id' => (int) $card['id']]);
-            $count++;
+            $due[(int) $card['plugin_tralla_boards_id']][] = [
+                'card'    => $card,
+                'code'    => tralla_display_code($card, 'maintenance'),
+                'waiting' => max(1, (int) round(($now - strtotime((string) ($card['date_sla_start'] ?: $card['date_creation']))) / 60)),
+            ];
+        }
+
+        foreach ($due as $boardCards) {
+            $members = self::boardMemberIds((int) $boardCards[0]['card']['plugin_tralla_boards_id']);
+            if (count($boardCards) > self::PENDING_SUMMARY_FROM) {
+                // Muitos cards vencendo juntos: uma mensagem curta no lugar de uma por card.
+                $codes = array_map(static fn (array $item): string => '#' . $item['code'], $boardCards);
+                $oldest = max(array_column($boardCards, 'waiting'));
+                $text = 'Tralla – ' . count($boardCards) . " cards aguardando técnico no Pendente\n"
+                    . implode(', ', $codes) . "\n"
+                    . 'O mais antigo está há ' . self::durationLabel($oldest);
+                self::notifyUsers($boardCards[0]['card'], $members, 'pending_priority', count($boardCards) . ' cards pendentes', $text);
+                foreach ($boardCards as $item) {
+                    $DB->update('glpi_plugin_tralla_cards', ['pending_reminded_at' => tralla_now()], ['id' => (int) $item['card']['id']]);
+                    $count++;
+                }
+                continue;
+            }
+            foreach ($boardCards as $item) {
+                $card = $item['card'];
+                $text = "Tralla – card #{$item['code']} aguardando técnico\n"
+                    . $card['name'] . "\n"
+                    . 'Prioridade: ' . (tralla_priorities()[$card['priority']]['label'] ?? $card['priority']) . "\n"
+                    . 'No Pendente há ' . self::durationLabel($item['waiting']);
+                self::notifyUsers($card, $members, 'pending_priority', 'card pendente #' . $item['code'], $text);
+                $DB->update('glpi_plugin_tralla_cards', ['pending_reminded_at' => tralla_now()], ['id' => (int) $card['id']]);
+                $count++;
+            }
         }
 
         return $count;
