@@ -1349,6 +1349,11 @@
 
         updateSearchUi();
         var scrollLeft = listsEl.scrollLeft;
+        // A rolagem vertical de cada lista também precisa sobreviver ao redesenho (atualização automática).
+        var listScroll = {};
+        Array.prototype.forEach.call(listsEl.querySelectorAll('.tralla-cards[data-list-id]'), function (el) {
+            if (el.scrollTop > 0) { listScroll[el.getAttribute('data-list-id')] = el.scrollTop; }
+        });
         var lists = Array.isArray(state.lists) ? state.lists : [];
         var visibleCards = (Array.isArray(state.cards) ? state.cards : []).filter(function (card) {
             return cardMatchesSearch(card, searchQuery);
@@ -1394,6 +1399,10 @@
             return renderList(list, visibleCards);
         }).join('') + addListColumn;
         listsEl.scrollLeft = scrollLeft;
+        Object.keys(listScroll).forEach(function (id) {
+            var el = listsEl.querySelector('.tralla-cards[data-list-id="' + id + '"]');
+            if (el) { el.scrollTop = listScroll[id]; }
+        });
     }
 
     var slaSortedCategories = {
