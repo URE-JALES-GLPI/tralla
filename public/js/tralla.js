@@ -1901,6 +1901,11 @@
 
     /* ------------------------------------------------------------- modal */
 
+    /** Rolagem da lista lateral (Pendentes/Retiradas/Aprovação), mantida ao trocar de card. */
+    var navScroll = null;
+    /** Card de onde o "Adicionar card" da lateral foi clicado: volta para ele depois de criar. */
+    var pendingReturn = null;
+
     function showModal(html, wide) {
         if (!modalRoot) {
             return;
@@ -1908,10 +1913,17 @@
         if (!modalRoot.innerHTML) {
             lastFocused = document.activeElement;
         }
+        var previousNav = modalRoot.querySelector('.tralla-approval-navigation-list');
+        if (previousNav) { navScroll = previousNav.scrollTop; }
         modalRoot.innerHTML = '<div class="tralla-modal-backdrop" data-tralla-modal-backdrop>'
             + '<div class="tralla-modal' + (wide ? ' is-wide' : '') + '" role="dialog" aria-modal="true">'
             + html
             + '</div></div>';
+        var nextNav = modalRoot.querySelector('.tralla-approval-navigation-list');
+        if (nextNav && navScroll !== null) {
+            nextNav.scrollTop = navScroll;
+            navScroll = null;
+        }
         bindBackdropDismiss(modalRoot.querySelector('[data-tralla-modal-backdrop]'), closeModal);
         document.body.classList.add('tralla-modal-open');
 
@@ -1935,6 +1947,8 @@
         modalRoot.innerHTML = '';
         document.body.classList.remove('tralla-modal-open');
         activeCard = null;
+        navScroll = null;
+        pendingReturn = null;
         if (document.body.classList.contains('tralla-embed') && window.parent !== window) {
             window.parent.postMessage({ trallaEmbed: 'closed' }, window.location.origin);
         }
@@ -6343,8 +6357,17 @@
                 return;
             }
 
+            var returnTo = pendingReturn;
+            pendingReturn = null;
             closeModal();
             applyState(data);
+            if (returnTo) {
+                // Criado pela lateral: volta ao card em que estava, com a lista na mesma posição.
+                toast('Card criado.', 'success');
+                navScroll = returnTo.scroll;
+                await openCard(returnTo.cardId);
+                return;
+            }
             toast(isMaintenance
                 ? (releaseMode === 'now'
                     ? 'Chamado P1 (Alta) criado e disponível para Pegar.'
@@ -6756,6 +6779,15 @@
         var openCardButton = event.target.closest('[data-open-card]');
         if (openCardButton) {
             openCard(Number(openCardButton.dataset.openCard));
+            return;
+        }
+
+        var navAddCard = event.target.closest('[data-add-card]');
+        if (navAddCard) {
+            event.preventDefault();
+            var navList = modalRoot.querySelector('.tralla-approval-navigation-list');
+            pendingReturn = activeCard ? { cardId: Number(activeCard.id), scroll: navList ? navList.scrollTop : 0 } : null;
+            openCreateCard(Number(navAddCard.dataset.addCard));
             return;
         }
 
