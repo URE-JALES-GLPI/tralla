@@ -191,7 +191,7 @@ class PluginTrallaCron extends CommonDBTM
         global $DB;
 
         $count = 0;
-        $due = [];
+        $all = [];
         $now = time();
         if (!$force && !tralla_pending_reminder_allowed_at($now)) {
             return 0;
@@ -211,20 +211,28 @@ class PluginTrallaCron extends CommonDBTM
         ]) as $card) {
             $minutes = tralla_pending_reminder_minutes((string) $card['priority']);
             $base = strtotime((string) ($card['pending_reminded_at'] ?: ($card['date_sla_start'] ?: $card['date_creation'])));
-            if ($minutes <= 0 || $base === false || (!$force && $now < $base + $minutes * 60)) {
+            if ($minutes <= 0 || $base === false) {
                 continue;
             }
 
-            $due[(int) $card['plugin_tralla_boards_id']][] = [
+            $all[(int) $card['plugin_tralla_boards_id']][] = [
                 'card'    => $card,
                 'code'    => tralla_display_code($card, 'maintenance'),
                 'waiting' => max(1, (int) round(($now - strtotime((string) ($card['date_sla_start'] ?: $card['date_creation']))) / 60)),
+                'due'     => $force || $now >= $base + $minutes * 60,
             ];
         }
 
-        foreach ($due as $boardCards) {
+        foreach ($all as $boardAll) {
+            $boardCards = array_values(array_filter($boardAll, static fn (array $item): bool => $item['due']));
+            if ($boardCards === []) {
+                continue;
+            }
             $members = self::boardMemberIds((int) $boardCards[0]['card']['plugin_tralla_boards_id']);
-            if (count($boardCards) > self::PENDING_SUMMARY_FROM) {
+            if (count($boardAll) > self::PENDING_SUMMARY_FROM) {
+                // Se algum card venceu, o resumo leva todos os pendentes do quadro (e zera o relógio de todos),
+                // para não chegar uma mensagem por grupo que venceu em minutos diferentes.
+                $boardCards = $boardAll;
                 // Muitos cards vencendo juntos: uma mensagem curta no lugar de uma por card.
                 $codes = array_map(static fn (array $item): string => '#' . $item['code'], $boardCards);
                 $oldest = max(array_column($boardCards, 'waiting'));
