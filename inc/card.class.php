@@ -4388,6 +4388,21 @@ class PluginTrallaCard extends CommonDBTM
         return self::getCardDetail($parentId, $userId);
     }
 
+    /** Aprovações (stage 2) ainda abertas de um card, exceto a indicada. */
+    private static function openApprovalsOf(int $parentId, int $exceptId): array
+    {
+        global $DB;
+
+        return iterator_to_array($DB->request([
+            'SELECT' => ['id', 'approval_kind'],
+            'FROM'   => 'glpi_plugin_tralla_cards',
+            'WHERE'  => [
+                'parent_cards_id' => $parentId, 'stage' => 2, 'is_archived' => 0, 'is_deleted' => 0,
+                'status' => 'waiting_approval', ['id' => ['<>', $exceptId]],
+            ],
+        ]), false);
+    }
+
     public static function decideDeletion(int $approvalId, bool $approve, string $reason, int $userId, bool $isAdmin): array
     {
         global $DB;
@@ -4464,6 +4479,17 @@ class PluginTrallaCard extends CommonDBTM
                     'date_mod'          => $now,
                 ], ['id' => $approvalId]);
 
+                // Outras aprovações abertas do mesmo card (ex.: "Liberação e prioridade") não fazem mais sentido.
+                foreach (self::openApprovalsOf($parentId, $approvalId) as $other) {
+                    $DB->update('glpi_plugin_tralla_cards', [
+                        'status'           => 'rejected',
+                        'is_archived'      => 1,
+                        'rejection_reason' => 'Card excluído.',
+                        'date_mod'         => $now,
+                    ], ['id' => (int) $other['id']]);
+                    PluginTrallaHistory::log((int) $other['id'], $userId, 'card_deletion_approved', 'Aprovação encerrada: o card foi excluído.');
+                }
+
                 self::syncFamilyWithdrawal($boardId, self::familyRoot($parent), $userId);
 
                 PluginTrallaHistory::log($parentId, $userId, 'card_deletion_approved', 'Exclusão aprovada; card movido para Excluídos.');
@@ -4479,7 +4505,7 @@ class PluginTrallaCard extends CommonDBTM
                     'plugin_tralla_lists_id'      => $listId,
                     'status'                      => tralla_restore_status($parent, 'maintenance'),
                     'is_locked'                   => tralla_restore_is_locked($parent),
-                    'approval_cards_id'           => 0,
+                    'approval_cards_id'           => (int) ((self::openApprovalsOf($parentId, $approvalId)[0]['id'] ?? 0)),
                     'deletion_reason'             => null,
                     'deletion_requested_at'       => null,
                     'deletion_requested_by'       => 0,
