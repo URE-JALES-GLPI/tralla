@@ -3730,6 +3730,39 @@
             }).join('') + '</div></nav>';
     }
 
+    /** Lateral da lista Pendente (só aprovador): todos os cards pendentes e o botão de adicionar. */
+    function renderPendingNavigation(card) {
+        if (!isMaintenance || !(can && can.approve) || Number(card.stage) !== 1) { return ''; }
+        var pendingList = (state.lists || []).find(function (list) { return list.category === 'maintenance_pending'; });
+        if (!pendingList || Number(card.plugin_tralla_lists_id) !== Number(pendingList.id)) { return ''; }
+        var pendingCards = (state.cards || []).filter(function (item) {
+            return Number(item.stage) === 1 && Number(item.plugin_tralla_lists_id) === Number(pendingList.id);
+        }).sort(function (left, right) {
+            return Number(left.rank) - Number(right.rank) || Number(left.id) - Number(right.id);
+        });
+        if (!pendingCards.some(function (item) { return Number(item.id) === Number(card.id); })) {
+            pendingCards.push(card);
+        }
+        return '<nav class="tralla-approval-navigation tralla-pending-navigation" aria-label="Cards em Pendente">'
+            + '<div class="tralla-approval-navigation-head"><strong>Pendentes</strong>'
+            + '<span>' + pendingCards.length + ' card' + (pendingCards.length === 1 ? '' : 's') + '</span></div>'
+            + (can.create_card
+                ? '<button type="button" class="tralla-btn tralla-btn-primary tralla-pending-add" data-add-card="' + Number(pendingList.id) + '">'
+                    + '<i class="ti ti-plus" aria-hidden="true"></i> Adicionar card</button>'
+                : '')
+            + '<div class="tralla-approval-navigation-list">'
+            + pendingCards.map(function (item) {
+                var current = Number(item.id) === Number(card.id);
+                return '<button type="button" class="tralla-approval-navigation-item' + (current ? ' is-current' : '')
+                    + '" data-open-card="' + Number(item.id) + '"' + (current ? ' aria-current="true"' : '') + '>'
+                    + '<span class="tralla-approval-navigation-code">' + esc(displayCardCode(item.code, item.id)) + '</span>'
+                    + '<strong>' + esc(item.name) + '</strong>'
+                    + '<span class="tralla-approval-navigation-kind">'
+                    + esc(item.machine_summary || ((item.machine_count || 0) + ' máquina(s)')) + '</span>'
+                    + '</button>';
+            }).join('') + '</div></nav>';
+    }
+
     function renderCardModal(card) {
         if (isUpdates) { renderUpdateModal(card); return; }
         var permissions = card.permissions || {};
@@ -3835,7 +3868,7 @@
         body += renderAssignature(card);
         body += renderHistory(card);
 
-        var approvalNavigation = renderApprovalNavigation(card) || renderWithdrawalNavigation(card);
+        var approvalNavigation = renderApprovalNavigation(card) || renderWithdrawalNavigation(card) || renderPendingNavigation(card);
         showModal(approvalNavigation + detailHeader(card)
             + '<div class="tralla-modal-body"><div class="tralla-detail-grid">'
             + '<div class="tralla-detail-main">' + body + '</div>'

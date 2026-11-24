@@ -5909,3 +5909,6 @@ details.tralla-release-backup[open] > small { margin-top: 8px; }
 .tralla-tech-body .tralla-user-dash-card dl { margin-bottom: 14px; }
 .tralla-tech-body .tralla-user-dash-prio > span { padding: 6px 4px; }
 .tralla-tech-body .tralla-user-dash-prio b { font-size: 15px; }
+
+/* Lateral da lista Pendente: botão de adicionar card */
+.tralla-pending-navigation .tralla-pending-add { margin: 0 0 10px; width: 100%; }
