@@ -5912,3 +5912,7 @@ details.tralla-release-backup[open] > small { margin-top: 8px; }
 
 /* Lateral da lista Pendente: botão de adicionar card */
 .tralla-pending-navigation .tralla-pending-add { margin: 0 0 10px; width: 100%; }
+
+/* Botão discreto de copiar o relatório */
+.tralla-copy-report { margin-left: 6px; opacity: .45; transition: opacity .15s; vertical-align: middle; }
+.tralla-copy-report:hover, .tralla-copy-report:focus-visible { opacity: 1; }

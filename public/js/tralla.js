@@ -1016,6 +1016,34 @@
         return 'Fazer manutenção técnica em ' + order.map(function (name) { return counts[name] + 'x ' + name; }).join(', ');
     }
 
+    /** Copia o texto do relatório (o que está na caixa, mesmo ainda não salvo). */
+    function copyCallReport(button) {
+        var section = button.closest('.tralla-call-report');
+        var field = section ? section.querySelector('#tralla-call-report') : null;
+        var text = field ? field.value : (section && section.querySelector('.tralla-detail-description')
+            ? section.querySelector('.tralla-detail-description').innerText : '');
+        text = String(text || '').trim();
+        if (!text || /^Ainda não há relatório\.?$/.test(text)) { toast('Não há relatório para copiar.', 'error'); return; }
+        function fallback() {
+            var area = document.createElement('textarea');
+            area.value = text;
+            area.setAttribute('readonly', '');
+            area.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+            document.body.appendChild(area);
+            area.select();
+            var ok = false;
+            try { ok = document.execCommand('copy'); } catch (error) { ok = false; }
+            area.remove();
+            return ok;
+        }
+        function done(ok) { toast(ok ? 'Relatório copiado.' : 'Não consegui copiar o relatório.', ok ? 'success' : 'error'); }
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(fallback()); });
+        } else {
+            done(fallback());
+        }
+    }
+
     function copyCrmText(card) {
         var text = crmTextFor(card);
         function fallback() {
@@ -3852,7 +3880,9 @@
             var callSource = card;
             var canEditCall = Number(card.stage) === 1 && !!permissions.edit_machines;
             body += '<section class="tralla-detail-section tralla-call-report">'
-                + '<h3><i class="ti ti-file-report"></i> Relatório do atendimento</h3>'
+                + '<h3><i class="ti ti-file-report"></i> Relatório do atendimento'
+                + '<button type="button" class="tralla-icon-btn tralla-copy-report" data-copy-call-report title="Copiar o relatório" aria-label="Copiar o relatório">'
+                + '<i class="ti ti-copy" aria-hidden="true"></i></button></h3>'
                 + (canEditCall
                     ? '<div class="tralla-field"><label for="tralla-call-report">Descreva o atendimento realizado</label>'
                         + '<textarea id="tralla-call-report" rows="7" maxlength="200000" placeholder="Registre o diagnóstico e a solução aplicada...">'
@@ -6788,6 +6818,13 @@
         var openCardButton = event.target.closest('[data-open-card]');
         if (openCardButton) {
             openCard(Number(openCardButton.dataset.openCard));
+            return;
+        }
+
+        var copyReportButton = event.target.closest('[data-copy-call-report]');
+        if (copyReportButton) {
+            event.preventDefault();
+            copyCallReport(copyReportButton);
             return;
         }
 
