@@ -4563,6 +4563,24 @@
                 return;
             }
 
+            if (action === 'delete' && activeCard && Number(activeCard.is_draft) === 1) {
+                // Rascunho: some direto (vai para Excluídos), sem aprovação e sem pedir motivo.
+                var draftOk = await confirmDialog({
+                    title: 'Apagar rascunho',
+                    message: 'Este rascunho será movido para Excluídos. Deseja continuar?',
+                    icon: 'ti-trash',
+                    tone: 'danger',
+                    confirmLabel: 'Apagar rascunho'
+                });
+                if (!draftOk) { return; }
+                setBusy(button, true);
+                var draftDeleted = await api('card_request_deletion', { id: cardId, reason: 'Rascunho apagado.' });
+                applyState(draftDeleted);
+                closeModal();
+                toast('Rascunho movido para Excluídos.', 'success');
+                return;
+            }
+
             if (action === 'delete') {
                 var reason = await promptDialog({
                     title: 'Excluir card',

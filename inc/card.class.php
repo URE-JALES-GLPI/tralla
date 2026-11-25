@@ -941,6 +941,13 @@ class PluginTrallaCard extends CommonDBTM
             'move'             => $isMember && in_array($boardType, ['normal', 'preventiva'], true) && $canUpdate,
         ];
 
+        if ($isDraft && $isAdmin && $boardType === 'maintenance' && $stage === 1
+            && empty($card['is_deleted']) && empty($card['is_archived'])
+            && !in_array($status, ['deletion_pending', 'deleted'], true)) {
+            // Rascunho (só SuperAdmin vê): pode ser apagado direto, sem aprovação.
+            $permissions['request_deletion'] = true;
+        }
+
         if ($isDraft) {
             // Rascunho: ninguém pega, atribui, separa, pausa ou pede liberação até publicar.
             foreach (['take', 'assign_technician', 'split', 'request_pause', 'request_call_release',
@@ -4747,7 +4754,7 @@ class PluginTrallaCard extends CommonDBTM
                 throw new RuntimeException('Sem permissão para excluir este card.');
             }
 
-            if (!in_array($freshBoardType, ['normal', 'preventiva'], true)) {
+            if (!in_array($freshBoardType, ['normal', 'preventiva'], true) && empty($fresh['is_draft'])) {
                 $approvalList = PluginTrallaBoard::findListByCategory(
                     (int) $fresh['plugin_tralla_boards_id'],
                     'maintenance_approval'
