@@ -1008,7 +1008,7 @@
     function crmTextFor(card) {
         var counts = {};
         var order = [];
-        (card.machines || []).forEach(function (machine) {
+        (Number(card.stage) === 2 && card.parent ? (card.parent.machines || []) : (card.machines || [])).forEach(function (machine) {
             var name = String(machine.model_name || '').trim() || 'Máquina';
             if (!counts[name]) { counts[name] = 0; order.push(name); }
             counts[name] += 1;
