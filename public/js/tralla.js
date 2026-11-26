@@ -2584,10 +2584,10 @@
         } else {
             machines.forEach(function (machine, index) {
                 var missing = [];
-                if (['done', 'not_repairable', 'warranty', 'pending'].indexOf(machine.status) < 0) {
-                    missing.push('Escolher o status (Pendente, Concluído, Inservível ou Garantia)');
+                if (['done', 'not_repairable', 'warranty', 'damaged', 'pending'].indexOf(machine.status) < 0) {
+                    missing.push('Escolher o status (Pendente, Concluído, Inservível, Garantia ou Danificado)');
                 } else if (card.workflow_type === 'call' && machine.status === 'pending') {
-                    missing.push('Escolher Concluído, Inservível ou Garantia; Chamados não aceitam Pendente');
+                    missing.push('Escolher Concluído, Inservível, Garantia ou Danificado; Chamados não aceitam Pendente');
                 }
                 if (!String(machine.report || '').trim()) { missing.push('Preencher o relatório técnico'); }
                 if (!Number(machine.service_done)) { missing.push('Marcar Serviço realizado'); }
@@ -2596,9 +2596,9 @@
                 }
             });
             if (!machines.some(function (machine) {
-                return machine.status === 'done' || machine.status === 'not_repairable' || machine.status === 'warranty';
+                return machine.status === 'done' || machine.status === 'not_repairable' || machine.status === 'warranty' || machine.status === 'damaged';
             })) {
-                requirements.general.push('Deixe ao menos uma máquina com status Concluído, Inservível ou Garantia.');
+                requirements.general.push('Deixe ao menos uma máquina com status Concluído, Inservível, Garantia ou Danificado.');
             }
         }
         if (!(card.permissions || {}).edit_machines && (requirements.general.length || requirements.machines.length)) {
@@ -2813,7 +2813,7 @@
             + '</div></section>';
     }
 
-    var serviceDoneStatuses = { pending: true, done: true, not_repairable: true, warranty: true };
+    var serviceDoneStatuses = { pending: true, done: true, not_repairable: true, warranty: true, damaged: true };
 
     function serviceDoneAllowed(status) {
         return !!serviceDoneStatuses[String(status || 'in_progress')];
@@ -2856,7 +2856,7 @@
         var filled = machines.filter(function (machine) {
             var report = String(machine.report || '').trim();
             return machine.is_filled
-                || (report !== '' && !!machine.service_done && (machine.status === 'done' || machine.status === 'not_repairable' || machine.status === 'warranty' || machine.status === 'pending'));
+                || (report !== '' && !!machine.service_done && (machine.status === 'done' || machine.status === 'not_repairable' || machine.status === 'warranty' || machine.status === 'damaged' || machine.status === 'pending'));
         }).length;
         return {
             total: total,
@@ -5456,7 +5456,7 @@
                     });
                 }
                 local.is_filled = String(local.report || '').trim() !== ''
-                    && !!local.service_done && (local.status === 'done' || local.status === 'not_repairable' || local.status === 'warranty' || local.status === 'pending');
+                    && !!local.service_done && (local.status === 'done' || local.status === 'not_repairable' || local.status === 'warranty' || local.status === 'damaged' || local.status === 'pending');
             }
             var pill = machineEl.querySelector('.tralla-pill');
             if (pill) {

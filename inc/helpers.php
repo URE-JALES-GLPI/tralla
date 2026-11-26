@@ -148,6 +148,7 @@ if (!function_exists('tralla_machine_status_labels')) {
             'done'             => 'Concluído',
             'not_repairable'   => 'Inservível',
             'warranty'         => 'Garantia',
+            'damaged'          => 'Danificado',
         ];
     }
 }
@@ -164,7 +165,7 @@ if (!function_exists('tralla_machine_status_label')) {
 if (!function_exists('tralla_machine_service_done_allowed')) {
     function tralla_machine_service_done_allowed(string $status): bool
     {
-        return in_array($status, ['pending', 'done', 'not_repairable', 'warranty'], true);
+        return in_array($status, ['pending', 'done', 'not_repairable', 'warranty', 'damaged'], true);
     }
 }
 
@@ -177,6 +178,7 @@ if (!function_exists('tralla_machine_status_choices')) {
             'done'           => 'Concluído',
             'not_repairable' => 'Inservível',
             'warranty'       => 'Garantia',
+            'damaged'        => 'Danificado',
         ];
     }
 }
@@ -428,7 +430,7 @@ if (!function_exists('tralla_machine_is_filled')) {
         $status = (string) ($machine['status'] ?? '');
         $serviceDone = !empty($machine['service_done']);
 
-        return $report !== '' && $serviceDone && in_array($status, ['done', 'not_repairable', 'warranty', 'pending'], true);
+        return $report !== '' && $serviceDone && in_array($status, ['done', 'not_repairable', 'warranty', 'damaged', 'pending'], true);
     }
 }
 

@@ -449,6 +449,7 @@ class PluginTrallaAsset
         'done'           => 'Concluído',
         'not_repairable' => 'Inservível',
         'warranty'       => 'Garantia',
+        'damaged'        => 'Danificado',
     ];
 
     /** Id do status do GLPI com esse nome; cria se ainda não existir. */

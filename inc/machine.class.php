@@ -188,7 +188,7 @@ class PluginTrallaMachine extends CommonDBTM
             $allowed['inventory_items_id'] = max(0, (int) $data['inventory_items_id']);
         }
 
-        // "Serviço realizado" só vale para Pendente, Concluído ou Inservível.
+        // "Serviço realizado" só vale para Pendente, Concluído, Inservível, Garantia ou Danificado.
         if (array_key_exists('status', $allowed) || array_key_exists('service_done', $allowed)) {
             $finalStatus = $allowed['status'] ?? null;
             if ($finalStatus === null) {

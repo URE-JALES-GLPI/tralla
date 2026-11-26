@@ -117,6 +117,9 @@ $partition = tralla_finalization_partition([
 ]);
 check('finalization keeps completed and unserviceable machines', $partition['ready'] === [11, 13]);
 check('finalization groups all pending machines', $partition['pending'] === [12, 14]);
+check('damaged machine counts as finished', tralla_finalization_partition([
+    ['id' => 16, 'status' => 'damaged'],
+])['ready'] === [16]);
 check('all pending machines cannot finalize', tralla_finalization_partition([
     ['id' => 15, 'status' => 'pending'],
 ])['ready'] === []);

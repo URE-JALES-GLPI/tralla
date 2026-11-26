@@ -396,7 +396,7 @@ function plugin_tralla_install(): bool
                 `label`                         VARCHAR(255) NOT NULL DEFAULT '',
                 `serial`                        VARCHAR(255) NOT NULL DEFAULT '',
                 `report`                        LONGTEXT     DEFAULT NULL,
-                `status`                        VARCHAR(30)  NOT NULL DEFAULT '' COMMENT 'pending,in_progress,done,not_repairable',
+                `status`                        VARCHAR(30)  NOT NULL DEFAULT '' COMMENT 'pending,in_progress,done,not_repairable,warranty,damaged',
                 `service_done`                  TINYINT(1)   NOT NULL DEFAULT '0',
                 `needs_inventory`               TINYINT(1)   NOT NULL DEFAULT '0',
                 `needs_backup`                  TINYINT(1)   NOT NULL DEFAULT '0',

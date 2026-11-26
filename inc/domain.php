@@ -13,7 +13,7 @@ if (!function_exists('tralla_finalization_partition')) {
             $status = (string) ($machine['status'] ?? '');
             if ($status === 'pending') {
                 $pending[] = $id;
-            } elseif (in_array($status, ['done', 'not_repairable', 'warranty'], true)) {
+            } elseif (in_array($status, ['done', 'not_repairable', 'warranty', 'damaged'], true)) {
                 $ready[] = $id;
             }
         }

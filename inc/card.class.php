@@ -2911,10 +2911,10 @@ class PluginTrallaCard extends CommonDBTM
             }
             $partition = $callWithoutMachines ? ['ready' => [], 'pending' => []] : tralla_finalization_partition($machines);
             if (!$callWithoutMachines && $partition['ready'] === []) {
-                throw new RuntimeException('Conclua ou marque como Inservível ao menos uma máquina antes de finalizar.');
+                throw new RuntimeException('Conclua ou marque como Inservível, Garantia ou Danificado ao menos uma máquina antes de finalizar.');
             }
             if ($isCall && $partition['pending'] !== []) {
-                throw new RuntimeException('Conclua ou marque como Inservível todas as máquinas do chamado antes de finalizar.');
+                throw new RuntimeException('Conclua ou marque como Inservível, Garantia ou Danificado todas as máquinas do chamado antes de finalizar.');
             }
 
             // Finalizar não passa por aprovação: Manutenção segue para Retirada e Chamado vai direto para Concluído.
