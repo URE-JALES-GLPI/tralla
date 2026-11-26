@@ -2980,10 +2980,12 @@ class PluginTrallaCard extends CommonDBTM
                 ], ['id' => $pendingCardId]);
                 tralla_code_cache(true);
                 // Card novo, numeração nova: as máquinas recomeçam em #1.
+                // Relatório e ativo seguem junto; "Serviço realizado" volta desmarcado para o novo atendimento.
                 foreach (array_values($partition['pending']) as $position => $machineId) {
                     $DB->update('glpi_plugin_tralla_machines', [
                         'plugin_tralla_cards_id' => $pendingCardId,
                         'machine_number'         => $position + 1,
+                        'service_done'           => 0,
                         'date_mod'               => $now,
                     ], ['id' => $machineId]);
                 }
