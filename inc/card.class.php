@@ -143,6 +143,9 @@ class PluginTrallaCard extends CommonDBTM
             $machinesByCard[(int) $machine['plugin_tralla_cards_id']][] = $machine;
         }
 
+        // Serial, patrimônio e IMEI dos ativos vinculados entram na busca do quadro.
+        $assetSearchText = PluginTrallaAsset::searchTextForMachines(array_merge([], ...array_values($machinesByCard)));
+
         $modelIds = [];
         foreach ($machinesByCard as $cardMachines) {
             foreach ($cardMachines as $machine) {
@@ -219,7 +222,10 @@ class PluginTrallaCard extends CommonDBTM
             $card['board_type'] = $boardType;
             $codeOwner = (int) $card['stage'] === 2 ? (int) $card['parent_cards_id'] : (int) $card['id'];
             $card['pause_codes'] = $codesByCard[$codeOwner] ?? ['crm_code' => '', 'external_ticket_code' => ''];
-            $card['search_codes'] = implode(' ', array_filter($card['pause_codes']));
+            $card['search_codes'] = implode(' ', array_filter(array_merge(
+                array_values($card['pause_codes']),
+                array_map(static fn (array $m): string => $assetSearchText[(int) $m['id']] ?? '', $machines)
+            )));
             $card['code'] = tralla_display_code($card, $boardType);
             $card['approval_kind_label'] = '';
             $card['pending_approval_kind'] = '';

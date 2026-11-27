@@ -267,6 +267,77 @@ class PluginTrallaAsset
         return $out;
     }
 
+    /**
+     * Texto de busca dos ativos vinculados (nome, serial, patrimônio e campos personalizados como IMEI),
+     * por id da máquina. Uma consulta por tipo de tabela, para o quadro inteiro de uma vez.
+     *
+     * @param array<int, array> $machines linhas de glpi_plugin_tralla_machines
+     * @return array<int, string>
+     */
+    public static function searchTextForMachines(array $machines): array
+    {
+        global $DB;
+        $computerIds = [];
+        $assetIds = [];
+        foreach ($machines as $machine) {
+            $itemsId = (int) ($machine['inventory_items_id'] ?? 0);
+            $itemtype = (string) ($machine['asset_itemtype'] ?? '');
+            if ($itemsId <= 0 || $itemtype === '') {
+                continue;
+            }
+            if ($itemtype === 'Computer') {
+                $computerIds[$itemsId] = $itemsId;
+            } else {
+                $assetIds[$itemsId] = $itemsId;
+            }
+        }
+        $texts = ['Computer' => [], 'asset' => []];
+        try {
+            if ($computerIds !== [] && $DB->tableExists('glpi_computers')) {
+                foreach ($DB->request([
+                    'SELECT' => ['id', 'name', 'serial', 'otherserial'],
+                    'FROM'   => 'glpi_computers',
+                    'WHERE'  => ['id' => array_values($computerIds)],
+                ]) as $row) {
+                    $texts['Computer'][(int) $row['id']] = trim($row['name'] . ' ' . $row['serial'] . ' ' . $row['otherserial']);
+                }
+            }
+            if ($assetIds !== [] && $DB->tableExists('glpi_assets_assets')) {
+                $hasCustom = $DB->fieldExists('glpi_assets_assets', 'custom_fields');
+                foreach ($DB->request([
+                    'SELECT' => array_merge(['id', 'name', 'serial', 'otherserial'], $hasCustom ? ['custom_fields'] : []),
+                    'FROM'   => 'glpi_assets_assets',
+                    'WHERE'  => ['id' => array_values($assetIds)],
+                ]) as $row) {
+                    $parts = [(string) $row['name'], (string) $row['serial'], (string) $row['otherserial']];
+                    $custom = $hasCustom && !empty($row['custom_fields']) ? json_decode((string) $row['custom_fields'], true) : null;
+                    if (is_array($custom)) {
+                        foreach ($custom as $value) {
+                            if (is_scalar($value) && trim((string) $value) !== '') {
+                                $parts[] = (string) $value;
+                            }
+                        }
+                    }
+                    $texts['asset'][(int) $row['id']] = trim(implode(' ', $parts));
+                }
+            }
+        } catch (Throwable $e) {
+            error_log('[Tralla] busca por ativo: ' . $e->getMessage());
+        }
+
+        $out = [];
+        foreach ($machines as $machine) {
+            $itemsId = (int) ($machine['inventory_items_id'] ?? 0);
+            $itemtype = (string) ($machine['asset_itemtype'] ?? '');
+            $text = $texts[$itemtype === 'Computer' ? 'Computer' : 'asset'][$itemsId] ?? '';
+            $serial = trim((string) ($machine['serial'] ?? ''));
+            if ($text !== '' || $serial !== '') {
+                $out[(int) $machine['id']] = trim($serial . ' ' . $text);
+            }
+        }
+        return $out;
+    }
+
     /** Dados de exibição de um ativo vinculado (ou null se não existe mais). */
     public static function describe(string $itemtype, int $itemsId): ?array
     {
